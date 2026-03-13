@@ -70,13 +70,22 @@ end
 function calculate_economy(shared_data::Vector{EconomyEmissionData},
                            sim_params::Dict{String,Any},
                            economy_parameter::AbstractDict{String,Any})
+    # set initials
     result = EconomyResult()
-
-    # get period sto cover the whole economy observation_period_in_years
-    simulation_period = sim_params["end_date"] - sim_params["start_date_output"]
     observation_period_in_years_economy = Year(economy_parameter["observation_period_in_years"])
-    observation_period_in_years_emissions = Year(emissions_parameter["observation_period_in_years"])
 
+    # get time stamp of extended simulation results
+    economy_end_date = sim_params["start_date_output"] + observation_period_in_years_economy
+    number_of_timesteps = Int(Dates.value(Second(sub_ignoring_leap_days(economy_end_date,
+                                                                        sim_params["start_date_output"]))) /
+                              sim_params["time_step_seconds"])
+    simulation_result_timestamp = Vector{DateTime}(undef, number_of_timesteps)
+    for idx in 1:number_of_timesteps
+        simulation_result_timestamp[idx] = add_ignoring_leap_days(sim_params["start_date_output"],
+                                                                  Second((idx - 1) * sim_params["time_step_seconds"]))
+    end
+
+    # iterate over all components in the current energy system
     for item in shared_data
         component = item.component
         sf = component.sys_function
@@ -84,42 +93,37 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
         if sf === EnergySystems.sf_bus
             continue
         end
-        if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source]
-            # get respective energy output profile and unmet supply
-            energy_output = extend_energy_profile(item.energy_out, observation_period_in_years_economy,
-                                                  simulation_period)
-            energy_supply = extend_energy_profile(item.energy_supply, observation_period_in_years_economy,
-                                                  simulation_period)
-            energy_supply_unmet = energy_supply .- energy_output
+        if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source,
+                  EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
+            if sf === EnergySystems.sf_fixed_source
+                energy = extend_profile(.-item.energy_out, observation_period_in_years_economy, sim_params) # source output
+                energy_supply = extend_profile(.-item.energy_supply, observation_period_in_years_economy, sim_params) # source supply
+                energy_unmet = energy_supply .- energy # unmet supply of source
+            elseif sf === EnergySystems.sf_flexible_source
+                energy = extend_profile(.-item.energy_out, observation_period_in_years_economy, sim_params) #  source output
+                energy_unmet = nothing # unmet supply of source
+            elseif sf === EnergySystems.sf_flexible_sink
+                energy = extend_profile(item.energy_in, observation_period_in_years_economy, sim_params) # sink input
+                energy_demand = extend_profile(item.energy_demand, observation_period_in_years_economy, sim_params) # sink demand
+                energy_unmet = energy_demand .- energy # unmet demand of sink
+            elseif sf === EnergySystems.sf_fixed_sink
+                energy = extend_profile(item.energy_in, observation_period_in_years_economy, sim_params) # sink input
+                energy_unmet = nothing  # unmet demand of sink
+            end
+
+            # Note: (unmet) energies from sources are negative, (unmet) energies into sinks are positive at this point
 
             # calculate economy using correct price(profile)
-            price_profile = -component.price_profile #TODO  taken supplies are negative
-            price_profile = extend_price_profile(price_profile, observation_period_in_years_economy, simulation_period)
+            price_profile_energy = component.price_profile_energy  # TODO 
+            price_profile_energy = extend_profile(price_profile_energy, observation_period_in_years_economy, sim_params)
+
+            # price for unmet energy
+            price_unmet = 0 # TODO
 
             # calculate annuity for opex
-            result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy_output, price_profile,
+            result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy, price_profile_energy,
                                                                                       sim_params, annuity_energies,
-                                                                                      breakdown_economy)
-
-            # TODO price for non-delivered energy from source
-
-        elseif sf in [EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
-            # get respective energy input profile and unmet demand
-            energy_input = extend_energy_profile(item.energy_in, observation_period_in_years_economy, simulation_period)
-            energy_demand = extend_energy_profile(item.energy_demand, observation_period_in_years_economy,
-                                                  simulation_period)
-            energy_demand_unmet = energy_demand .- energy_input
-
-            # calculate economy using correct price(profile)
-            price_profile = component.price_profile #TODO delivered demand are positive
-            price_profile = extend_price_profile(price_profile, observation_period_in_years_economy, simulation_period)
-
-            # calculate annuity for opex
-            result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy_input, price_profile,
-                                                                                      sim_params, annuity_energies,
-                                                                                      breakdown_economy)
-
-            # TODO price for non-delivered energy to sink
+                                                                                      breakdown)
 
         elseif sf in [EnergySystems.sf_storage, EnergySystems.sf_transformer]
             # start and end energy of storage?! TODO
@@ -134,6 +138,23 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
         end
     end
     return result
+end
+
+function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years_economy::DateTime,
+                        sim_params::Dict{String,Any})
+    if profile === nothing
+        return nothing
+    end
+    # currently only a very simple algorithm is used. The profile is taken as it is and it is repeated until the 
+    # observation_period_in_years_economy is reached. If the profile does not cover a whole year, this is may not
+    # the best way to extend the profile...
+    # Add: Repeat only last year/month TODO
+    economy_end_date = sim_params["start_date_output"] + observation_period_in_years_economy
+    nr_to_repeat = Int(ceil((economy_end_date - sim_params["end_date"]) /
+                            (sim_params["end_date"] - sim_params["start_date_output"])))
+    profile_extended = repeat(profile, nr_to_repeat + 1)
+
+    return profile_extended
 end
 
 function add_to_breakdown!(breakdown::Dict{String,Any}, uac::String, dict_to_add::Dict{String,Any})
@@ -221,8 +242,6 @@ function calculate_emissions(shared_data::Vector{EconomyEmissionData},
     result = EmissionsResult()
 
     # get period sto cover the whole economy observation_period_in_years
-    simulation_period = sim_params["end_date"] - sim_params["start_date_output"]
-    observation_period_in_years_economy = Years(economy_parameter["observation_period_in_years"])
     observation_period_in_years_emissions = Years(emissions_parameter["observation_period_in_years"])
 
     for item in shared_data
@@ -233,12 +252,11 @@ function calculate_emissions(shared_data::Vector{EconomyEmissionData},
             continue
         end
         if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source]
-            energy_output = extend_energy_profile(item.energy_out, observation_period_in_years_economy,
-                                                  simulation_period)
+            energy_output = extend_profile(item.energy_out, observation_period_in_years_emissions, sim_params)
             # emission calculation here
 
         elseif sf in [EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
-            energy_input = extend_energy_profile(item.energy_in, observation_period_in_years_economy, simulation_period)
+            energy_input = extend_profile(item.energy_in, observation_period_in_years_emissions, sim_params)
             # emission calculation here
 
         elseif sf in [EnergySystems.sf_storage, EnergySystems.sf_transformer]
