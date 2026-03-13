@@ -184,7 +184,7 @@ end
 function test_required_with_conditional()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "FlexibleSupply",
+            "type" => "GridInput",
             "output_refs" => ["TST_BUS_01"],
             "medium" => "m_e_ac_230v",
         ),
