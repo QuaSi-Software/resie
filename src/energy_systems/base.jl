@@ -1681,6 +1681,30 @@ function extract_control_parameters(x::Type{Component}, config::Dict{String,Any}
 end
 
 """
+    check_validation_at_least_one(validation::Tuple, extracted::Dict{String,Any}, uac::String, is_active::Bool)
+
+Checks the primary validation operand "at_least_one".
+
+# Args
+- `validation::Tuple`: The validation to check, from the parameter SSOT definition
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `is_active::Bool`: If the parameter is active in the sense that its conditionals all apply
+"""
+function check_validation_at_least_one(validation::Tuple, extracted::Dict{String,Any}, uac::String, is_active::Bool)
+    if !is_active
+        # don't check inactive parameters
+        return
+    end
+
+    names = validation[2:end]
+    if sum([haskey(extracted, u) && !isnothing(extracted[u]) ? 1 : 0 for u in names]) < 1
+        throw(InputError("At least one of the following parameters of components `$uac` must not be nothing: " *
+                         join(names, " ")))
+    end
+end
+
+"""
     check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
 
 Checks the given parameter for the given validation. Throws InputError if the validation
@@ -1692,18 +1716,16 @@ fails or is misconfigured.
 - `value::Any`: The value of the parameter to validate
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
 - `uac::String`: The UAC of the component, mostly used in error messages
+- `is_active::Bool`: If the parameter is active in the sense that its conditionals all apply
 """
-function check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
-    # currently most validations take primary operand "self", only one works differently
+function check_validation(validation::Tuple, name::String, value::Any,
+                          extracted::Dict{String,Any}, uac::String, is_active::Bool)
     if validation[1] == "at_least_one"
-        names = validation[2:end]
-        if sum([haskey(extracted, u) && !isnothing(extracted[u]) ? 1 : 0 for u in names]) < 1
-            throw(InputError("At least one of the following parameters of components `$uac` must not be nothing: " *
-                             join(names, " ")))
-        end
+        check_validation_at_least_one(validation, extracted, uac, is_active)
         return
     elseif validation[1] != "self"
-        throw(InputError("Unknown validation operand `$(validation[1])` for component `$uac`"))
+        # the remaining code checks for primary operand "self"
+        throw(InputError("Unknown primary validation operand `$(validation[1])` for component `$uac`"))
     end
 
     # most current operators expect a not-nothing value, so we can catch it here
@@ -1873,7 +1895,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         # check for other field-specific validations
         if name in keys(type_def) && isdefined(type_def[name], :validations)
             for validation in type_def[name].validations
-                check_validation(validation, name, value, extracted, uac)
+                check_validation(validation, name, value, extracted, uac, conditionals_apply(name, extracted, type_def))
             end
         end
     end
