@@ -493,6 +493,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
         "A_total_incentive" => A_total_incentive,
+        "CO2_yearly" => CO2_yearly["CO2_yearly"],
         "CO2_yearly_heat" => CO2_yearly["CO2_yearly_heat"],
         "CO2_yearly_power" => CO2_yearly["CO2_yearly_power"]
     )
