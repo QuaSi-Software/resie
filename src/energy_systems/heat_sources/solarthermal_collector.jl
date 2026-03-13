@@ -530,6 +530,7 @@ mutable struct SolarthermalCollector <: Component
     temperature_energy_pairs::Dict{Temperature,Tuple}
     # uacs for which energy was calculated
     calc_uacs::Array{Stringing}
+    # mean of ambient temperature over the whole simulation time; used for irradiance calculations
     mean_ambient_temperature::Float64
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
