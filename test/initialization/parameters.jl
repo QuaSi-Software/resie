@@ -39,6 +39,50 @@ end
     test_mutex_parameters()
 end
 
+function test_at_least_one_parameter()
+    components_config = Dict{String,Any}(
+        "TST_SRC_01" => Dict{String,Any}(
+            "type" => "GenericHeatSource",
+            "output_refs" => ["TST_DEM_01"],
+            "medium" => "m_h_w_lt1",
+            "constant_power" => 500.0,
+        ),
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "output_refs" => [],
+            "medium" => "m_h_w_lt1",
+            "constant_demand" => 500.0,
+        ),
+    )
+    simulation_params = get_default_sim_params()
+
+    # first try should error because no parameter is defined
+    construction_errored = false
+    msg = ""
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+        msg = sprint(showerror, e)
+    end
+    @assert construction_errored
+    @assert occursin("Can't construct component TST_SRC_01", msg)
+
+    # second try should succeed because we added one of the parameters
+    components_config["TST_SRC_01"]["constant_temperature"] = 50.0
+    construction_errored = false
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+    end
+    @assert !construction_errored
+end
+
+@testset "at_least_one_parameter" begin
+    test_at_least_one_parameter()
+end
+
 function test_parameter_with_options()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
