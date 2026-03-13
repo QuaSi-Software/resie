@@ -404,6 +404,7 @@ function co2_yearly(sim::Dict)
                         sum(PV_power .* co2_intensity_PV)) .* 1e-6
 
     return OrderedDict(
+        "CO2_yearly" => yearly_co2_heat + yearly_co2_power,
         "CO2_yearly_heat" => yearly_co2_heat,
         "CO2_yearly_power" => yearly_co2_power
     )
@@ -424,11 +425,13 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     sim_new["Photovoltaic_IN_Heat"] = sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+
                                       sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"]
     sim_new["Photovoltaic_IN_Power"] = sim["m_power EnergyFlow Photovoltaic->Demand_Power"] .+
-                                       sim["m_power EnergyFlow Photovoltaic->Battery"]
+                                       sim["m_power EnergyFlow Photovoltaic->Battery"] .+
+                                       sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
     sim_new["Wind_IN_Heat"] = sim["m_power EnergyFlow WindFarm->HeatPump"] .+
                               sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
     sim_new["Wind_IN_Power"] = sim["m_power EnergyFlow WindFarm->Demand_Power"] .+
-                               sim["m_power EnergyFlow WindFarm->Battery"]
+                               sim["m_power EnergyFlow WindFarm->Battery"] .+
+                               sim["m_power EnergyFlow WindFarm->Grid_OUT"]
     sim_new["Power_Demand_P2H"] = sim_new["Grid_IN_Heat"] .+
                                   sim_new["Photovoltaic_IN_Heat"] .+
                                   sim_new["Wind_IN_Heat"]
