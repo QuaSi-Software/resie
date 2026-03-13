@@ -17,6 +17,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
             ("temperature_from_global_file", "mutex"),
             ("constant_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -31,6 +35,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
             ("temperature_profile_file_path", "mutex"),
             ("constant_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -44,6 +52,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
             ("temperature_profile_file_path", "mutex"),
             ("temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -55,6 +67,9 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         required=false,
         conditionals=[
             ("constant_power", "mutex"),
+        ],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
         ],
         type=String,
         json_type="string",
@@ -68,7 +83,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         conditionals=[
             ("max_power_profile_file_path", "mutex"),
         ],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power"),
+            ("self", "value_gte_num_or_nothing", 0.0)
+        ],
         type=Float64,
         json_type="number",
         unit="W"

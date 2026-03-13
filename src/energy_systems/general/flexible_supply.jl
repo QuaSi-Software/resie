@@ -54,6 +54,9 @@ const FLEXIBLE_SUPPLY_PARAMETERS = Dict(
         display_name="Max. power profile file",
         required=false,
         conditionals=[("constant_power", "mutex")],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -64,7 +67,10 @@ const FLEXIBLE_SUPPLY_PARAMETERS = Dict(
         display_name="Constant max. power",
         required=false,
         conditionals=[("max_power_profile_file_path", "mutex")],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
+        ],
         type=Float64,
         json_type="number",
         unit="W"

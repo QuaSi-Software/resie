@@ -268,6 +268,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
             ("ambient_temperature_from_global_file", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -281,6 +285,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -293,6 +301,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         conditionals=[
             ("ambient_temperature_profile_file_path", "mutex"),
             ("ambient_temperature_from_global_file", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
         ],
         type=Float64,
         json_type="number",
@@ -324,7 +336,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "of the storage at the ground surface",
         display_name="Ground domain radius factor",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("at_least_one", "ground_domain_radius_factor", "ground_domain_radius")
+        ],
         conditionals=[
             ("ground_domain_radius", "mutex"),
             ("ground_model", "is", "FVM")
@@ -339,7 +354,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "STES geometry.",
         display_name="Ground domain radius",
         required=false,
-        validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+            ("at_least_one", "ground_domain_radius_factor", "ground_domain_radius")
+        ],
         conditionals=[
             ("ground_domain_radius_factor", "mutex"),
             ("ground_model", "is", "FVM")
@@ -354,7 +372,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "height of the storage",
         display_name="Ground domain depth factor",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("at_least_one", "ground_domain_depth_factor", "ground_domain_depth")
+        ],
         conditionals=[
             ("ground_domain_depth", "mutex"),
             ("ground_model", "is", "FVM")
@@ -369,7 +390,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "the STES geometry.",
         display_name="Ground domain depth",
         required=false,
-        validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+            ("at_least_one", "ground_domain_depth_factor", "ground_domain_depth")
+        ],
         conditionals=[
             ("ground_domain_depth_factor", "mutex"),
             ("ground_model", "is", "FVM")

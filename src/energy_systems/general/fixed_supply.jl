@@ -54,6 +54,9 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         display_name="Energy profile file",
         required=false,
         conditionals=[("constant_supply", "mutex")],
+        validations=[
+            ("at_least_one", "energy_profile_file_path", "constant_supply")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -64,7 +67,10 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         display_name="Constant supply",
         required=false,
         conditionals=[("energy_profile_file_path", "mutex")],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "energy_profile_file_path", "constant_supply")
+        ],
         type=Float64,
         json_type="number",
         unit="W"

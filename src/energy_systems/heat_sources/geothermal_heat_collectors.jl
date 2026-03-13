@@ -56,6 +56,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_from_global_file", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -71,6 +75,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -84,6 +92,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("ambient_temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -96,6 +108,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("global_solar_radiation_from_global_file", "mutex"),
             ("constant_global_solar_radiation", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "global_solar_radiation_profile_file_path",
+             "global_solar_radiation_from_global_file", "constant_global_solar_radiation")
         ],
         type=String,
         json_type="string",
@@ -111,6 +127,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("global_solar_radiation_profile_file_path", "mutex"),
             ("constant_global_solar_radiation", "mutex")
         ],
+        validations=[
+            ("at_least_one", "global_solar_radiation_profile_file_path",
+             "global_solar_radiation_from_global_file", "constant_global_solar_radiation")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -124,6 +144,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("global_solar_radiation_profile_file_path", "mutex"),
             ("global_solar_radiation_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "global_solar_radiation_profile_file_path",
+             "global_solar_radiation_from_global_file", "constant_global_solar_radiation")
+        ],
         type=Float64,
         json_type="number",
         unit="Wh/m^2"
@@ -136,6 +160,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("infrared_sky_radiation_from_global_file", "mutex"),
             ("constant_infrared_sky_radiation", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
         ],
         type=String,
         json_type="string",
@@ -151,6 +179,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
             ("infrared_sky_radiation_profile_file_path", "mutex"),
             ("constant_infrared_sky_radiation", "mutex")
         ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -163,6 +195,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("infrared_sky_radiation_profile_file_path", "mutex"),
             ("infrared_sky_radiation_from_global_file", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
         ],
         type=Float64,
         json_type="number",

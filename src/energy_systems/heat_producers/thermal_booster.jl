@@ -117,6 +117,9 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         conditionals=[
             ("constant_demand_input_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "demand_input_temperature_profile_file_path", "constant_demand_input_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -129,7 +132,10 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         conditionals=[
             ("demand_input_temperature_profile_file_path", "mutex")
         ],
-        validations=[("self", "value_gte_num", 0.0)],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("at_least_one", "demand_input_temperature_profile_file_path", "constant_demand_input_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"

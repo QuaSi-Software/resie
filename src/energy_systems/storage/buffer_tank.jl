@@ -38,6 +38,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
             ("ambient_temperature_from_global_file", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -53,6 +57,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -67,6 +75,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("ambient_temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -77,7 +89,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
         display_name="Capacity (energy)",
         required=false,
         conditionals=[("volume", "mutex")],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "capacity", "volume")
+        ],
         type=Float64,
         json_type="number",
         unit="Wh"
@@ -88,7 +103,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
         display_name="Capacity (volume)",
         required=false,
         conditionals=[("capacity", "mutex")],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "capacity", "volume")
+        ],
         type=Float64,
         json_type="number",
         unit="m^3"

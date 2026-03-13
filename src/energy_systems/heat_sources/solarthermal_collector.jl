@@ -28,6 +28,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_from_global_file", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -42,6 +46,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -55,6 +63,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("ambient_temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=Temperature,
         json_type="number",
         unit="°C"
@@ -67,6 +79,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("beam_solar_radiation_from_global_file", "mutex"),
             ("constant_beam_solar_radiation", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "beam_solar_radiation_profile_file_path",
+             "beam_solar_radiation_from_global_file", "constant_beam_solar_radiation")
         ],
         type=String,
         json_type="string",
@@ -82,6 +98,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("beam_solar_radiation_profile_file_path", "mutex"),
             ("constant_beam_solar_radiation", "mutex")
         ],
+        validations=[
+            ("at_least_one", "beam_solar_radiation_profile_file_path",
+             "beam_solar_radiation_from_global_file", "constant_beam_solar_radiation")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -95,6 +115,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("beam_solar_radiation_profile_file_path", "mutex"),
             ("beam_solar_radiation_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "beam_solar_radiation_profile_file_path",
+             "beam_solar_radiation_from_global_file", "constant_beam_solar_radiation")
+        ],
         type=Float64,
         json_type="number",
         unit="W/m^2"
@@ -107,6 +131,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("diffuse_solar_radiation_from_global_file", "mutex"),
             ("constant_diffuse_solar_radiation", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "diffuse_solar_radiation_profile_file_path",
+             "diffuse_solar_radiation_from_global_file", "constant_diffuse_solar_radiation")
         ],
         type=String,
         json_type="string",
@@ -122,6 +150,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("diffuse_solar_radiation_profile_file_path", "mutex"),
             ("constant_diffuse_solar_radiation", "mutex")
         ],
+        validations=[
+            ("at_least_one", "diffuse_solar_radiation_profile_file_path",
+             "diffuse_solar_radiation_from_global_file", "constant_diffuse_solar_radiation")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -135,6 +167,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("diffuse_solar_radiation_profile_file_path", "mutex"),
             ("diffuse_solar_radiation_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "diffuse_solar_radiation_profile_file_path",
+             "diffuse_solar_radiation_from_global_file", "constant_diffuse_solar_radiation")
+        ],
         type=Float64,
         json_type="number",
         unit="W/m^2"
@@ -147,6 +183,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("infrared_sky_radiation_from_global_file", "mutex"),
             ("constant_infrared_sky_radiation", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
         ],
         type=String,
         json_type="string",
@@ -162,6 +202,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("infrared_sky_radiation_profile_file_path", "mutex"),
             ("constant_infrared_sky_radiation", "mutex")
         ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -175,6 +219,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("infrared_sky_radiation_profile_file_path", "mutex"),
             ("infrared_sky_radiation_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "infrared_sky_radiation_profile_file_path",
+             "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation")
+        ],
         type=Float64,
         json_type="number",
         unit="W/m²"
@@ -187,6 +235,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("wind_speed_from_global_file", "mutex"),
             ("constant_wind_speed", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "wind_speed_profile_file_path",
+             "wind_speed_from_global_file", "constant_wind_speed")
         ],
         type=String,
         json_type="string",
@@ -202,6 +254,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
             ("wind_speed_profile_file_path", "mutex"),
             ("constant_wind_speed", "mutex")
         ],
+        validations=[
+            ("at_least_one", "wind_speed_profile_file_path",
+             "wind_speed_from_global_file", "constant_wind_speed")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -214,6 +270,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         conditionals=[
             ("wind_speed_profile_file_path", "mutex"),
             ("wind_speed_from_global_file", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "wind_speed_profile_file_path",
+             "wind_speed_from_global_file", "constant_wind_speed")
         ],
         type=Float64,
         json_type="number",
@@ -343,6 +403,9 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         display_name="Temperature difference",
         required=false,
         conditionals=[("spec_flow_rate", "mutex")],
+        validations=[
+            ("at_least_one", "delta_T", "spec_flow_rate")
+        ],
         type=Float64,
         json_type="number",
         unit="K"
@@ -354,6 +417,9 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         display_name="Specific flow rate",
         required=false,
         conditionals=[("delta_T", "mutex")],
+        validations=[
+            ("at_least_one", "delta_T", "spec_flow_rate")
+        ],
         type=Float64,
         json_type="number",
         unit="m^3/s*m^2"
