@@ -240,7 +240,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "pipe_laying_depth" => (
         default=1.5,
@@ -337,7 +337,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "soil_specific_heat_capacity_frozen" => (
         default=900,
@@ -349,7 +349,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "soil_heat_conductivity" => (
         default=1.5,
@@ -361,7 +361,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "soil_heat_conductivity_frozen" => (
         default=2.0,
@@ -373,7 +373,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "soil_specific_enthalpy_of_fusion" => (
         default=90000,
@@ -416,7 +416,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "surface_reflection_factor" => (
         default=0.25,
@@ -453,7 +453,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "fluid_density" => (
         default=1045,
@@ -497,7 +497,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "use_dynamic_fluid_properties" => (
         default=false,

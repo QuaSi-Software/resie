@@ -95,7 +95,7 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "terminal_dT" => (
         default=2.0,

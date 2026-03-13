@@ -225,7 +225,7 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m²"
+        unit="W/m^2"
     ),
     "wind_speed_profile_file_path" => (
         default=nothing,
@@ -385,7 +385,7 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         required=false,
         type=Float64,
         json_type="number",
-        unit="J/m^3*K"
+        unit="J/(m^3*K)"
     ),
     "wind_speed_reduction" => (
         default=1.0,
@@ -422,7 +422,7 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="m^3/s*m^2"
+        unit="m^3/(s*m^2)"
     ),
     "spec_flow_rate_min" => (
         default=0.000002,
@@ -431,7 +431,7 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         required=false,
         type=Float64,
         json_type="number",
-        unit="m^3/s*m^2"
+        unit="m^3/(s*m^2)"
     ),
     "delta_T_min" => (
         default=2.0,

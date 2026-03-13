@@ -158,7 +158,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "fluid_density" => (
         default=1045.0,
@@ -194,7 +194,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "fluid_prandtl_number" => (
         default=30.0,
@@ -217,7 +217,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "pipe_heat_conductivity" => (
         default=0.42,
@@ -228,7 +228,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "borehole_diameter" => (
         default=0.15,
@@ -368,7 +368,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "soil_density" => (
         default=2000.0,
@@ -390,7 +390,7 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "borehole_thermal_resistance" => (
         default=0.1,

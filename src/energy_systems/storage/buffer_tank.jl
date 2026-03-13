@@ -142,7 +142,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="kJ/kg*K"
+        unit="kJ/(kg*K)"
     ),
     "high_temperature" => (
         default=75.0,
@@ -206,7 +206,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_barrel" => (
         default=1.2,
@@ -217,7 +217,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_bottom" => (
         default=1.2,
@@ -228,7 +228,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "ground_temperature" => (
         default=12.0,

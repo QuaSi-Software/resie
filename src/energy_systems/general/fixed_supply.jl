@@ -115,7 +115,7 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         conditionals=[("treat_profile_as_volume_flow_in_qm_per_hour", "is_true")],
         type=Floathing,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
 )
 #! format: on

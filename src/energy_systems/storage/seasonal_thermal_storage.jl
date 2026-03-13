@@ -109,7 +109,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "diffusion_coefficient" => (
         default=0.143 * 10^-6,
@@ -227,7 +227,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_barrel_above_ground" => (
         default=0.375,
@@ -237,7 +237,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_barrel_below_ground" => (
         default=0.375,
@@ -247,7 +247,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         validations=[("self","value_gte_num",0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_bottom" => (
         default=0.375,
@@ -257,7 +257,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         validations=[("self","value_gte_num",0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "ambient_temperature_profile_file_path" => (
         default=nothing,
@@ -434,7 +434,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Float64},
         json_type="array",
-        unit="W/m*K"
+        unit="W/(m*K)"
     ),
     "ground_layers_rho" => (
         default=Float64[2000.0],
@@ -455,7 +455,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Float64},
         json_type="array",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
     "soil_surface_hconv" => (
         default=14.7,
@@ -465,7 +465,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         conditionals=[("ground_model", "is", "FVM")],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "has_top_insulation_overlap" => (
         default=false,
@@ -501,7 +501,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         ],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "ground_bottom_boundary" => (
         default="Neumann",
