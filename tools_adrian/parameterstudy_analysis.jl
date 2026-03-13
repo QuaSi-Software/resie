@@ -8,10 +8,10 @@ using JSON
 using Statistics
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_550runs_260309_161836.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_1183runs_260312_195550.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 const OUT_CSV_PATH = "C:/Users/jenter/Documents/resie/output/out.csv"
-const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_no_ems.json"
+const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_fuzzy_ems.json"
 
 const XCOLS = [
     "HeatPump_Power / W",
@@ -19,19 +19,22 @@ const XCOLS = [
     "BufferTank_Capacity / Wh",
     "Battery_Capacity / Wh",
 ]
-const YCOL_NO = "annuity_no A_total / €"
+const YCOL_NO = "A_total / EUR"
 const CO2_COL = "CO2_yearly / t/a"
+const CO2_HEAT_COL = "CO2_yearly_heat / t/a"
+const CO2_POWER_COL = "CO2_yearly_power / t/a"
 const BAL_COLS = ["balance_power", "balance_heat"]
 const BAL_THRESHOLD = 1.0
 const ANNUITY_COST_COLS = [
-    "annuity_no A_cap / €",
-    "annuity_no A_misc / €",
-    "annuity_no A_op / €",
-    "annuity_no A_energy / €",
+    "A_cap / EUR",
+    "A_misc / EUR",
+    "A_op / EUR",
+    "A_energy_heat / EUR",
+    "A_energy_power / EUR",
 ]
 const ANNUITY_REV_COLS = [
-    "annuity_no A_rev_control / €",
-    "annuity_no A_rev_feed / €",
+    "A_rev_control / EUR",
+    "A_rev_feed / EUR",
 ]
 
 to_million(x::Real) = x / 1e6
@@ -46,6 +49,19 @@ function coerce_columns!(df::DataFrame, cols::Vector{String})
     for c in cols
         c in names(df) && (df[!, c] = to_float.(df[!, c]))
     end
+    return df
+end
+
+function ensure_total_co2!(df::DataFrame; total_col::String=CO2_COL, heat_col::String=CO2_HEAT_COL, power_col::String=CO2_POWER_COL)
+    if total_col in names(df)
+        df[!, total_col] = to_float.(df[!, total_col])
+        return df
+    end
+    @assert heat_col in names(df) "Spalte '$heat_col' fehlt in der CSV."
+    @assert power_col in names(df) "Spalte '$power_col' fehlt in der CSV."
+    heat_vals = to_float.(df[!, heat_col])
+    power_vals = to_float.(df[!, power_col])
+    df[!, total_col] = coalesce.(heat_vals, 0.0) .+ coalesce.(power_vals, 0.0)
     return df
 end
 
@@ -100,7 +116,7 @@ function topn_co2(df::DataFrame, n::Int; xcols::Vector{String}=XCOLS, co2col::St
     return bestn
 end
 
-function save_topn_xlsx(topn::DataFrame; outdir::String=OUTDIR, filename::String="top100_annuity_no.xlsx")
+function save_topn_xlsx(topn::DataFrame; outdir::String=OUTDIR, filename::String="top100_annuity.xlsx")
     isdir(outdir) || mkpath(outdir)
     path = joinpath(outdir, filename)
     XLSX.writetable(path, Tables.columntable(topn); sheetname="Top100")
@@ -124,7 +140,8 @@ function plot_top10_annuity(best10::DataFrame; ycol::String=YCOL_NO, outdir::Str
     cap = Vector{Float64}(best10[!, ANNUITY_COST_COLS[1]])
     misc = Vector{Float64}(best10[!, ANNUITY_COST_COLS[2]])
     op = Vector{Float64}(best10[!, ANNUITY_COST_COLS[3]])
-    energy = Vector{Float64}(best10[!, ANNUITY_COST_COLS[4]])
+    energy_heat = Vector{Float64}(best10[!, ANNUITY_COST_COLS[4]])
+    energy_power = Vector{Float64}(best10[!, ANNUITY_COST_COLS[5]])
     rev_control = Vector{Float64}(best10[!, ANNUITY_REV_COLS[1]])
     rev_feed = Vector{Float64}(best10[!, ANNUITY_REV_COLS[2]])
 
@@ -143,8 +160,10 @@ function plot_top10_annuity(best10::DataFrame; ycol::String=YCOL_NO, outdir::Str
     stack_up .+= misc
     bar!(p, x_cost, stack_up .+ op; fillrange=stack_up, bar_width=bw, label="A_op")
     stack_up .+= op
-    bar!(p, x_cost, stack_up .+ energy; fillrange=stack_up, bar_width=bw, label="A_energy")
-    stack_up .+= energy
+    bar!(p, x_cost, stack_up .+ energy_heat; fillrange=stack_up, bar_width=bw, label="A_energy_heat")
+    stack_up .+= energy_heat
+    bar!(p, x_cost, stack_up .+ energy_power; fillrange=stack_up, bar_width=bw, label="A_energy_power")
+    stack_up .+= energy_power
 
     top_down = copy(stack_up)
     bar!(p, x_rev, top_down; fillrange=top_down .- rev_control, bar_width=bw, label="A_rev_control")
@@ -163,7 +182,7 @@ function plot_top10_annuity(best10::DataFrame; ycol::String=YCOL_NO, outdir::Str
     end
     xticks!(p, x, string.(x))
 
-    savefig(p, joinpath(outdir, "top10_annuity_no.png"))
+    savefig(p, joinpath(outdir, "top10_annuity.png"))
     return p
 end
 
@@ -471,11 +490,12 @@ end
 function main()
     df = CSV.read(CSV_PATH, DataFrame; delim=';', decimal=',')
 
-    required_cols = vcat(XCOLS, ANNUITY_COST_COLS, ANNUITY_REV_COLS, [YCOL_NO, CO2_COL], BAL_COLS)
+    required_cols = vcat(XCOLS, ANNUITY_COST_COLS, ANNUITY_REV_COLS, [YCOL_NO, CO2_HEAT_COL, CO2_POWER_COL], BAL_COLS)
     missing_required = [c for c in required_cols if !(c in names(df))]
     @assert isempty(missing_required) "Fehlende Pflichtspalten: $(join(missing_required, ", "))"
 
     coerce_columns!(df, required_cols)
+    ensure_total_co2!(df)
 
     best100 = topn_annuity(df, 100)
     xlsx_path = save_topn_xlsx(best100)
@@ -494,7 +514,7 @@ function main()
     println("\nFertig. Dateien in: $OUTDIR")
     println("- $(basename(xlsx_path))")
     println("- $(basename(co2_csv_path))")
-    println("- top10_annuity_no.png")
+    println("- top10_annuity.png")
     println("- 3d_parameter_space.html")
     println("- matrix_plot_top25_no_battery.html")
     println("- $(basename(sensitivity_csv_path))")

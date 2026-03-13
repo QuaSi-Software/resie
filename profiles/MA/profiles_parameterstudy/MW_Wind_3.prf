@@ -1,7 +1,6 @@
 # data_type:	intensive
 # time_definition:	datestamp
 # timestamp_format:	dd.mm.yyyy HH:MM
-# time_zone:	Europe/Berlin
 # interpolation_type:	stepwise
 01.01.2024 00:00;65.02
 01.01.2024 00:15;65.02

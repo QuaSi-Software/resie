@@ -227,7 +227,7 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    base_price = 214.0  #sim["Grid_price"]    # €/MWh (market price)   # 214.0
+    base_price = 214.0 #sim["Grid_price"]    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
@@ -242,10 +242,14 @@ function energy_annuity(sim::Dict, p::VDIParams)
     A_energy_wind_heat = annuitize_energy(sim["Wind_IN_Heat"], Wind_price)
     A_energy_wind_power = annuitize_energy(sim["Wind_IN_Power"], Wind_price)
 
+    A_energy_grid = annuitize_energy(sim["Grid_IN"], base_price)
+    A_energy_pv = annuitize_energy(sim["Photovoltaic_IN"], Photovoltaic_price)
+    A_energy_wind = annuitize_energy(sim["Wind_IN"], Wind_price)
     A_energy_heat = A_energy_grid_heat + A_energy_pv_heat + A_energy_wind_heat
     A_energy_power = A_energy_grid_power + A_energy_pv_power + A_energy_wind_power
 
     return OrderedDict(
+        "A_energy" => A_energy_grid + A_energy_pv + A_energy_wind,
         "A_energy_heat" => A_energy_heat,
         "A_energy_power" => A_energy_power
     )
@@ -482,6 +486,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_cap_incentive" => A_cap_incentive,
         "A_op" => A_op,
         "A_misc" => A_misc,
+        "A_energy" => A_energy["A_energy"],
         "A_energy_heat" => A_energy["A_energy_heat"],
         "A_energy_power" => A_energy["A_energy_power"],
         "A_rev_control" => A_rev_control,

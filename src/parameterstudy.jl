@@ -30,20 +30,20 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.js
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 5.0e6         # lower limit
-Pth_HeatPump_hi   = 6.0e6         # upper limit
+Pth_HeatPump_lo   = 4.5e6         # lower limit
+Pth_HeatPump_hi   = 8.0e6         # upper limit
 Pth_HeatPump_step = 0.25e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 2.5e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 3.75e6     # upper limit
+Pth_ElectrodeBoiler_lo   = 2.0e6     # lower limit
+Pth_ElectrodeBoiler_hi   = 5.0e6     # upper limit
 Pth_ElectrodeBoiler_step = 0.25e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 15.0e6        # lower limit
-Cap_hi_Wh   = 30.0e6        # upper limit
+Cap_lo_Wh   = 10.0e6        # lower limit
+Cap_hi_Wh   = 40.0e6        # upper limit
 Cap_step_Wh = 5.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
