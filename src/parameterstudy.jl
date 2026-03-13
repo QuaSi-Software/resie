@@ -31,7 +31,7 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.js
 
 # HeatPump power (W)
 Pth_HeatPump_lo   = 4.5e6         # lower limit
-Pth_HeatPump_hi   = 8.0e6         # upper limit
+Pth_HeatPump_hi   = 7.0e6         # upper limit
 Pth_HeatPump_step = 0.25e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
@@ -354,7 +354,7 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     # balance warnings
     header_balances = ["balance_power", "balance_heat", "Errors"]
     # yearly_CO2-emissions
-    header_co2 = ["CO2_yearly_heat / t/a", "CO2_yearly_power / t/a"]
+    header_co2 = ["CO2_yearly / t/a", "CO2_yearly_heat / t/a", "CO2_yearly_power / t/a"]
     header = join(vcat(header_parameters, header_annuity_no, header_co2, header_balances), ';') * "\n"
 
     open(out_file_path, "a") do file_handle
@@ -453,7 +453,8 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
             annuities_no = [sim_output[runidx]["VDI_NO"][k] for k in vdi_annuity_keys]
             # annuities_mod = [sim_output[runidx]["VDI_MOD"][k] for k in vdi_annuity_keys]
             # annuities_pro = [sim_output[runidx]["VDI_PRO"][k] for k in vdi_annuity_keys]
-            co2_yearly = [sim_output[runidx]["VDI_NO"]["CO2_yearly_heat"],
+            co2_yearly = [sim_output[runidx]["VDI_NO"]["CO2_yearly"],
+                          sim_output[runidx]["VDI_NO"]["CO2_yearly_heat"],
                           sim_output[runidx]["VDI_NO"]["CO2_yearly_power"]]
         else
             annuities_no = fill(missing, length(header_annuity_no))
