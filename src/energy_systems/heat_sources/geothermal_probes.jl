@@ -365,6 +365,11 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Heat conductivity of surrounding soil, homogenous and constant",
         display_name="Soil heat conductivity",
         required=false,
+        conditionals=[
+            ("model_type", "is", "detailed"),
+            "OR",
+            ("g_function_file_path", "is_nothing")
+        ],
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
