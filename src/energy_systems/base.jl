@@ -1699,8 +1699,8 @@ function check_validation_at_least_one(validation::Tuple, extracted::Dict{String
 
     names = validation[2:end]
     if sum([haskey(extracted, u) && !isnothing(extracted[u]) ? 1 : 0 for u in names]) < 1
-        throw(InputError("At least one of the following parameters of components `$uac` must not be nothing: " *
-                         join(names, " ")))
+        throw(InputError("At least one of the following parameters of component `$uac` must not be nothing: " *
+                         join(names, ", ")))
     end
 end
 
