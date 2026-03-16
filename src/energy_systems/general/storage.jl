@@ -124,7 +124,7 @@ function process(unit::Storage, sim_params::Dict{String,Any})
     exchanges = balance_on(outface, outface.target)
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
-    if energy_demand >= 0.0
+    if energy_demand >= 0.0 || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
@@ -160,7 +160,7 @@ function load(unit::Storage, sim_params::Dict{String,Any})
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
-    if energy_available <= 0.0
+    if energy_available <= 0.0 || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return # load is only concerned with receiving energy from the source

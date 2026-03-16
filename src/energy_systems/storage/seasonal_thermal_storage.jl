@@ -2221,7 +2221,7 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     energy_available = unit.current_max_output_energy  # is positive
 
     # shortcut if there is no energy demanded
-    if energy_demanded >= -sim_params["epsilon"]
+    if energy_demanded >= -sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
@@ -2258,6 +2258,9 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 end
 
 function handle_component_update!(unit::SeasonalThermalStorage, step::String, sim_params::Dict{String,Any})
+    if unit.capacity <= sim_params["epsilon"]
+        return 
+    end
     if step == "process"
         unit.process_done = true
     elseif step == "load"
@@ -2288,7 +2291,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
+    if energy_available <= sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         return

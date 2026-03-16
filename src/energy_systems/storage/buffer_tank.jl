@@ -485,7 +485,7 @@ function temperature_at_load(unit::BufferTank)::Temperature
 end
 
 function calculate_losses!(unit::BufferTank, sim_params)
-    if !unit.consider_losses
+    if !unit.consider_losses || unit.capacity <= sim_params["epsilon"]
         unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
@@ -549,7 +549,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     energy_demanded = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy demanded
-    if energy_demanded >= -sim_params["epsilon"]
+    if energy_demanded >= -sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         handle_component_update!(unit, "process", sim_params)
         return
@@ -607,7 +607,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
+    if energy_available <= sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
