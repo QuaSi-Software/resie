@@ -247,3 +247,56 @@ end
 @testset "required_with_conditional" begin
     test_required_with_conditional()
 end
+
+function test_conditionals_with_or()
+    parameter_def = Dict{String,NamedTuple}(
+        "test_param" => (default=1.0,
+                         description="",
+                         display_name="",
+                         required=false,
+                         conditionals=[("param_1", "is", "foo"),
+                                       "OR",
+                                       ("param_2", "is_nothing")],
+                         validations=[("self", "value_gt_num", 0.0)],
+                         type=Float64,
+                         json_type="number",
+                         unit=""),
+    )
+
+    values = Dict{String,Any}(
+        "param_2" => nothing,
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+
+    values = Dict{String,Any}(
+        "param_1" => "foo",
+        "param_2" => nothing,
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+
+    values = Dict{String,Any}(
+        "param_1" => "bar",
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert !check # does not apply because param_1 should be foo or param_2 should be nothing
+
+    values = Dict{String,Any}(
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert !check # does not apply because param_1 should be foo or param_2 should be nothing
+
+    values = Dict{String,Any}(
+        "param_1" => "foo",
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+end
+
+@testset "conditionals_with_or" begin
+    test_conditionals_with_or()
+end

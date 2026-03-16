@@ -1787,13 +1787,81 @@ function check_validation(validation::Tuple, name::String, value::Any,
 end
 
 """
+    build_flat_boolean_expr(tokens)
+
+Builds an expression ready for `eval` from a flat boolean expression with infix notation.
+
+"Flat" means that no parentheses are used and the only operators are: AND, OR
+The token list must not be empty, but can be a single boolean literal.
+
+# Arguments
+- `tokens<:Vector`: The list of tokens
+# Returns
+- `Union{Bool,Expr}`: The expression ready for `eval`. Might just be a single boolean
+    literal.
+"""
+function build_flat_boolean_expr(tokens::T)::Union{Bool,Expr} where {T<:Vector}
+    if length(tokens) < 1
+        throw(ArgumentError("Token list must not be empty"))
+    end
+    expr = tokens[1]
+
+    i = 2
+    while i < length(tokens)
+        operator = tokens[i]
+        operand = tokens[i + 1]
+        expr = Expr(operator, expr, operand) # nest the expression for prefix notation
+        i += 2
+    end
+
+    return expr
+end
+
+"""
+    evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Symbol where T<:Tuple
+
+Evaluates the given conditional and returns its boolean value.
+
+# Arguments
+- `conditional<:Tuple`: The conditional to check
+- `extracted::Dict{String,Any}`: The values of extracted parameters for calculation
+# Returns
+- `Bool`: The boolean value of the evaluated conditional
+"""
+function evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Bool where {T<:Tuple}
+    other_name = conditional[1]
+    operator = conditional[2]
+    operand = length(conditional) > 2 ? conditional[3] : nothing
+
+    if operator == "is"
+        return haskey(extracted, other_name) && extracted[other_name] == operand ? :true : :false
+    elseif operator == "is_not"
+        return haskey(extracted, other_name) && extracted[other_name] != operand ? :true : :false
+    elseif operator == "is_true"
+        return haskey(extracted, other_name) && Bool(extracted[other_name]) ? :true : :false
+    elseif operator == "is_not_nothing"
+        return haskey(extracted, other_name) && !isnothing(extracted[other_name]) ? :true : :false
+    elseif operator == "is_nothing"
+        return haskey(extracted, other_name) && isnothing(extracted[other_name]) ? :true : :false
+    elseif operator == "is_one_of"
+        has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
+        return has_match ? :true : :false
+    else
+        throw(InputError("Unknown conditional operator $operator"))
+    end
+end
+
+"""
     conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
 
-Returns if all conditionals for the given parameter apply.
+Returns if the conditionals for the given parameter apply.
 
-A parameter can be active, meaning it should be validated and will be used, when all
+A parameter can be active, meaning it should be validated and will be used, when the
 conditionals that are defined for it evaluate to true. A parameter without conditionals
-therefore is always active.
+therefore is always active. Conditionals are implicitly connected via the logical operator
+AND if nothing is specified and can also be connected via OR by placing it in-between the
+conditional tuples. The entire vector thus builds a boolean expression that is being
+evaluated.
 
 # Args
 - `name::String`: The name of the parameter to check
@@ -1807,33 +1875,49 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
         return true
     end
 
-    all_apply = true
-    for conditional in type_def[name].conditionals
-        other_name = conditional[1]
-        operator = conditional[2]
-        operand = length(conditional) > 2 ? conditional[3] : nothing
+    # add implicit AND between conditionals that have no logical operator between them. also
+    # strip mutex, as it doesn't factor into the calculation
+    conditionals = []
+    for idx in 1:length(type_def[name].conditionals)
+        conditional = type_def[name].conditionals[idx]
+        if typeof(conditional) <: Tuple && length(conditional) >= 2 && conditional[2] == "mutex"
+            continue
+        end
 
-        if operator == "is"
-            all_apply = all_apply && (haskey(extracted, other_name) && extracted[other_name] == operand)
-        elseif operator == "is_not"
-            all_apply = all_apply && (haskey(extracted, other_name) && extracted[other_name] != operand)
-        elseif operator == "is_true"
-            all_apply = all_apply && (haskey(extracted, other_name) && Bool(extracted[other_name]))
-        elseif operator == "is_not_nothing"
-            all_apply = all_apply && (haskey(extracted, other_name) && !isnothing(extracted[other_name]))
-        elseif operator == "is_nothing"
-            all_apply = all_apply && (haskey(extracted, other_name) && isnothing(extracted[other_name]))
-        elseif operator == "is_one_of"
-            has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
-            all_apply = all_apply && has_match
-        elseif operator == "mutex"
-            all_apply = all_apply # mutex doesn't factor into the calculation and is handled elsewhere
-        else
-            throw(InputError("Unknown conditional operator $operator"))
+        # push conditional / operator, but prevent double operators / operands or starting
+        # with an operator (happens because of stripping mutex)
+        if length(conditionals) == 0 && typeof(conditional) <: Tuple ||
+           length(conditionals) > 0 && typeof(conditionals[end]) != typeof(conditional)
+            # end of expression
+            push!(conditionals, conditional)
+        end
+
+        # add AND if this and the next is also a conditional
+        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx+1] : nothing
+        if typeof(conditional) <: Tuple && typeof(next) <: Tuple
+            push!(conditionals, "AND")
         end
     end
 
-    return all_apply
+    # due to stripping mutex we might end up with no conditionals to checks
+    if length(conditionals) == 0
+        return true
+    end
+
+    # build expression by evaluating each conditional and putting operators between
+    expression = []
+    for conditional in conditionals
+        if typeof(conditional) == String
+            push!(expression, conditional == "AND" ? :&& : :||)
+            continue
+        end
+
+        push!(expression, evaluate_conditional(conditional, extracted))
+    end
+
+    # eval is safe here because we built the expression from bool literals and operators
+    # with no user input making it into the expression
+    return Bool(eval(build_flat_boolean_expr(expression)))
 end
 
 """
