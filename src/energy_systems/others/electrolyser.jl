@@ -489,7 +489,7 @@ function calculate_energies(unit::Electrolyser,
                                                                               Vector{<:Stringing}}}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 

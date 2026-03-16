@@ -216,7 +216,7 @@ function calculate_energies(unit::FuelBoiler,
                             sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 
