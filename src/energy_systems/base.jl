@@ -1921,6 +1921,39 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
 end
 
 """
+    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+
+Validates the given component parameter config for mutex conditionals.
+
+If a mutex conditional is triggered, throws an InputError.
+
+# Arguments
+- `config::Dict{String,Any}`: The component parameter config
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+"""
+function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    for (name, value) in pairs(config)
+        if name in keys(type_def) && isdefined(type_def[name], :conditionals)
+            for cond in type_def[name].conditionals
+                if length(cond) >= 2 && cond[2] == "mutex"
+                    other_name = cond[1]
+                    other_value = other_name in keys(config) ? config[other_name] : nothing
+                    if ((type_def[name].type != Bool && value !== nothing) ||
+                        (type_def[name].type == Bool && value === true)) &&
+                       ((type_def[other_name].type != Bool && other_value !== nothing) ||
+                        (type_def[other_name].type == Bool && other_value === true))
+                        # end of condition
+                        throw(InputError("Parameters `$name` and `$other_name` of " *
+                                         "component `$uac` are mutually exclusive."))
+                    end
+                end
+            end
+        end
+    end
+end
+
+"""
     validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
 
 Validates the given configuration for interdependencies and consistency.
@@ -1956,23 +1989,6 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
             if !(value in type_def[name].options)
                 throw(InputError("Given value $value is not in the allowed options for " *
                                  "parameter `$name` of component `$uac`."))
-            end
-        end
-
-        # check for mutually exclusive parameters
-        if name in keys(type_def) && isdefined(type_def[name], :conditionals)
-            for cond in type_def[name].conditionals
-                if length(cond) >= 2 && cond[2] == "mutex"
-                    other_name = cond[1]
-                    other_value = other_name in keys(extracted) ? extracted[other_name] : nothing
-                    if ((type_def[name].type != Bool && value !== nothing) ||
-                        (type_def[name].type == Bool && value === true)) &&
-                       ((type_def[other_name].type != Bool && other_value !== nothing) ||
-                        (type_def[other_name].type == Bool && other_value === true))
-                        # end of condition
-                        throw(InputError("Parameters `$name` and `$other_name` of component `$uac` are mutually exclusive."))
-                    end
-                end
             end
         end
 
@@ -2035,7 +2051,8 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
 
     # extract all parameters using the parameter dictionary as the source of truth
     extracted_params = Dict{String,Any}()
-    for (param_name, param_def) in component_parameters(T)
+    type_def = component_parameters(T)
+    for (param_name, param_def) in type_def
         try
             extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
         catch e
@@ -2051,6 +2068,10 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     try
         # extract control_parameters, which is essentially a subconfig
         extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+        # check mutex conditionals, based on given parameter values, not extracted (as they
+        # include the default values)
+        validate_mutex_params(config, uac, type_def)
 
         # validate configuration, e.g. for interdependencies and allowed values
         validate_config(T, config, extracted_params, uac, sim_params)

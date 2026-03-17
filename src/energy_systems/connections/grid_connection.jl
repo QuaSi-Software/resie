@@ -111,6 +111,10 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         # extract control_parameters, which is essentially a subconfig
         extracted_params["control_parameters"] = extract_control_parameters(Component, config)
 
+        # check mutex conditionals, based on given parameter values, not extracted (as they
+        # include the default values)
+        validate_mutex_params(config, uac, GRID_CONNECTION_PARAMETERS)
+
         # validate configuration, e.g. for interdependencies and allowed values
         validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params)
     catch e
