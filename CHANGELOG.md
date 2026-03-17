@@ -4,6 +4,10 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+## Version 0.13.11
+* Changed transformer potential handling so `MaxEnergy` is no longer updated in interfaces toward (proxy) buses and is instead written only to the bus balance table, allowing `balance_on()` of the bus to correctly handle multiple transformers with multiple potential steps; linked interfaces remain an exception and still require to update `MaxEnergy` in the interfaces during potential step for correct communication.
+* Fixed `inner_distribute` in buses to avoid `Inf - Inf`, which previously produced `NaN` values in the bus balance table in some rare cases
+
 ### Version 0.13.10
 * Fix function reorder_src_snk_connected_to-transformer not working after merges of new battery model
 
