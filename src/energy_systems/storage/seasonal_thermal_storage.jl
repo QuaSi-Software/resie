@@ -751,7 +751,6 @@ function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     m_heat_in = Symbol(params["m_heat_in"])
     m_heat_out = Symbol(params["m_heat_out"])
-    register_media([m_heat_in, m_heat_out])
 
     return (uac,
             Controller(params["control_parameters"]),

@@ -572,7 +572,6 @@ end
 function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     m_heat_out = Symbol(params["m_heat_out"])
-    register_media([m_heat_out])
 
     const_wind_speed = params["constant_wind_speed"]
     if const_wind_speed === nothing

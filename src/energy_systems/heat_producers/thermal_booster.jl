@@ -230,11 +230,10 @@ end
 
 function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     m_el_in = Symbol(params["m_el_in"])
     m_heat_out = Symbol(params["m_heat_out"])
     m_heat_in = Symbol(params["m_heat_in"])
-    register_media([m_el_in, m_heat_out, m_heat_in])
 
     # return tuple in the order expected by new()
     return (uac,

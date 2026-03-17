@@ -207,7 +207,6 @@ end
 function init_from_params(x::Type{GenericHeatSource}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     medium = Symbol(params["medium"])
-    register_media([medium])
 
     max_power_profile = params["max_power_profile_file_path"] !== nothing ?
                         Profile(params["max_power_profile_file_path"], sim_params) :

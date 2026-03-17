@@ -71,9 +71,8 @@ end
 
 function init_from_params(x::Type{PVPlant}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     m_el_out = Symbol(params["m_el_out"])
-    register_media([m_el_out])
 
     # load energy profile from path
     energy_profile = Profile(params["energy_profile_file_path"], sim_params)

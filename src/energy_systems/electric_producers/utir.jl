@@ -140,10 +140,9 @@ end
 
 function init_from_params(x::Type{UTIR}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     m_el_in = Symbol(params["m_el_in"])
     m_el_out = Symbol(params["m_el_out"])
-    register_media([m_el_in, m_el_out])
     interface_list = (Symbol("el_in"), Symbol("el_out"))
     linear_interface = Symbol(params["linear_interface"])
 

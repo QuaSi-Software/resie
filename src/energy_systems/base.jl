@@ -58,59 +58,6 @@ some_or_none(x::Some, y...) = x.value
 some_or_none(x::Any, y...) = x
 
 """
-Categories that each represent a physical medium in conjunction with additional attributes,
-such as temperature or voltage. These attributes are not necessarily unchanging, but are
-considered the nominal range. For example, a heating component might circulate water anywhere
-from 30°C to 60°C, but the nominal temperature is considered to be 60°C. This is intended
-so it becomes possible to prevent linking components that do not work together because they
-work on different nominal temperatures, while both work with the same physical medium,
-for example water.
-
-The names are structured in a composite of segments. For example, these are:
-    m_e_ac_230v
-
-    1. m: This segment is used to distinguish its symbols from the symbols of other types
-    2. e: The energy type, in this case electricity
-    3. ac: The physical medium, in this case AC current
-    4. 230v: Additional attributes of nominal value or ranges numbered through
-"""
-medium_categories = Set{Symbol}([
-                                 # electricity
-                                 :m_e_ac_230v,
-
-                                 # chemicals - gasses
-                                 :m_c_g_natgas,
-                                 :m_c_g_h2,
-                                 :m_c_g_o2,
-
-                                 # heat - low temperature water
-                                 :m_h_w_lt1,
-                                 :m_h_w_lt2,
-                                 :m_h_w_lt3,
-                                 :m_h_w_lt4,
-                                 :m_h_w_lt5,
-
-                                 # heat - high temperature water
-                                 :m_h_w_ht1,
-                                 :m_h_w_ht2,
-                                 :m_h_w_ht3,
-                                 :m_h_w_ht4,
-                                 :m_h_w_ht5])
-
-"""
-register_media(categories)
-
-Add the given medium categories to the set of all medium categories.
-"""
-function register_media(categories::Vector{Symbol})
-    for cat in categories
-        push!(medium_categories, cat)
-    end
-end
-
-register_media(category::Symbol) = register_media([category])
-
-"""
 Enumerations of the archetype of a component describing its general function.
 
 These are described in more detail in the accompanying documentation of the simulation

@@ -190,7 +190,6 @@ end
 function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple where {IsSource}
     medium = Symbol(params["medium"])
-    register_media([medium])
 
     sys_function = params["is_source"] ? sf_flexible_source : sf_flexible_sink
 

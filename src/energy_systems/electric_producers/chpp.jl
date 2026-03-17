@@ -178,11 +178,10 @@ end
 
 function init_from_params(x::Type{CHPP}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     m_fuel_in = Symbol(params["m_fuel_in"])
     m_heat_out = Symbol(params["m_heat_out"])
     m_el_out = Symbol(params["m_el_out"])
-    register_media([m_fuel_in, m_heat_out, m_el_out])
     interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
     linear_interface = Symbol(params["linear_interface"])
 

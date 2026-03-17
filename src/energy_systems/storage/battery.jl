@@ -464,12 +464,11 @@ end
 
 function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     heat_lt_is_usable = params["heat_lt_is_usable"]
     m_el_in = Symbol(params["m_el_in"])
     m_el_out = Symbol(params["m_el_out"])
     m_heat_lt_out = Symbol(params["m_heat_lt_out"])
-    register_media([m_el_in, m_el_out, m_heat_lt_out])
 
     output_interfaces = InterfaceMap(m_el_in => nothing, m_el_out => nothing)
     if heat_lt_is_usable
