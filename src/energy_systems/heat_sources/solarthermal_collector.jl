@@ -1040,10 +1040,7 @@ function check_temperature_and_get_max_energy(unit::SolarthermalCollector,
                                               temperature_output::Temperature,
                                               limit_max_output_energy_to_avoid_pulsing::Bool)::Tuple{Temperature,
                                                                                                      Float64}
-    # get max output temperature of solarthermal collector
-    _, source_max_out_temperature = get_output_temperature_bounds(unit, sim_params)
-
-    if temperature_output === nothing || temperature_output > source_max_out_temperature
+    if unit.collector_gross_area = 0 || temperature_output === nothing || temperature_output > get_output_temperature_bounds(unit, sim_params)
         # the requested temperature is higher than the current output temperature or
         # no temperature information is given, the collector doesn't run and produces no energy
         temperature_output = nothing
