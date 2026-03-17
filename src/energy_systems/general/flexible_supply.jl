@@ -24,7 +24,7 @@ const FLEXIBLE_SUPPLY_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
@@ -53,8 +53,9 @@ const FLEXIBLE_SUPPLY_PARAMETERS = Dict(
         description="Path to a profile file with maximum power values",
         display_name="Max. power profile file",
         required=false,
-        conditionals=[
-            ("constant_power", "mutex"),
+        conditionals=[("constant_power", "mutex")],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
         ],
         type=String,
         json_type="string",
@@ -65,8 +66,10 @@ const FLEXIBLE_SUPPLY_PARAMETERS = Dict(
         description="Constant maximum power to supply",
         display_name="Constant max. power",
         required=false,
-        conditionals=[
-            ("max_power_profile_file_path", "mutex"),
+        conditionals=[("max_power_profile_file_path", "mutex")],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
         ],
         type=Float64,
         json_type="number",

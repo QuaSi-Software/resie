@@ -114,6 +114,7 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Icing loss coefficients (comma-separated)",
         display_name="Icing coefficients",
         required=false,
+        conditionals=[("consider_icing", "is_true")],
         type=String,
         json_type="string",
         unit="-"
@@ -134,7 +135,7 @@ const HEAT_PUMP_PARAMETERS = Dict(
         display_name="Thermal power",
         required=true,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -1341,8 +1342,8 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
                                      unit.constant_loss_energy)
     energies.potential_el_in -= unit.current_constant_loss
 
-    # shortcut if we're limited by zero input electricity
-    if energies.potential_el_in <= 0.0
+    # shortcut if we're limited by zero input electricity or 0 W thermal design power
+    if energies.potential_el_in <= 0.0 || unit.design_power_th <= sim_params["epsilon"]
         do_calculation = false
     end
 

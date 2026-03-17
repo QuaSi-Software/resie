@@ -39,6 +39,118 @@ end
     test_mutex_parameters()
 end
 
+function test_mutex_with_default()
+    components_config = Dict{String,Any}(
+        "TST_STES_01" => Dict{String,Any}(
+            "type" => "SeasonalThermalStorage",
+            "m_heat_in" => "m_h_w_lt1",
+            "m_heat_out" => "m_h_w_lt1",
+            "output_refs" => ["TST_BUS_01"],
+            "volume" => 50000,
+            "initial_load" => 0.0,
+            "constant_ambient_temperature" => 10.0,
+            "constant_ground_temperature" => 10.0,
+            "hr_ratio" => 0.55,
+            "sidewall_angle" => 27.5,
+            "shape" => "round",
+            "high_temperature" => 90,
+            "low_temperature" => 10,
+            "max_load_rate_energy" => 1,
+            "max_unload_rate_energy" => 1,
+            "max_load_rate_mass" => 1,
+            "max_unload_rate_mass" => 1,
+            "ground_model" => "FVM",
+            "ground_domain_radius_factor" => 1.5,
+            "ground_domain_depth_factor" => 2.0,
+            "ground_domain_depth" => 20.0,
+        ),
+        "TST_BUS_01" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_lt1",
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_STES_01"],
+                "output_order" => ["TST_STES_01"],
+            ),
+        ),
+    )
+    simulation_params = get_default_sim_params()
+
+    # first loading, should fail because both ground_domain_depth_factor and
+    # ground_domain_depth are given and they are mutex
+    construction_errored = false
+    msg = ""
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+        msg = sprint(showerror, e)
+    end
+    @assert construction_errored
+    @assert occursin("Can't construct component TST_STES_01", msg)
+
+    # second loading, should succeed because ground_domain_depth_factor was removed.
+    # however this tests against a regression of a bug where the default of the removed
+    # parameter would still trigger the mutex conditional
+    delete!(components_config["TST_STES_01"], "ground_domain_depth_factor")
+    construction_errored = false
+    msg = ""
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+        msg = sprint(showerror, e)
+    end
+    @assert !construction_errored
+end
+
+@testset "mutex_with_default" begin
+    test_mutex_with_default()
+end
+
+function test_at_least_one_parameter()
+    components_config = Dict{String,Any}(
+        "TST_SRC_01" => Dict{String,Any}(
+            "type" => "GenericHeatSource",
+            "output_refs" => ["TST_DEM_01"],
+            "medium" => "m_h_w_lt1",
+            "constant_power" => 500.0,
+        ),
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "output_refs" => [],
+            "medium" => "m_h_w_lt1",
+            "constant_demand" => 500.0,
+        ),
+    )
+    simulation_params = get_default_sim_params()
+
+    # first try should error because no parameter is defined
+    construction_errored = false
+    msg = ""
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+        msg = sprint(showerror, e)
+    end
+    @assert construction_errored
+    @assert occursin("Can't construct component TST_SRC_01", msg)
+
+    # second try should succeed because we added one of the parameters
+    components_config["TST_SRC_01"]["constant_temperature"] = 50.0
+    construction_errored = false
+    try
+        _ = Resie.load_components(components_config, simulation_params)
+    catch e
+        construction_errored = true
+    end
+    @assert !construction_errored
+end
+
+@testset "at_least_one_parameter" begin
+    test_at_least_one_parameter()
+end
+
 function test_parameter_with_options()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -140,7 +252,7 @@ end
 function test_required_with_conditional()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "FlexibleSupply",
+            "type" => "GridInput",
             "output_refs" => ["TST_BUS_01"],
             "medium" => "m_e_ac_230v",
         ),
@@ -202,4 +314,57 @@ end
 
 @testset "required_with_conditional" begin
     test_required_with_conditional()
+end
+
+function test_conditionals_with_or()
+    parameter_def = Dict{String,NamedTuple}(
+        "test_param" => (default=1.0,
+                         description="",
+                         display_name="",
+                         required=false,
+                         conditionals=[("param_1", "is", "foo"),
+                                       "OR",
+                                       ("param_2", "is_nothing")],
+                         validations=[("self", "value_gt_num", 0.0)],
+                         type=Float64,
+                         json_type="number",
+                         unit=""),
+    )
+
+    values = Dict{String,Any}(
+        "param_2" => nothing,
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+
+    values = Dict{String,Any}(
+        "param_1" => "foo",
+        "param_2" => nothing,
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+
+    values = Dict{String,Any}(
+        "param_1" => "bar",
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert !check # does not apply because param_1 should be foo or param_2 should be nothing
+
+    values = Dict{String,Any}(
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert !check # does not apply because param_1 should be foo or param_2 should be nothing
+
+    values = Dict{String,Any}(
+        "param_1" => "foo",
+        "param_2" => "foo",
+    )
+    check = EnergySystems.conditionals_apply("test_param", values, parameter_def)
+    @assert check
+end
+
+@testset "conditionals_with_or" begin
+    test_conditionals_with_or()
 end

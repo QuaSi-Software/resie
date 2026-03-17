@@ -24,7 +24,7 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
@@ -53,8 +53,9 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         description="Path to a profile file with energy values",
         display_name="Energy profile file",
         required=false,
-        conditionals=[
-            ("constant_supply", "mutex"),
+        conditionals=[("constant_supply", "mutex")],
+        validations=[
+            ("at_least_one", "energy_profile_file_path", "constant_supply")
         ],
         type=String,
         json_type="string",
@@ -65,8 +66,10 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         description="Constant supply (power, not work)",
         display_name="Constant supply",
         required=false,
-        conditionals=[
-            ("energy_profile_file_path", "mutex"),
+        conditionals=[("energy_profile_file_path", "mutex")],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "energy_profile_file_path", "constant_supply")
         ],
         type=Float64,
         json_type="number",
@@ -88,6 +91,7 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
                     "with a unit of [m^3/h]",
         display_name="Medium density",
         required=false,
+        conditionals=[("energy_profile_file_path", "is_not_nothing")],
         type=Bool,
         json_type="boolean",
         unit="-"
@@ -111,7 +115,7 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         conditionals=[("treat_profile_as_volume_flow_in_qm_per_hour", "is_true")],
         type=Floathing,
         json_type="number",
-        unit="J/kg*K"
+        unit="J/(kg*K)"
     ),
 )
 #! format: on

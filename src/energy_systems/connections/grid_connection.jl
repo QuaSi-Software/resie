@@ -35,7 +35,7 @@ const GRID_CONNECTION_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
@@ -110,6 +110,10 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     try
         # extract control_parameters, which is essentially a subconfig
         extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+        # check mutex conditionals, based on given parameter values, not extracted (as they
+        # include the default values)
+        validate_mutex_params(config, uac, GRID_CONNECTION_PARAMETERS)
 
         # validate configuration, e.g. for interdependencies and allowed values
         validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params)

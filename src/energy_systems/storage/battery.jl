@@ -54,7 +54,7 @@ const BATTERY_PARAMETERS = Dict(
         description="Capacity of the battery",
         display_name="Capacity",
         required=true,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="Wh"
@@ -77,9 +77,9 @@ const BATTERY_PARAMETERS = Dict(
         description="Charge efficienc for simplified model",
         display_name="Charge efficiency",
         required=true,
-        conditionals=[("model_type", "has_value", "simplified")],
+        conditionals=[("model_type", "is", "simplified")],
         validations=[
-            ("self", "value_gte_num", 0.0),
+            ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
         type=Float64,
@@ -91,9 +91,9 @@ const BATTERY_PARAMETERS = Dict(
         description="Discharge efficiency for simplified model",
         display_name="Discharge efficiency",
         required=true,
-        conditionals=[("model_type", "has_value", "simplified")],
+        conditionals=[("model_type", "is", "simplified")],
         validations=[
-            ("self", "value_gte_num", 0.0),
+            ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
         type=Float64,
@@ -102,7 +102,8 @@ const BATTERY_PARAMETERS = Dict(
     ),
     "self_discharge_rate" => (
         default=0.0,
-        description="Self-discharge rate including stand-by losses",
+        description="Self-discharge rate including stand-by losses. For this a month is " *
+                    "equal to 30 days, regardless of current time.",
         display_name="Self-discharge rate",
         required=false,
         validations=[("self", "value_gte_num", 0.0)],
@@ -115,7 +116,7 @@ const BATTERY_PARAMETERS = Dict(
         description="Maximum continuous charge C-rate",
         display_name="Charge C-rate",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -125,7 +126,7 @@ const BATTERY_PARAMETERS = Dict(
         description="Maximum continuous discharge C-rate",
         display_name="Discharge C-rate",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -169,7 +170,7 @@ const BATTERY_PARAMETERS = Dict(
     ),
     "cell_cutoff_current" => (
         default=nothing,
-        description="Cell cutoff current in A",
+        description="Cell charging cutoff current in A",
         display_name="Cell cutoff current",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
@@ -183,7 +184,7 @@ const BATTERY_PARAMETERS = Dict(
         display_name="Cycles",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 1.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -221,7 +222,7 @@ const BATTERY_PARAMETERS = Dict(
     "V_0" => (
         default=3.36964,
         description="Battery constant voltage V_0",
-        display_name="Const. voltage",
+        display_name="Const. voltage V_0",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
         type=Float64,
@@ -231,7 +232,7 @@ const BATTERY_PARAMETERS = Dict(
     "K" => (
         default=0.03546,
         description="Polarisation voltage K",
-        display_name="Polarisation voltage",
+        display_name="Polarisation voltage K",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
         type=Float64,
@@ -241,7 +242,7 @@ const BATTERY_PARAMETERS = Dict(
     "A" => (
         default=0.08165,
         description="Exponential zone amplitude A",
-        display_name="Exp. amplitude",
+        display_name="Exp. amplitude A",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
         type=Float64,
@@ -251,7 +252,7 @@ const BATTERY_PARAMETERS = Dict(
     "B" => (
         default=0.1003,
         description="Exponential zone time constant inverse B",
-        display_name="Exp. time constant",
+        display_name="Exp. time constant B",
         required=false,
         conditionals=[("model_type", "is_not", "simplified")],
         type=Float64,

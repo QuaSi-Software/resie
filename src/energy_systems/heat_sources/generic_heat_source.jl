@@ -17,6 +17,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
             ("temperature_from_global_file", "mutex"),
             ("constant_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -24,12 +28,16 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
             ("temperature_profile_file_path", "mutex"),
             ("constant_temperature", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
         ],
         type=String,
         json_type="string",
@@ -44,6 +52,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
             ("temperature_profile_file_path", "mutex"),
             ("temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "temperature_profile_file_path",
+             "temperature_from_global_file", "constant_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -56,6 +68,9 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         conditionals=[
             ("constant_power", "mutex"),
         ],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -67,6 +82,10 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         required=false,
         conditionals=[
             ("max_power_profile_file_path", "mutex"),
+        ],
+        validations=[
+            ("at_least_one", "max_power_profile_file_path", "constant_power"),
+            ("self", "value_gte_num_or_nothing", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -97,7 +116,7 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         description="Minimum source input temperature",
         display_name="Min. source temp.",
         required=false,
-        conditionals=[("temperature_reduction_model", "has_value", "lmtd")],
+        conditionals=[("temperature_reduction_model", "is", "lmtd")],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -107,7 +126,7 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         description="Maximum source input temperature",
         display_name="Max. source temp.",
         required=false,
-        conditionals=[("temperature_reduction_model", "has_value", "lmtd")],
+        conditionals=[("temperature_reduction_model", "is", "lmtd")],
         type=Float64,
         json_type="number",
         unit="°C"

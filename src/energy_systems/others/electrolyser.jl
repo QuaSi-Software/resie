@@ -132,7 +132,7 @@ const ELECTROLYSER_PARAMETERS = Dict(
         display_name="Electric power",
         required=true,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -165,7 +165,7 @@ const ELECTROLYSER_PARAMETERS = Dict(
         description="Part-load ratio of a single unit when operation is optimal",
         display_name="Optimal unit PLR",
         required=false,
-        conditionals=[("dispatch_strategy", "has_value", "try_optimal")],
+        conditionals=[("dispatch_strategy", "is", "try_optimal")],
         validations=[
             ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)
@@ -492,7 +492,7 @@ function calculate_energies(unit::Electrolyser,
                                                                               Vector{<:Stringing}}}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 

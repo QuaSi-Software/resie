@@ -38,6 +38,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
             ("ambient_temperature_from_global_file", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=String,
         json_type="string",
         unit="-"
@@ -45,13 +49,17 @@ const BUFFER_TANK_PARAMETERS = Dict(
     "ambient_temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "ambient temperature profile to be used",
+                    "ambient temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
             ("consider_losses", "is_true"),
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
+        ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
         ],
         type=String,
         json_type="string",
@@ -67,6 +75,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
             ("ambient_temperature_profile_file_path", "mutex"),
             ("ambient_temperature_from_global_file", "mutex")
         ],
+        validations=[
+            ("at_least_one", "ambient_temperature_profile_file_path",
+             "ambient_temperature_from_global_file", "constant_ambient_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -76,11 +88,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Capacity of the tank as energy value",
         display_name="Capacity (energy)",
         required=false,
-        conditionals=[
-            ("volume", "mutex"),
-        ],
+        conditionals=[("volume", "mutex")],
         validations=[
-            ("self", "value_gt_num_or_nothing", 0.0),
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "capacity", "volume")
         ],
         type=Float64,
         json_type="number",
@@ -91,11 +102,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Capacity of the tank as volume",
         display_name="Capacity (volume)",
         required=false,
-        conditionals=[
-            ("capacity", "mutex"),
-        ],
+        conditionals=[("capacity", "mutex")],
         validations=[
-            ("self", "value_gt_num_or_nothing", 0.0),
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "capacity", "volume")
         ],
         type=Float64,
         json_type="number",
@@ -119,9 +129,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Density of the fluid",
         display_name="Density fluid",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0),
-        ],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="kg/m^3"
@@ -131,12 +139,10 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Specific heat capacity of the fluid",
         display_name="Spec. heat capacity fluid",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0),
-        ],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="kJ/kg*K"
+        unit="kJ/(kg*K)"
     ),
     "high_temperature" => (
         default=75.0,
@@ -154,6 +160,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         required=false,
         validations=[
             ("self", "value_lt_rel", "high_temperature"),
+            ("self", "value_gte_num", 0.0),
         ],
         type=Float64,
         json_type="number",
@@ -164,9 +171,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Maximum load rate of the tank relative to the capacity",
         display_name="Max. load rate",
         required=false,
-        validations=[
-            ("self", "value_gt_num_or_nothing", 0.0),
-        ],
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -176,9 +181,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Maximum unload rate of the tank relative to the capacity",
         display_name="Max. unload rate",
         required=false,
-        validations=[
-            ("self", "value_gt_num_or_nothing", 0.0),
-        ],
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -188,9 +191,8 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Ratio of height to radius of the cylinder",
         display_name="Height-radius ratio",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0),
-        ],
+        conditionals=[("consider_losses", "is_true")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -200,54 +202,40 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Thermal transmission rate of the lid",
         display_name="Thermal transmission lid",
         required=false,
-        conditionals=[
-            ("consider_losses", "is_true"),
-        ],
-        validations=[
-            ("self", "value_gte_num", 0.0),
-        ],
+        conditionals=[("consider_losses", "is_true")],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_barrel" => (
         default=1.2,
         description="Thermal transmission rate of the barrel",
         display_name="Thermal transmission barrel",
         required=false,
-        conditionals=[
-            ("consider_losses", "is_true"),
-        ],
-        validations=[
-            ("self", "value_gte_num", 0.0),
-        ],
+        conditionals=[("consider_losses", "is_true")],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "thermal_transmission_bottom" => (
         default=1.2,
         description="Thermal transmission rate of the bottom",
         display_name="Thermal transmission bottom",
         required=false,
-        conditionals=[
-            ("consider_losses", "is_true"),
-        ],
-        validations=[
-            ("self", "value_gte_num", 0.0),
-        ],
+        conditionals=[("consider_losses", "is_true")],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="W/m^2*K"
+        unit="W/(m^2*K)"
     ),
     "ground_temperature" => (
         default=12.0,
         description="Constant temperature of the ground",
         display_name="Ground temperature",
         required=false,
-        conditionals=[
-            ("consider_losses", "is_true"),
-        ],
+        conditionals=[("consider_losses", "is_true")],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -257,9 +245,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         description="Switch point for the balanced model as relative load",
         display_name="Switch point",
         required=false,
-        conditionals=[
-            ("model_type", "has_value", "balanced"),
-        ],
+        conditionals=[("model_type", "is", "balanced")],
         validations=[
             ("self", "value_gt_num", 0.0),
             ("self", "value_lt_num", 1.0),
@@ -499,7 +485,7 @@ function temperature_at_load(unit::BufferTank)::Temperature
 end
 
 function calculate_losses!(unit::BufferTank, sim_params)
-    if !unit.consider_losses
+    if !unit.consider_losses || unit.capacity <= sim_params["epsilon"]
         unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
@@ -563,7 +549,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     energy_demanded = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy demanded
-    if energy_demanded >= -sim_params["epsilon"]
+    if energy_demanded >= -sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         handle_component_update!(unit, "process", sim_params)
         return
@@ -621,7 +607,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
+    if energy_available <= sim_params["epsilon"] || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
