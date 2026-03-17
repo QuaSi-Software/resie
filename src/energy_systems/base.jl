@@ -47,57 +47,15 @@ default(config::AbstractDict{String,Any}, name::String, default_val::Any)::Any =
                                                                                         default_val
 
 """
-Categories that each represent a physical medium in conjunction with additional attributes,
-such as temperature or voltage. These attributes are not necessarily unchanging, but are
-considered the nominal range. For example, a heating component might circulate water anywhere
-from 30°C to 60°C, but the nominal temperature is considered to be 60°C. This is intended
-so it becomes possible to prevent linking components that do not work together because they
-work on different nominal temperatures, while both work with the same physical medium,
-for example water.
+Convenience function that returns the first argument that is not nothing.
 
-The names are structured in a composite of segments. For example, these are:
-    m_e_ac_230v
-
-    1. m: This segment is used to distinguish its symbols from the symbols of other types
-    2. e: The energy type, in this case electricity
-    3. ac: The physical medium, in this case AC current
-    4. 230v: Additional attributes of nominal value or ranges numbered through
+This is similar to something, however it will return nothing if all arguments are nothing
+instead of throwing an error.
 """
-medium_categories = Set{Symbol}([
-                                 # electricity
-                                 :m_e_ac_230v,
-
-                                 # chemicals - gasses
-                                 :m_c_g_natgas,
-                                 :m_c_g_h2,
-                                 :m_c_g_o2,
-
-                                 # heat - low temperature water
-                                 :m_h_w_lt1,
-                                 :m_h_w_lt2,
-                                 :m_h_w_lt3,
-                                 :m_h_w_lt4,
-                                 :m_h_w_lt5,
-
-                                 # heat - high temperature water
-                                 :m_h_w_ht1,
-                                 :m_h_w_ht2,
-                                 :m_h_w_ht3,
-                                 :m_h_w_ht4,
-                                 :m_h_w_ht5])
-
-"""
-register_media(categories)
-
-Add the given medium categories to the set of all medium categories.
-"""
-function register_media(categories::Vector{Symbol})
-    for cat in categories
-        push!(medium_categories, cat)
-    end
-end
-
-register_media(category::Symbol) = register_media([category])
+some_or_none() = nothing
+some_or_none(x::Nothing, y...) = some_or_none(y...)
+some_or_none(x::Some, y...) = x.value
+some_or_none(x::Any, y...) = x
 
 """
 Enumerations of the archetype of a component describing its general function.
@@ -1587,6 +1545,514 @@ function calculate_energy_flow(interface::SystemInterface)::Float64
 end
 
 """
+    component_parameters(x::Type{HeatPump})::Dict{String,Any}
+
+Lists all configuration parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,NamedTuple}`: Definition of the parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,NamedTuple}()
+end
+
+"""
+    extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
+
+Helper to extract and process a parameter from config using its definition.
+Handles special processing like function parsing where needed.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method.
+- `config::Dict{String,Any}`: The component config
+- `param_name::String`: Name of the parameter. Has to be an exact match, this is not checked
+    in this function.
+- `param_def::NamedTuple`: The parameter definition with its metadata
+- `sim_params::Dict{String,Any}`: Simulation parameters
+- `uac::String`: UAC of the component, typically used for error messages
+"""
+function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if isdefined(param_def, :default)
+        value = default(config, param_name, param_def.default)
+    elseif param_name in keys(config)
+        value = config[param_name]
+    else
+        throw(InputError("Missing required parameter `$param_name` in component `$uac`."))
+    end
+
+    # cast to the type of the component, unless the value is nothing
+    if value !== nothing
+        try
+            value = convert(param_def.type, value)
+        catch
+            throw(InputError("Can't convert given value for parameter `$param_name` to type `$(param_def.type)` " *
+                             "in component `$uac`."))
+        end
+    end
+
+    # special handling for function-type parameters
+    if isdefined(param_def, :function_type)
+        if param_def.function_type == "cop"
+            return parse_cop_function(value)
+        elseif param_def.function_type == "1dim"
+            return parse_efficiency_function(value)
+        elseif param_def.function_type == "2dim"
+            return parse_2dim_function(value)
+        else
+            throw(InputError("Unknown function type `$(param_def.function_type)` in component `$uac`."))
+        end
+    end
+
+    return value
+end
+
+"""
+    extract_control_parameters(x::Type{Component}, config::Dict{String,Any})::Dict{String,Any}
+
+Extracts the control parameters from the config ready to be given to the `Controller` constructor.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method.
+- `config::Dict{String,Any}`: The config with the raw parameters
+# Returns
+- `Dict{String,Any}`: The extracted parameters
+"""
+function extract_control_parameters(x::Type{Component}, config::Dict{String,Any})::Dict{String,Any}
+    # TODO: for now this just carries the subconfig, if any, over to the Controller
+    # constructor. in the future we want to have those, as well as the control module,
+    # parameters being handled the same as the component parameters via a SSOT approach
+    if "control_parameters" in keys(config)
+        return config["control_parameters"]
+    end
+    return Dict{String,Any}()
+end
+
+"""
+    check_validation_at_least_one(validation::Tuple, extracted::Dict{String,Any}, uac::String, is_active::Bool)
+
+Checks the primary validation operand "at_least_one".
+
+# Args
+- `validation::Tuple`: The validation to check, from the parameter SSOT definition
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `is_active::Bool`: If the parameter is active in the sense that its conditionals all apply
+"""
+function check_validation_at_least_one(validation::Tuple, extracted::Dict{String,Any}, uac::String, is_active::Bool)
+    if !is_active
+        # don't check inactive parameters
+        return
+    end
+
+    names = validation[2:end]
+    if sum([haskey(extracted, u) && !isnothing(extracted[u]) ? 1 : 0 for u in names]) < 1
+        throw(InputError("At least one of the following parameters of component `$uac` must not be nothing: " *
+                         join(names, ", ")))
+    end
+end
+
+"""
+    check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
+
+Checks the given parameter for the given validation. Throws InputError if the validation
+fails or is misconfigured.
+
+# Args
+- `validation::Tuple`: The validation to check, from the parameter SSOT definition
+- `name::String`: The name of the parameter to validate
+- `value::Any`: The value of the parameter to validate
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `is_active::Bool`: If the parameter is active in the sense that its conditionals all apply
+"""
+function check_validation(validation::Tuple, name::String, value::Any,
+                          extracted::Dict{String,Any}, uac::String, is_active::Bool)
+    if validation[1] == "at_least_one"
+        check_validation_at_least_one(validation, extracted, uac, is_active)
+        return
+    elseif validation[1] != "self"
+        # the remaining code checks for primary operand "self"
+        throw(InputError("Unknown primary validation operand `$(validation[1])` for component `$uac`"))
+    end
+
+    # most current operators expect a not-nothing value, so we can catch it here
+    if !occursin("or_nothing", validation[2]) && value === nothing
+        throw(InputError("Value of `$name` in component `$uac` was `nothing` but must be numeric"))
+    end
+
+    if validation[2] == "value_lt_num"
+        if !(value < validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be less than $(validation[3])"))
+        end
+    elseif validation[2] == "value_lte_num"
+        if !(value <= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be less than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_gt_num"
+        if !(value > validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_gte_num"
+        if !(value >= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_gt_num_or_nothing"
+        if !(value === nothing || value > validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_gte_num_or_nothing"
+        if !(value === nothing || value >= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater or equal than $(validation[3])"))
+        end
+    elseif validation[2] == "value_lt_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value < other_value)
+            throw(InputError("Value of `$name` in component `$uac` must be less than value of parameter " *
+                             "`$(validation[3])`"))
+        end
+    elseif validation[2] == "value_lte_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value <= other_value)
+            throw(InputError("Value of `$name` in component `$uac` must be less than or equal to the value of " *
+                             "parameter `$(validation[3])`"))
+        end
+    elseif validation[2] == "value_gt_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value > other_value)
+            throw(InputError("Value of `$name` in component `$uac` must be greater than the value of " *
+                             "parameter `$(validation[3])`"))
+        end
+    elseif validation[2] == "value_gte_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value >= other_value)
+            throw(InputError("Value of `$name` in component `$uac` must be greater than or equal to the value " *
+                             "of parameter `$(validation[3])`"))
+        end
+    else
+        throw(InputError("Unknown validation operand `$(validation[2])` for parameter `$name` in component `$uac`"))
+    end
+end
+
+"""
+    build_flat_boolean_expr(tokens)
+
+Builds an expression ready for `eval` from a flat boolean expression with infix notation.
+
+"Flat" means that no parentheses are used and the only operators are: AND, OR
+The token list must not be empty, but can be a single boolean literal.
+
+# Arguments
+- `tokens<:Vector`: The list of tokens
+# Returns
+- `Union{Bool,Expr}`: The expression ready for `eval`. Might just be a single boolean
+    literal.
+"""
+function build_flat_boolean_expr(tokens::T)::Union{Bool,Expr} where {T<:Vector}
+    if length(tokens) < 1
+        throw(ArgumentError("Token list must not be empty"))
+    end
+    expr = tokens[1]
+
+    i = 2
+    while i < length(tokens)
+        operator = tokens[i]
+        operand = tokens[i + 1]
+        expr = Expr(operator, expr, operand) # nest the expression for prefix notation
+        i += 2
+    end
+
+    return expr
+end
+
+"""
+    evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Symbol where T<:Tuple
+
+Evaluates the given conditional and returns its boolean value.
+
+# Arguments
+- `conditional<:Tuple`: The conditional to check
+- `extracted::Dict{String,Any}`: The values of extracted parameters for calculation
+# Returns
+- `Bool`: The boolean value of the evaluated conditional
+"""
+function evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Bool where {T<:Tuple}
+    other_name = conditional[1]
+    operator = conditional[2]
+    operand = length(conditional) > 2 ? conditional[3] : nothing
+
+    if operator == "is"
+        return haskey(extracted, other_name) && extracted[other_name] == operand ? :true : :false
+    elseif operator == "is_not"
+        return haskey(extracted, other_name) && extracted[other_name] != operand ? :true : :false
+    elseif operator == "is_true"
+        return haskey(extracted, other_name) && Bool(extracted[other_name]) ? :true : :false
+    elseif operator == "is_not_nothing"
+        return haskey(extracted, other_name) && !isnothing(extracted[other_name]) ? :true : :false
+    elseif operator == "is_nothing"
+        return haskey(extracted, other_name) && isnothing(extracted[other_name]) ? :true : :false
+    elseif operator == "is_one_of"
+        has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
+        return has_match ? :true : :false
+    else
+        throw(InputError("Unknown conditional operator $operator"))
+    end
+end
+
+"""
+    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+
+Returns if the conditionals for the given parameter apply.
+
+A parameter can be active, meaning it should be validated and will be used, when the
+conditionals that are defined for it evaluate to true. A parameter without conditionals
+therefore is always active. Conditionals are implicitly connected via the logical operator
+AND if nothing is specified and can also be connected via OR by placing it in-between the
+conditional tuples. The entire vector thus builds a boolean expression that is being
+evaluated.
+
+# Args
+- `name::String`: The name of the parameter to check
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+# Returns
+- `Bool`: True if the parameter is active, false if not
+"""
+function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+    if !(name in keys(type_def) && isdefined(type_def[name], :conditionals))
+        return true
+    end
+
+    # add implicit AND between conditionals that have no logical operator between them. also
+    # strip mutex, as it doesn't factor into the calculation
+    conditionals = []
+    for idx in 1:length(type_def[name].conditionals)
+        conditional = type_def[name].conditionals[idx]
+        if typeof(conditional) <: Tuple && length(conditional) >= 2 && conditional[2] == "mutex"
+            continue
+        end
+
+        # push conditional / operator, but prevent double operators / operands or starting
+        # with an operator (happens because of stripping mutex)
+        if length(conditionals) == 0 && typeof(conditional) <: Tuple ||
+           length(conditionals) > 0 && typeof(conditionals[end]) != typeof(conditional)
+            # end of expression
+            push!(conditionals, conditional)
+        end
+
+        # add AND if this and the next is also a conditional
+        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx+1] : nothing
+        if typeof(conditional) <: Tuple && typeof(next) <: Tuple
+            push!(conditionals, "AND")
+        end
+    end
+
+    # due to stripping mutex we might end up with no conditionals to checks
+    if length(conditionals) == 0
+        return true
+    end
+
+    # build expression by evaluating each conditional and putting operators between
+    expression = []
+    for conditional in conditionals
+        if typeof(conditional) == String
+            push!(expression, conditional == "AND" ? :&& : :||)
+            continue
+        end
+
+        push!(expression, evaluate_conditional(conditional, extracted))
+    end
+
+    # eval is safe here because we built the expression from bool literals and operators
+    # with no user input making it into the expression
+    return Bool(eval(build_flat_boolean_expr(expression)))
+end
+
+"""
+    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+
+Validates the given component parameter config for mutex conditionals.
+
+If a mutex conditional is triggered, throws an InputError.
+
+# Arguments
+- `config::Dict{String,Any}`: The component parameter config
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+"""
+function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    for (name, value) in pairs(config)
+        if name in keys(type_def) && isdefined(type_def[name], :conditionals)
+            for cond in type_def[name].conditionals
+                if length(cond) >= 2 && cond[2] == "mutex"
+                    other_name = cond[1]
+                    other_value = other_name in keys(config) ? config[other_name] : nothing
+                    if ((type_def[name].type != Bool && value !== nothing) ||
+                        (type_def[name].type == Bool && value === true)) &&
+                       ((type_def[other_name].type != Bool && other_value !== nothing) ||
+                        (type_def[other_name].type == Bool && other_value === true))
+                        # end of condition
+                        throw(InputError("Parameters `$name` and `$other_name` of " *
+                                         "component `$uac` are mutually exclusive."))
+                    end
+                end
+            end
+        end
+    end
+end
+
+"""
+    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+
+Validates the given configuration for interdependencies and consistency.
+
+Throws `InputError` if validation fails.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method.
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `sim_params::Dict{String,Any}`: Simulation parameters
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+"""
+function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
+    for (name, value) in pairs(extracted)
+        # skip control_parameters, as they have their own validation. also skip is_source
+        # from GridConnection as it is an internal parameter
+        if name == "control_parameters" || name == "is_source"
+            continue
+        end
+
+        # check if it is required but has a value of nothing (meaning both the default is
+        # nothing and no value was given). but also check if conditionals would "turn off"
+        # the parameter in any case, in which case the value does not matter
+        if type_def[name].required && value === nothing && conditionals_apply(name, extracted, type_def)
+            throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
+        end
+
+        # check, for parameters with field options, if the value is one of the options
+        if name in keys(type_def) && isdefined(type_def[name], :options)
+            if !(value in type_def[name].options)
+                throw(InputError("Given value $value is not in the allowed options for " *
+                                 "parameter `$name` of component `$uac`."))
+            end
+        end
+
+        # check for other field-specific validations
+        if name in keys(type_def) && isdefined(type_def[name], :validations)
+            for validation in type_def[name].validations
+                check_validation(validation, name, value, extracted, uac, conditionals_apply(name, extracted, type_def))
+            end
+        end
+    end
+end
+
+"""
+    x::Type{Component}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any})::Tuple
+
+Constructs the initial values for the component's fields.
+
+# Args
+-`x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method
+-`uac::String`: The UAC of the component
+-`params::Dict{String,Any}`: The extracted and validated parameters
+-`raw_params::Dict{String,Any}`: The original component config before extraction
+-`sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+-`Tuple`: A tuple matching the order expected by the `new()` constructor of the component
+"""
+function init_from_params(x::Type{Component}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    return Tuple()
+end
+
+"""
+    SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,Any},
+                               sim_params::Dict{String,Any})::Tuple
+
+Base implementation of a Component-Subtype constructor using the single-source-of-truth
+functionality for parameter parsing and validation.
+
+This is used by being called inside a constructor function and will return a tuple ready to
+be unrolled into the default constructor method and/or `new`. E.g.:
+```
+function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+    return new(SSOT_parameter_constructor(HeatPump, uac, config, sim_params)...)
+end
+```
+
+# Args
+- `T::Type`: The type on which the constructor is called. This is used to call the subtype-
+    specific parameter functions, e.g. `extract_parameter`
+- `uac::String`: The UAC of the component
+- `config::Dict{String,Any}`: The config dict with the parameter values
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Tuple`: The extracted and validated parameter values ready to be unrolled into `new`
+"""
+function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,Any},
+                                    sim_params::Dict{String,Any})::Tuple
+    constructor_errored = false
+
+    # extract all parameters using the parameter dictionary as the source of truth
+    extracted_params = Dict{String,Any}()
+    type_def = component_parameters(T)
+    for (param_name, param_def) in type_def
+        try
+            extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
+        catch e
+            io = IOBuffer()
+            showerror(io, e)
+            print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
+            msg = String(take!(io))
+            @error msg
+            constructor_errored = true
+        end
+    end
+
+    try
+        # extract control_parameters, which is essentially a subconfig
+        extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+        # check mutex conditionals, based on given parameter values, not extracted (as they
+        # include the default values)
+        validate_mutex_params(config, uac, type_def)
+
+        # validate configuration, e.g. for interdependencies and allowed values
+        validate_config(T, config, extracted_params, uac, sim_params)
+    catch e
+        io = IOBuffer()
+        showerror(io, e)
+        print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
+        msg = String(take!(io))
+        @error msg
+        constructor_errored = true
+    end
+
+    # we delayed throwing the errors upwards so that many errors are caught at once
+    if constructor_errored
+        throw(InputError("Can't construct component $uac because of errors parsing " *
+                         "the parameter config. Check the error log for more " *
+                         "information on each error."))
+    end
+
+    # initialize the parameters ready for feeding into new()
+    return init_from_params(T, uac, extracted_params, config, sim_params)
+end
+
+"""
     output_value(unit, key)
 
 Return the value for the output with the given output key.
@@ -2034,6 +2500,73 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
 end
 
 """
+    load_profile_from_global_weather_file(config::Dict{String,Any}, from_global_file_key::String,
+                                          sim_params::Dict{String,Any}, uac::String)
+
+Reads a profile file path from the given config and then loads and returns the profile from
+the global weather file.
+
+# Args
+-`config::Dict{String,Any}`: The config from which to read the file path
+-`from_global_file_key::String`: The key for the config containing the name of the profile
+    in the global weather file
+-`sim_params::Dict{String,Any}`: Simulation parameters
+-`uac::String`: The UAC of the component, used for error messages
+# Returns
+-`Union{Nothing,Profile}`: The requested profile or nothing if the config does not contain
+    the given key
+"""
+function load_profile_from_global_weather_file(config::Dict{String,Any},
+                                               from_global_file_key::String,
+                                               sim_params::Dict{String,Any},
+                                               uac::String)
+    if !haskey(config, from_global_file_key)
+        return nothing
+    end
+
+    if !haskey(sim_params, "weather_data")
+        throw(InputError("For component $uac a global weather file key was given, but " *
+                         "no global weather file is set (or it failed to load)."))
+    end
+
+    wd = sim_params["weather_data"]
+    field_name_str = config[from_global_file_key]
+    field_symbols = fieldnames(typeof(wd))
+    if any(occursin(field_name_str, string(sym)) for sym in field_symbols)
+        return getfield(wd, Symbol(field_name_str))
+    else
+        throw(InputError("For component $uac the global weather file key, given as " *
+                         "'$field_name_str', must be one of: " *
+                         "$(join(string.(field_symbols), ", "))."))
+    end
+end
+
+"""
+    load_optional_profile(config::Dict{String,Any}, parameter_name::String,
+                          sim_params::Dict{String,Any})
+
+Reads the given config for the given key and then loads the profile or returns nothing if
+the key does not occur in the config.
+
+# Args
+-`config::Dict{String,Any}`: The config that maybe contains the key
+-`parameter_name::String`: The key for the config with the profile file path
+-`sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+-`Union{Nothing,Profile}`: The requested profile or nothing if the config does not contain
+    the given key
+"""
+function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
+                               sim_params::Dict{String,Any})
+    if haskey(config, parameter_name)
+        path = config[parameter_name]
+        return Profile(path, sim_params)
+    end
+
+    return nothing
+end
+
+"""
 get_diff_solar_radiation_profile_from_config(config, simulation_parameter, uac)
 
 Function to determine the source of the solar diffuse radiation profile.
@@ -2125,6 +2658,31 @@ function get_wind_speed_profile_from_config(config::Dict{String,Any}, sim_params
         @info "For '$uac', no wind speed is set."
         return nothing
     end
+end
+
+"""
+    all_component_parameters()::Dict{String,Any}
+
+Returns a dictionary, with type names as keys, of the parameters of all components.
+
+# Returns
+- `Dict{String,Any}`: The parameter definition for all components, indexed by type names.
+"""
+function all_component_parameters()::Dict{String,Any}
+    types = [Battery, BufferTank, Bus, CHPP, Electrolyser, FixedSink, FixedSupply, FlexibleSink,
+             FlexibleSupply, FuelBoiler, GenericHeatSource, GeothermalHeatCollector,
+             GeothermalProbes, GridInput, GridOutput, HeatPump, PVPlant, SeasonalThermalStorage,
+             SolarthermalCollector, Storage, ThermalBooster, UTIR]
+
+    all_parameters = Dict{String,Any}()
+    for cmp_type in types
+        # turning the Type into a Symbol gives the fully qualified name including modules,
+        # but we care only about the last part, the actual type name
+        name = String(Symbol(cmp_type))
+        splitted = split(name, ".")
+        all_parameters[last(splitted)] = component_parameters(cmp_type)
+    end
+    return all_parameters
 end
 
 end

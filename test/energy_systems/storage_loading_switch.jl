@@ -65,7 +65,6 @@ function test_primary_producer_can_load_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
             "constant_demand" => 20000,

@@ -103,6 +103,7 @@ function get_default_sim_params()::Dict{String,Any}
         "run_path" => function (path)
             return path
         end,
+        "show_detailed_errors" => true,
     )
 end
 
