@@ -121,6 +121,19 @@ function is_empty(row::Union{BTInputRow,BTOutputRow})::Bool
             is_max_energy_nothing(row.energy_pool))
 end
 
+#! format: off
+const BUS_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the bus (e.g. electricity, heat, gas, etc.)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a bus component for balancing multiple inputs and outputs.
 
@@ -161,6 +174,10 @@ end
 
 Config-constructor for a Bus.
 
+This could ideally be rolled into an inner constructor, however having it external to the
+struct has the advantage that additional constructors can make use of the default internal
+constructor without keyword arguments.
+
 # Arguments
 `uac::String`: The UAC of the new bus
 `config::Dict{String,Any}`: The config from the project file
@@ -170,25 +187,7 @@ Config-constructor for a Bus.
 `Bus`: The constructed bus
 """
 function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
-    medium = Symbol(config["medium"])
-    register_media([medium])
-
-    return Bus(uac,                                          # uac
-               Controller(default(config, "control_parameters", nothing)),
-               sf_bus,                                       # sys_function
-               medium,                                       # medium
-               [],                                           # input_interfaces
-               [],                                           # output_interfaces,
-               ConnectionMatrix(config),                     # connectivity
-               0.0,                                          # remainder
-               Dict{String,BTInputRow}(),                    # balance_table_inputs
-               Dict{String,BTOutputRow}(),                   # balance_table_outputs
-               Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
-               [],                                           # input_output_rows_iteration
-               false,                                        # has_custom_order
-               nothing,                                      # proxy
-               uuid1(),                                      # holds the current run ID later
-               sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
+    return Bus(SSOT_parameter_constructor(Bus, uac, config, sim_params)...)
 end
 
 """
@@ -225,6 +224,43 @@ function Bus(uac::String,
                nothing,                                      # proxy
                run_id,                                       # run ID
                epsilon)
+end
+
+function component_parameters(x::Type{Bus})::Dict{String,NamedTuple}
+    return deepcopy(BUS_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{Bus}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(Bus))
+end
+
+function init_from_params(x::Type{Bus}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any},
+                          sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+
+    # return tuple in the order expected by new()
+    return (uac,                                          # uac
+            Controller(params["control_parameters"]),
+            sf_bus,                                       # sys_function
+            medium,                                       # medium
+            [],                                           # input_interfaces
+            [],                                           # output_interfaces,
+            ConnectionMatrix(raw_params),                 # connectivity
+            0.0,                                          # remainder
+            Dict{String,BTInputRow}(),                    # balance_table_inputs
+            Dict{String,BTOutputRow}(),                   # balance_table_outputs
+            Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
+            [],                                           # input_output_rows_iteration
+            false,                                        # has_custom_order
+            nothing,                                      # proxy
+            uuid1(),                                      # holds the current run ID later
+            sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
 end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
@@ -351,7 +387,8 @@ function set_max_energy!(unit::Bus,
                          purpose_uac::Union{Stringing,Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool,
                          recalculate_max_energy::Bool,
-                         is_secondary_interface::Bool=false)
+                         is_secondary_interface::Bool=false,
+                         is_transformer_potential::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
     com_uac = adjust_name_if_secondary(comp.uac, is_secondary_interface)
 
@@ -373,7 +410,8 @@ function set_max_energy!(unit::Bus,
                         recalculate_max_energy)
     end
 
-    if unit.proxy !== nothing
+    # update also proxy interface, but only in process-step, not in potential
+    if unit.proxy !== nothing && !is_transformer_potential
         proxy_interface = is_input ?
                           bus.input_interfaces[bus.balance_table_inputs[com_uac].priority] :
                           bus.output_interfaces[bus.balance_table_outputs[comp.uac].priority]
@@ -601,7 +639,11 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy) # the caller has not calculated its potential
+                if unit.balance_table[input_row.priority, output_row.priority * 2 - 1] == 0.0 &&
+                   is_max_energy_nothing(interface.max_energy)
+                    # the caller has not calculated its potential OR has another potential AND 
+                    # no energy has been distributed in the bus balance table due to other restrictions,
+                    # so get the original energy that are required by the output, including the temperatures.
                     temperature_min = get_min_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
                                                           input_row.source.uac)
                     temperature_max = get_max_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
@@ -660,8 +702,11 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy)
-                    # no max_energy is written, but maybe temperatures --> get infos from input_row
+                if unit.balance_table[input_row.priority, output_row.priority * 2 - 1] == 0.0 &&
+                   is_max_energy_nothing(interface.max_energy)
+                    # the caller has not calculated its potential OR has another potential AND 
+                    # no energy has been distributed in the bus balance table due to other restrictions,
+                    # so get the original energy that are supplied by the input, including the temperatures
                     temperature_min = get_min_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
                                                           output_row.target.uac)
                     temperature_max = get_max_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
@@ -907,7 +952,7 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
                                                                                  temperature_lowest_max)
 
-        if energy_flow !== 0.0
+        if energy_flow !== 0.0 && !isinf(energy_flow)
             # extract the already distributed energy from the balance table
             already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority, 1:2:end])
             already_distributed_input_temperatures = unit.balance_table[input_row.priority, 2:2:end]

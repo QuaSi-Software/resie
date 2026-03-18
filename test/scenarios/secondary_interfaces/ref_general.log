@@ -1,0 +1,38 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:17:44
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'SRC_GRID', no 'temperature' is set.
+[Info] For 'SRC_PV_01', no 'temperature' is set.
+[Info] For 'DEM_1', the 'temperature' is set to the constant value of 50.0.
+[Info] For 'SRC_LT', the 'temperature' is set to the constant value of 10.0.
+[Info] For 'DEM_2', the 'temperature' is set to the constant value of 50.0.
+[Info] For 'SRC_LT2', the 'temperature' is set to the constant value of 10.0.
+[Info] For 'SRC_PV_02', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\secondary_interfaces\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/669 in 0.252 s. ETA: 4.8567 s
+[Info] Progress: 66/669 in 0.446 s. ETA: 8.1496 s
+[Info] Progress: 99/669 in 0.238 s. ETA: 4.1109 s
+[Info] Progress: 132/669 in 0.164 s. ETA: 2.6687 s
+[Info] Progress: 165/669 in 0.173 s. ETA: 2.6422 s
+[Info] Progress: 198/669 in 0.136 s. ETA: 1.9411 s
+[Info] Progress: 231/669 in 0.139 s. ETA: 1.8449 s
+[Info] Progress: 264/669 in 0.181 s. ETA: 2.2214 s
+[Info] Progress: 297/669 in 0.13 s. ETA: 1.4655 s
+[Info] Progress: 330/669 in 0.147 s. ETA: 1.5101 s
+[Info] Progress: 363/669 in 0.129 s. ETA: 1.1962 s
+[Info] Progress: 396/669 in 0.175 s. ETA: 1.4477 s
+[Info] Progress: 429/669 in 0.15 s. ETA: 1.0909 s
+[Info] Progress: 462/669 in 0.121 s. ETA: 0.7590 s
+[Info] Progress: 495/669 in 0.196 s. ETA: 1.0335 s
+[Info] Progress: 528/669 in 0.108 s. ETA: 0.4572 s
+[Info] Progress: 561/669 in 0.137 s. ETA: 0.4484 s
+[Info] Progress: 594/669 in 0.112 s. ETA: 0.2545 s
+[Info] Progress: 627/669 in 0.19 s. ETA: 0.2418 s
+[Info] Progress: 660/669 in 0.113 s. ETA: 0.0308 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\secondary_interfaces\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\secondary_interfaces\sankey_plot.html
+[Info] general log saved to .\test\scenarios\secondary_interfaces\general.log

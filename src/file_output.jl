@@ -320,7 +320,10 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 if length(splitted) > 1
                     medium_key = splitted[1]
                     medium = Symbol(String(medium_key))
-                    if medium in EnergySystems.medium_categories
+                    unit_fields = fieldnames(typeof(unit))
+                    unit_media = [getfield(unit, f)
+                                  for f in unit_fields if startswith(String(f), "m_") || String(f) == "medium"]
+                    if medium in unit_media
                         value_key = splitted[2]
                     else
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
@@ -556,6 +559,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
                                                                "auxiliary_plots_path",
                                                                "./output/"))
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+        aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
             if plot_optional_figures_begin(component[2], aux_plots_output_path, aux_plots_formats, sim_params)

@@ -60,9 +60,12 @@
             "output_refs": [
                 "TST_BUS_DC"
             ],
-            "medium": "m_e_dc_pv",
+            "m_el_in": "m_e_dc_pv",
+            "m_el_out": "m_e_dc_pv",
             "capacity": 50000,
-            "load": 25000
+            "initial_load": 0.5,
+            "charge_efficiency": 1.0,
+            "discharge_efficiency": 1.0
         },
         "TST_BUS_AC": {
             "type": "Bus",

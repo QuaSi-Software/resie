@@ -71,12 +71,15 @@
         },
         "TST_BAT_01": {
             "type": "Battery",
-            "medium": "m_e_ac_230v",
+            "m_el_in": "m_e_ac_230v",
+            "m_el_out": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_02"
             ],
             "capacity": 8000,
-            "load": 4000
+            "initial_load": 0.5,
+            "charge_efficiency": 1.0,
+            "discharge_efficiency": 1.0
         },
         "TST_BUS_01": {
             "type": "Bus",

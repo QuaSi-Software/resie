@@ -8,6 +8,7 @@ using Resie.EnergySystems
     include("initialization/bus.jl")
     include("initialization/bus_merge.jl")
     include("initialization/profiles.jl")
+    include("initialization/parameters.jl")
     include("order_of_operations/load_order_of_operation.jl")
     include("order_of_operations/bus_output_priorities.jl")
     include("order_of_operations/bus_to_bus.jl")

@@ -1,0 +1,55 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:10:01
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation (extensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature (intensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed (intensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The profile at sunrise_times (intensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using stepwise interpolation.
+[Info] The profile at sunset_times (intensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using stepwise interpolation.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:DiffuseHorizontalIrradiation (extensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_solar_radiation interpolation.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:BeamHorizontalIrradiation (extensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_solar_radiation interpolation.
+[Info] For 'TST_01_HZG_02_DEM', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] For 'TST_01_ELT_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_ELT_02_GRI', no 'temperature' is set.
+[Info] For 'TST_01_ELT_01_GRO', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_DEM', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] For 'TST_01_H2_02_DEM', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_STS', the 'ambient_temperature' is taken from the project-wide weather file: temp_ambient_air
+[Info] For 'TST_01_HZG_01_STS', the 'ground_temperature' is set to the constant value of 9.0.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electrolyser_single_bus\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 11.395 s. ETA: 220.6486 s
+[Info] Progress: 66/672 in 0.175 s. ETA: 3.2136 s
+[Info] Progress: 99/672 in 0.152 s. ETA: 2.6393 s
+[Info] Progress: 132/672 in 0.15 s. ETA: 2.4545 s
+[Info] Progress: 165/672 in 0.253 s. ETA: 3.8870 s
+[Info] Progress: 198/672 in 0.149 s. ETA: 2.1402 s
+[Info] Progress: 231/672 in 0.184 s. ETA: 2.4589 s
+[Info] Progress: 264/672 in 0.147 s. ETA: 1.8175 s
+[Info] Progress: 297/672 in 0.215 s. ETA: 2.4432 s
+[Info] Progress: 330/672 in 0.163 s. ETA: 1.6893 s
+[Info] Progress: 363/672 in 0.155 s. ETA: 1.4514 s
+[Info] Progress: 396/672 in 0.222 s. ETA: 1.8567 s
+[Info] Progress: 429/672 in 0.23 s. ETA: 1.6936 s
+[Info] Progress: 462/672 in 0.198 s. ETA: 1.2600 s
+[Info] Progress: 495/672 in 0.167 s. ETA: 0.8957 s
+[Info] Progress: 528/672 in 0.227 s. ETA: 0.9905 s
+[Info] Progress: 561/672 in 0.143 s. ETA: 0.4810 s
+[Info] Progress: 594/672 in 0.171 s. ETA: 0.4042 s
+[Info] Progress: 627/672 in 0.226 s. ETA: 0.3082 s
+[Info] Progress: 660/672 in 0.178 s. ETA: 0.0647 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electrolyser_single_bus\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electrolyser_single_bus\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electrolyser_single_bus\out.csv
+[Info] general log saved to .\test\scenarios\electrolyser_single_bus\general.log
