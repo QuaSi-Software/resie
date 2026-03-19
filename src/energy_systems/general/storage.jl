@@ -77,7 +77,7 @@ function extract_parameter(x::Type{Storage}, config::Dict{String,Any}, param_nam
 end
 
 function validate_config(x::Type{Storage}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
+                         sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(Storage))
 end
 

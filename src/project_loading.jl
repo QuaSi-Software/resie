@@ -283,5 +283,56 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
     return UInt(time_step), start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output
 end
 
+"""
+    get_economy_parameter(project_config)
+
+Extract economy parameters form input file.
+
+Args:
+-`project_config::AbstractDict{}`: The project config data
+Return:
+-`Dict{String,Any}`: The economy parameters from the input file. If non are given, calculate_economy will be set to false.
+"""
+function get_economy_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+    if haskey(project_config, "economy_parameter")
+        return Dict{String,Any}(
+            "calculate_economy" => default(project_config["economy_parameter"], "calculate_economy", false),
+            "observation_period_in_years" => default(project_config["economy_parameter"], "observation_period_in_years",
+                                                     20.0),
+            "interest_rate" => default(project_config["economy_parameter"], "interest_rate", 0.02),
+        )
+    else
+        return Dict{String,Any}(
+            "calculate_economy" => false,
+        )
+    end
+end
+
+"""
+    get_emission_parameter(project_config)
+
+Extract emission parameters form input file.
+
+Args:
+-`project_config::AbstractDict{}`: The project config data
+Return:
+-`Dict{String,Any}`: The emission parameters from the input file. If non are given, calculate_emissions will be set to false.
+"""
+function get_emission_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+    if haskey(project_config, "emissions_parameter")
+        return Dict{String,Any}(
+            "calculate_emissions" => default(project_config["emissions_parameter"], "calculate_emissions", false),
+            "observation_period_in_years" => default(project_config["emissions_parameter"],
+                                                     "observation_period_in_years", 20.0),
+            "include_embodied_emissions" => default(project_config["emissions_parameter"], "include_embodied_emissions",
+                                                    true),
+        )
+    else
+        return Dict{String,Any}(
+            "calculate_emissions" => false,
+        )
+    end
+end
+
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")

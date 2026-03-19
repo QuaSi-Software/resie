@@ -1,4 +1,7 @@
 
+"""
+Holds the energy profiles of each component that are relevant for economy calculation
+"""
 Base.@kwdef struct EconomyEmissionData{Component}
     component::Component
     energy_out::Union{Nothing,Vector{Float64}} = nothing
@@ -7,6 +10,9 @@ Base.@kwdef struct EconomyEmissionData{Component}
     energy_demand::Union{Nothing,Vector{Float64}} = nothing
 end
 
+"""
+Holds results of the economy calculation
+"""
 Base.@kwdef mutable struct EconomyResult
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
@@ -131,10 +137,10 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
             result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                                                                                                               sim_params::Dict{String,
                                                                                                                                Any},
-                                                                                                              annuity_capex::Float64,
-                                                                                                              annuity_opex::Float64,
-                                                                                                              breakdown_economy::Dict{String,
-                                                                                                                                      Any})
+                                                                                                              result.annuity_capex::Float64,
+                                                                                                              result.annuity_opex::Float64,
+                                                                                                              result.breakdown::Dict{String,
+                                                                                                                                     Any})
         end
     end
     return result

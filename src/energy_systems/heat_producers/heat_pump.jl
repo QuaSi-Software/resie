@@ -424,26 +424,28 @@ function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_na
 end
 
 function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(HeatPump))
 
-    model_type = extracted["model_type"]
-    cop_func_def = default(config, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
-    plf_func_def = default(config, "plf_function", HEAT_PUMP_PARAMETERS["plf_function"].default)
+    if param_type == "component"
+        model_type = extracted["model_type"]
+        cop_func_def = default(config, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
+        plf_func_def = default(config, "plf_function", HEAT_PUMP_PARAMETERS["plf_function"].default)
 
-    if model_type in ("inverter", "on-off") && occursin("const", cop_func_def)
-        @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
-               "or on-off operation, but has a constant COP. Toggle optimisation off " *
-               "by switching to simplified model type as the algorithm is unstable " *
-               "this case."
-        throw(InputError())
-    end
+        if model_type in ("inverter", "on-off") && occursin("const", cop_func_def)
+            @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
+                   "or on-off operation, but has a constant COP. Toggle optimisation off " *
+                   "by switching to simplified model type as the algorithm is unstable " *
+                   "this case."
+            throw(InputError())
+        end
 
-    if model_type == "simplified" && !occursin("const", plf_func_def)
-        @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
-               "function. The simplified model cannot handle this correctly. Please " *
-               "use a different model type or switch to a constant PLF function."
-        throw(InputError())
+        if model_type == "simplified" && !occursin("const", plf_func_def)
+            @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
+                   "function. The simplified model cannot handle this correctly. Please " *
+                   "use a different model type or switch to a constant PLF function."
+            throw(InputError())
+        end
     end
 end
 

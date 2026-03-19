@@ -188,7 +188,7 @@ function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_n
 end
 
 function validate_config(x::Type{FixedSink}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
+                         sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(FixedSink))
 end
 

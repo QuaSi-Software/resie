@@ -60,6 +60,25 @@ const GRID_CONNECTION_PARAMETERS = Dict(
         unit="°C"
     ),
 )
+
+const GRID_ECONOMY_PARAMETERS = get_economy_standard_params("connection", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.03,
+    ),
+    Dict{String,Any}(),
+)
+
+const GRID_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+    Dict{String,Any}(
+        "energy_emissions_profile_file_path" => nothing,
+        "constant_energy_emissions" => nothing,
+        "energy_emissions_change_rate_per_year" =>  -0.02,
+    ),
+    Dict{String,Any}(),
+)
+
 #! format: on
 
 """
@@ -76,6 +95,8 @@ provide a given temperature.
 mutable struct GridConnection{IsSource} <: Component
     uac::String
     controller::Controller
+    economy_parameters::Dict{String,Any}
+    emission_parameters::Dict{String,Any}
     sys_function::SystemFunction
     medium::Symbol
 
@@ -107,6 +128,39 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         end
     end
 
+    # extract economy parameters using the economy parameter dictionary as the source of truth
+    extracted_economy_params = Dict{String,Any}()
+    economy_parameters_config = get(config, "economy_parameters", Dict{String,Any}())
+    if sim_params["economy_parameter"]["calculate_economy"]
+        for (param_name, param_def) in GRID_ECONOMY_PARAMETERS
+            try
+                extracted_economy_params[param_name] = extract_parameter(GridConnection{IsSource},
+                                                                         economy_parameters_config, param_name,
+                                                                         param_def, sim_params,
+                                                                         (uac * " - economy_parameters"))
+            catch e
+                @error "$(sprint(showerror, e))"
+                constructor_errored = true
+            end
+        end
+    end
+
+    # extract emission parameters using the emission parameter dictionary as the source of truth
+    extracted_emission_params = Dict{String,Any}()
+    emission_parameters_config = get(config, "emission_parameters", Dict{String,Any}())
+    if sim_params["emissions_parameter"]["calculate_emissions"]
+        for (param_name, param_def) in GRID_EMISSION_PARAMETERS
+            try
+                extracted_emission_params[param_name] = extract_parameter(GridConnection{IsSource},
+                                                                          emission_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - emission_parameters"))
+            catch e
+                constructor_errored = handle_extraction_error(e, sim_params)
+            end
+        end
+    end
+
     try
         # extract control_parameters, which is essentially a subconfig
         extracted_params["control_parameters"] = extract_control_parameters(Component, config)
@@ -116,7 +170,28 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         validate_mutex_params(config, uac, GRID_CONNECTION_PARAMETERS)
 
         # validate configuration, e.g. for interdependencies and allowed values
-        validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params)
+        validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params, "component")
+
+        # do the same for economy
+        if sim_params["economy_parameter"]["calculate_economy"]
+            if haskey(config, "economy_parameters") # only check for mutex if economy parameters are given
+                validate_mutex_params(config, uac, GRID_ECONOMY_PARAMETERS)
+            end
+            config_economy = haskey(config, "economy_parameters") ? config["economy_parameters"] : Dict{String,Any}()
+            validate_config(GridConnection{IsSource}, config_economy, extracted_economy_params, uac, sim_params,
+                            "economy")
+        end
+
+        # do the same for emissions
+        if sim_params["emissions_parameter"]["calculate_emissions"]
+            if haskey(config, "emission_parameters") # only check for mutex if economy parameters are given
+                validate_mutex_params(config, uac, GRID_EMISSION_PARAMETERS)
+            end
+            config_emissions = haskey(config, "emission_parameters") ? config["emission_parameters"] :
+                               Dict{String,Any}()
+            validate_config(GridConnection{IsSource}, config_emissions, extracted_emission_params, uac, sim_params,
+                            "emission")
+        end
     catch e
         @error "$(sprint(showerror, e))"
         constructor_errored = true
@@ -130,6 +205,8 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     end
 
     # initialize and construct the object
+    extracted_params["economy_parameters"] = extracted_economy_params
+    extracted_params["emission_parameters"] = extracted_emission_params
     init_values = init_from_params(GridConnection{IsSource}, uac, extracted_params, config, sim_params)
     return GridConnection{IsSource}(init_values...)
 end
@@ -165,6 +242,38 @@ function component_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
     return params
 end
 
+function economy_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
+    return deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
+    return params
+end
+
+function economy_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
+    return params
+end
+
+function emission_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
+    return deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
+    return params
+end
+
+function emission_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
+    return params
+end
+
 function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String) where {IsSource}
     if param_name == "is_source"
@@ -183,8 +292,17 @@ function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{Strin
 end
 
 function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any}) where {IsSource}
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GridConnection{IsSource}))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String) where {IsSource}
+    if param_type == "economy"
+        parameter = economy_parameters(GridConnection{IsSource})
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(GridConnection{IsSource})
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(GridConnection{IsSource})
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params::Dict{String,Any},
@@ -196,7 +314,9 @@ function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params
 
     # return tuple in the order expected by new()
     return (uac,                                     # uac
-            Controller(params["control_parameters"]),
+            Controller(params["control_parameters"]),#
+            params["economy_parameters"],
+            params["emission_parameters"],
             sys_function,                            # sys_function
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces

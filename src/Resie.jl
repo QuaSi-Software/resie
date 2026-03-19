@@ -130,6 +130,8 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
                                               false),
         "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
     )
+    sim_params["economy_parameter"] = get_economy_parameter(project_config)
+    sim_params["emissions_parameter"] = get_emission_parameter(project_config)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.

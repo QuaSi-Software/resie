@@ -233,7 +233,7 @@ function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::S
 end
 
 function validate_config(x::Type{Bus}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(Bus))
 end
 

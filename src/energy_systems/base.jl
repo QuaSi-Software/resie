@@ -1613,6 +1613,43 @@ function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
 end
 
 """
+    economy_parameters(x::Type{Component})::Dict{String,Any}
+
+Lists all economy parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,NamedTuple}`: Definition of the economy parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function economy_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,NamedTuple}()
+end
+
+"""
+    emission_parameters(x::Type{Component})::Dict{String,Any}
+
+Lists all emission parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,NamedTuple}`: Definition of the emission parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function emission_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,NamedTuple}()
+end
+"""
     extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
 
 Helper to extract and process a parameter from config using its definition.
@@ -1899,7 +1936,7 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
         end
 
         # add AND if this and the next is also a conditional
-        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx+1] : nothing
+        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx + 1] : nothing
         if typeof(conditional) <: Tuple && typeof(next) <: Tuple
             push!(conditionals, "AND")
         end
@@ -1979,7 +2016,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
     for (name, value) in pairs(extracted)
         # skip control_parameters, as they have their own validation. also skip is_source
         # from GridConnection as it is an internal parameter
-        if name == "control_parameters" || name == "is_source"
+        if name in ["control_parameters", "is_source", "economy_parameters", "emission_parameters"]
             continue
         end
 
@@ -2055,19 +2092,46 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
                                     sim_params::Dict{String,Any})::Tuple
     constructor_errored = false
 
-    # extract all parameters using the parameter dictionary as the source of truth
+    # extract component parameters using the parameter dictionary as the source of truth
     extracted_params = Dict{String,Any}()
-    type_def = component_parameters(T)
-    for (param_name, param_def) in type_def
+    type_def_component = component_parameters(T)
+    for (param_name, param_def) in type_def_component
         try
             extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
         catch e
-            io = IOBuffer()
-            showerror(io, e)
-            print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
-            msg = String(take!(io))
-            @error msg
-            constructor_errored = true
+            constructor_errored = handle_extraction_error(e, sim_params)
+        end
+    end
+
+    # extract economy parameters using the economy parameter dictionary as the source of truth
+    extracted_economy_params = Dict{String,Any}()
+    economy_parameters_config = get(config, "economy_parameters", Dict{String,Any}())
+    if sim_params["economy_parameter"]["calculate_economy"]
+        type_def_economy = economy_parameters(T)
+        for (param_name, param_def) in type_def_economy
+            try
+                extracted_economy_params[param_name] = extract_parameter(T, economy_parameters_config, param_name,
+                                                                         param_def, sim_params,
+                                                                         (uac * " - economy_parameters"))
+            catch e
+                constructor_errored = handle_extraction_error(e, sim_params)
+            end
+        end
+    end
+
+    # extract emission parameters using the emission parameter dictionary as the source of truth
+    extracted_emission_params = Dict{String,Any}()
+    emission_parameters_config = get(config, "emission_parameters", Dict{String,Any}())
+    if sim_params["emissions_parameter"]["calculate_emissions"]
+        type_def_emissions = emission_parameters(T)
+        for (param_name, param_def) in type_def_emissions
+            try
+                extracted_emission_params[param_name] = extract_parameter(T, emission_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - emission_parameters"))
+            catch e
+                constructor_errored = handle_extraction_error(e, sim_params)
+            end
         end
     end
 
@@ -2077,17 +2141,32 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
 
         # check mutex conditionals, based on given parameter values, not extracted (as they
         # include the default values)
-        validate_mutex_params(config, uac, type_def)
+        validate_mutex_params(config, uac, type_def_component)
 
         # validate configuration, e.g. for interdependencies and allowed values
-        validate_config(T, config, extracted_params, uac, sim_params)
+        validate_config(T, config, extracted_params, uac, sim_params, "component")
+
+        # do the same for economy
+        if sim_params["economy_parameter"]["calculate_economy"]
+            if haskey(config, "economy_parameters") # only check for mutex if economy parameters are given
+                validate_mutex_params(config, uac, type_def_economy)
+            end
+            config_economy = haskey(config, "economy_parameters") ? config["economy_parameters"] : Dict{String,Any}()
+            validate_config(T, config_economy, extracted_economy_params, uac, sim_params, "economy")
+        end
+
+        # do the same for emissions
+        if sim_params["emissions_parameter"]["calculate_emissions"]
+            if haskey(config, "emission_parameters") # only check for mutex if emissions parameters are given
+                validate_mutex_params(config, uac, type_def_emissions)
+            end
+            config_emissions = haskey(config, "emission_parameters") ? config["emission_parameters"] :
+                               Dict{String,Any}()
+            validate_config(T, config_emissions, extracted_emission_params, uac, sim_params, "emission")
+        end
+
     catch e
-        io = IOBuffer()
-        showerror(io, e)
-        print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
-        msg = String(take!(io))
-        @error msg
-        constructor_errored = true
+        constructor_errored = handle_extraction_error(e, sim_params)
     end
 
     # we delayed throwing the errors upwards so that many errors are caught at once
@@ -2098,7 +2177,242 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     end
 
     # initialize the parameters ready for feeding into new()
+    extracted_params["economy_parameters"] = extracted_economy_params
+    extracted_params["emission_parameters"] = extracted_emission_params
     return init_from_params(T, uac, extracted_params, config, sim_params)
+end
+
+"""
+    handle_extraction_error(e, sim_params)
+
+Handles the error messages that occur during parameter construction.
+
+Args:
+-`e::ErrorHandler`: The error that should be handled
+-`sim_params::Dict{String,Any}`: Simulation parameters
+Returns:
+- `Bool`: Returns always true
+Throws:
+- `Error`: The error message as error
+"""
+function handle_extraction_error(e, sim_params)
+    io = IOBuffer()
+    showerror(io, e)
+    print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
+    msg = String(take!(io))
+    @error msg
+    return true
+end
+
+"""
+    get_economy_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+
+Returns the standard parameter definition of the SSOT for economy parameters, differently for
+Storages/Transformer and Connection components.
+Defaults have to be passed using the "defaults" dict.
+
+Args:
+-`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
+-`defaults::Dict{String,Any}`: Defaults for the standard economy parameter
+-`units::Dict{String,Any}`: Units for some of the standard economy parameter
+Returns:
+- `Dict{String,NamedTuple}`: A Dict with the economy standard parameter settings for the SSOT
+"""
+function get_economy_standard_params(type::String, defaults::Dict{String,Any},
+                                     units::Dict{String,Any})::Dict{String,NamedTuple}
+    #! format: off
+    if type in ["transformer", "storage"]
+        return Dict{String,NamedTuple}(
+            "lifetime_years" => (
+                default=defaults["lifetime_years"],
+                description="Lifetime of the component until replacement is required",
+                display_name="lifetime",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="years"
+            ),
+            "capex_specific" => (
+                default=defaults["capex_specific"],
+                description="Invest costs per storage volume",
+                display_name="capex",
+                required=true,
+                type=Floathing, # TODO can also be a function
+                json_type="number",
+                unit=units["capex_specific"]
+            ),
+            "capex_price_change_rate_per_year" => (
+                default=defaults["capex_price_change_rate_per_year"],
+                description="Yearly price change rate of the capex",
+                display_name="Capex price change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="%/year"
+            ),
+            "maintenance_repair_rate_per_year" => (
+                default=defaults["maintenance_repair_rate_per_year"],
+                description="Yearly rate of maintenance/repair with respect to the initial capex",
+                display_name="maintenance/repair rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="%/capex"
+            ),
+            "maintenance_repair_price_change_rate_per_year" => (
+                default=defaults["maintenance_repair_price_change_rate_per_year"],
+                description="Yearly change rate of the maintenance/repair costs",
+                display_name="maintenance/repair change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="%/year"
+            ),
+            "operational_labour_hour_per_year" => (
+                default=defaults["operational_labour_hour_per_year"],
+                description="Hours of labour per year for operation",
+                display_name="operational labour per year",
+                required=false,
+                validations=[("self", "value_gte_num", 0.0)],
+                type=Float64,
+                json_type="number",
+                unit="h/year"
+            ),
+            "subsidy_rate_of_capex" => (
+                default=defaults["subsidy_rate_of_capex"],
+                description="Subsidy rate of initial capex",
+                display_name="subsidy rate of capex",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Floathing,
+                json_type="number",
+                unit="%/capex"
+            ),
+            "subsidy_max" => (
+                default=defaults["subsidy_max"],
+                description="Maximum of subsidy for this component",
+                display_name="subsidy max",
+                required=false,
+                type=Floathing,
+                json_type="number",
+                unit="€"
+            )
+        )
+    elseif type in ["connection"]
+        return Dict{String,NamedTuple}(
+            "energy_price_profile_file_path" => (
+                default=defaults["energy_price_profile_file_path"],
+                description="Path to an energy price profile file",
+                display_name="Energy price profile file",
+                required=false,
+                conditionals=[("constant_energy_price", "mutex")],
+                type=String,
+                json_type="string",
+                unit="€/Wh"
+            ),
+            "constant_energy_price" => (
+                default=defaults["constant_energy_price"],
+                description="Constant energy price",
+                display_name="Constant energy price",
+                required=false,
+                conditionals=[("energy_price_profile_file_path", "mutex")],
+                type=Float64,
+                json_type="number",
+                unit="€/Wh"
+            ),
+            "energy_price_change_rate_per_year" => (
+                default=defaults["energy_price_change_rate_per_year"],
+                description="Yearly change rate of the energy price",
+                display_name="energy price change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="%/year"
+            )
+        )
+    else
+        @error "Unknown type in function get_economy_defaults."
+    end
+    #! format: on
+end
+
+"""
+    get_emissions_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+
+Returns the standard parameter definition of the SSOT for emission parameters, differently for
+Storages/Transformer and Connection components.
+Defaults have to be passed using the "defaults" dict.
+
+Args:
+-`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
+-`defaults::Dict{String,Any}`: Defaults for the standard emission parameter
+-`units::Dict{String,Any}`: Units for some of the standard emission parameter
+Returns:
+- `Dict{String,NamedTuple}`: A Dict with the emission standard parameter settings for the SSOT
+"""
+function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
+                                       units::Dict{String,Any})::Dict{String,NamedTuple}
+    #! format: off
+    if type in ["transformer", "storage"]
+        return Dict{String,NamedTuple}(
+            "lifetime_years" => (
+                default=defaults["lifetime_years"],
+                description="Lifetime of the component until replacement is required",
+                display_name="lifetime",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="years"
+            ),
+            "embodied_emissions_specific" => (
+                default=defaults["embodied_emissions_specific"],
+                description="Embodies emissions per volume",
+                display_name="embodied emissions specific",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit=units["embodied_emissions_specific"]
+            ),
+        )
+    elseif type in ["connection"]
+        return Dict{String,NamedTuple}(
+            "energy_emissions_profile_file_path" => (
+                default=defaults["energy_emissions_profile_file_path"],
+                description="Path to a specific emission profile file",
+                display_name="Emission profile file",
+                required=false,
+                conditionals=[("constant_energy_emissions", "mutex")],
+                type=String,
+                json_type="string",
+                unit="g CO2/Wh"
+            ),
+            "constant_energy_emissions" => (
+                default=defaults["constant_energy_emissions"],
+                description="Constant specific emission for the grid connection",
+                display_name="constant energy emissions",
+                required=false,
+                conditionals=[("energy_emissions_profile_file_path", "mutex")],
+                type=Float64,
+                json_type="number",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_change_rate_per_year" => (
+                default=defaults["energy_emissions_change_rate_per_year"],
+                description="Yearly change rate of specific energy emissions",
+                display_name="energy emissions change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="%/year"
+            )
+        )
+    else
+        @error "Unknown type in function get_economy_defaults."
+    end
+    #! format: on
 end
 
 """

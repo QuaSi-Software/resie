@@ -150,7 +150,7 @@ function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_
 end
 
 function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(FuelBoiler))
 end
 

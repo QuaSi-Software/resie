@@ -1,5 +1,5 @@
 #! format: off
-const BUFFER_TANK_PARAMETERS = Dict(
+const BUFFER_TANK_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         default="m_h_w_ht1",
         description="Heat medium of the buffer tank",
@@ -255,6 +255,32 @@ const BUFFER_TANK_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const BUFFER_TANK_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.01,
+            "maintenance_repair_rate_per_year" =>  0.025,
+            "maintenance_repair_price_change_rate_per_year" =>  0.01,
+            "operational_labour_hour_per_year" =>  0.5,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m^3"
+    )
+)
+
+const BUFFER_TANK_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/m^3"
+    ),
+)
 #! format: on
 
 """
@@ -281,6 +307,8 @@ upper temperature of the tank.
 mutable struct BufferTank <: Component
     uac::String
     controller::Controller
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
     sys_function::SystemFunction
 
     input_interfaces::InterfaceMap
@@ -339,7 +367,15 @@ mutable struct BufferTank <: Component
 end
 
 function component_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
-    return deepcopy(BUFFER_TANK_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(BUFFER_TANK_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
+    return deepcopy(BUFFER_TANK_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
+    return deepcopy(BUFFER_TANK_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -356,8 +392,17 @@ function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_
 end
 
 function validate_config(x::Type{BufferTank}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(BufferTank))
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economy_parameters(BufferTank)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(BufferTank)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(BufferTank)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,Any},
@@ -367,6 +412,8 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
 
     return (uac,
             Controller(params["control_parameters"]),
+            params["economy_parameters"],
+            params["emission_parameters"],
             sf_storage,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
@@ -418,10 +465,8 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         unit.capacity = unit.volume * unit.rho_medium * unit.cp_medium / 3600 *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
-        if unit.consider_losses
-            unit.volume = unit.capacity /
-                          (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
-        end
+        unit.volume = unit.capacity /
+                      (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
         throw(InputError())
