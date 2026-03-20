@@ -8,10 +8,10 @@ using JSON
 using Statistics
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_1183runs_260312_195550.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_1001runs_260313_151926.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 const OUT_CSV_PATH = "C:/Users/jenter/Documents/resie/output/out.csv"
-const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_fuzzy_ems.json"
+const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_ems.json"
 
 const XCOLS = [
     "HeatPump_Power / W",

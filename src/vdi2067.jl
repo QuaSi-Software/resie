@@ -76,6 +76,7 @@ VDI_SCENARIO_NONE = VDIParams(
     83.496    # AW_Wind €/MWh, 58.8*1.42
     )
 
+# OPTIONAL
 # Scenario 2 — moderate escalation
 VDI_SCENARIO_MOD = VDIParams(
     20,       # Evaluation period (years)
@@ -90,7 +91,7 @@ VDI_SCENARIO_MOD = VDIParams(
     106.8,    # AW_PV €/MWh
     83.496    # AW_Wind €/MWh, 58.8*1.42
     )
-
+# OPTIONAL
 # Scenario 3 — progressive escalation
 VDI_SCENARIO_PRO = VDIParams(
     20,       # Evaluation period (years)
@@ -171,6 +172,20 @@ function residual_value(A0, TN, T, i, r)    # residual value at end of evaluatio
     return RW_T / q^T   # Discounting residual value to t=0
 end
 
+# OPTIONAL - set grid_cap_new = grid_cap_old to disable
+function additional_p2h_investment()   # one-time system investment at t=0 without residual value
+    grid_cap_old = 5.0  # MW
+    grid_cap_new = 9.55  # MW
+    grid_expansion = grid_cap_new - grid_cap_old  # MW
+    grid_conection_cost_per_MW = 140000.0  # EUR/MW   # grid connection + electrical equipment
+    electro_expansion_cost = 500000.0 * 9  # EUR/MW * 9 MW
+    return grid_expansion * grid_conection_cost_per_MW + electro_expansion_cost
+end
+
+function additional_p2h_annuity(p::VDIParams)
+    return additional_p2h_investment() * annuity_factor(p.i_cap, p.T)
+end
+
 function capital_annuity(comp::VDIComponent, p::VDIParams)      # capital cost-related annuity
     return  (comp.A0 +
             npv_replacements(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap) -
@@ -227,7 +242,7 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    base_price = 214.0 #sim["Grid_price"]    # €/MWh (market price)   # 214.0
+    base_price = sim["Grid_price"]    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
@@ -468,11 +483,11 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
 
     sim = OrderedDict()
 
-    A_cap   = sum(capital_annuity(c, p) for c in components)
+    A_cap   = sum(capital_annuity(c, p) for c in components) + additional_p2h_annuity(p)
     A_op    = op_annuity(components, p)
     A_misc  = misc_annuity(components, p)
     A_energy = energy_annuity(sim_new, p)
-    A_cap_incentive = sum(capital_annuity_incentive(c, p) for c in components)
+    A_cap_incentive = sum(capital_annuity_incentive(c, p) for c in components) + additional_p2h_annuity(p)
     A_rev_control = revenue_control(sim_new, p)
     A_rev_feed    = revenue_feedin(sim_new, p)
 

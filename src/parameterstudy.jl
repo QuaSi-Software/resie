@@ -2,7 +2,6 @@
 # parameterstudy.jl - a parameterstudy tool for resie
 # -----------------------------------------------------------
 # - All components are defined here
-# - A component is deactivated by setting power parameters = 0
 # - Parameterstudy calls for vdi2067.jl and outputs annuity and  heat price per MWh
 ############################################################
 
@@ -22,7 +21,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
 
 
 ############################################################
@@ -30,34 +29,32 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.js
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 4.5e6         # lower limit
-Pth_HeatPump_hi   = 7.0e6         # upper limit
+Pth_HeatPump_lo   = 5.5e6         # lower limit
+Pth_HeatPump_hi   = 5.5e6         # upper limit
 Pth_HeatPump_step = 0.25e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 2.0e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 5.0e6     # upper limit
+Pth_ElectrodeBoiler_lo   = 3.5e6     # lower limit
+Pth_ElectrodeBoiler_hi   = 3.5e6     # upper limit
 Pth_ElectrodeBoiler_step = 0.25e6     # step size
-Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
+Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 10.0e6        # lower limit
-Cap_hi_Wh   = 40.0e6        # upper limit
+Cap_lo_Wh   = 30.0e6        # lower limit
+Cap_hi_Wh   = 30.0e6        # upper limit
 Cap_step_Wh = 5.0e6         # step size
-Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
+Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # array of values
 
 # Battery capacity (Wh)
 Batt_lo_Wh   = 0.0e3         # lower limit
 Batt_hi_Wh   = 0.0e3        # upper limit
 Batt_step_Wh = 100.0e3        # step size
-BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
+BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # array of values
 
 # define adjustments to the different price profiles in the order of
 # [grid_price, reserve_power_neg_price, reserve_energy_neg_price, reserve_power_pos_price, 
 #  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
-# TODO adjust values
-# Grid Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
 profile_addons = [110.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   #TODO CHANGED VALUES FROM 105.0
 profile_multipliers = [1.03, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
@@ -245,7 +242,6 @@ function create_variant(
     end
 
     
-
     ########################################################
     # safe run specific inputfile_"xxx".json
     ########################################################
@@ -274,7 +270,7 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     success, sim_output = Resie.load_and_run(input_file, run_ID)
 
     # add the profiles to the sim_output to be used in vdi2067 calculation
-    sim_output["Grid_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
+    sim_output["Grid_Price"] = profile_values[1, :]
     sim_output["Reserve_Power_Price_Neg"] = profile_values[2, :]
     sim_output["Reserve_Energy_Price_Neg"] = profile_values[3, :]
     sim_output["Reserve_Call_Neg"] = profile_values[4, :]
@@ -427,10 +423,10 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
-        A0_HeatPump     = 900 * (Pth_HeatPump / 1e3)        #   alter Wert 700
-        A0_ElectrodeBoiler = 60  * (Pth_ElectrodeBoiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen  # alter Wert: 285
-        A0_Buffer = 39  * (Cap_Wh / 1e3)        # from FACT document
-        A0_Batt   = 300 * (BattCap_Wh / 1e3)    # TODO Jule fragen
+        A0_HeatPump     = 900 * (Pth_HeatPump / 1e3)
+        A0_ElectrodeBoiler = 60  * (Pth_ElectrodeBoiler / 1e3)
+        A0_Buffer = 39  * (Cap_Wh / 1e3)
+        A0_Batt   = 300 * (BattCap_Wh / 1e3)
        
         components = VDI2067.VDIComponent[
             VDI2067.heatpump_component(A0_HeatPump),

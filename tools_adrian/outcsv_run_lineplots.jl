@@ -12,23 +12,23 @@ const TIME_FORMAT = dateformat"dd.mm.yyyy HH:MM:SS"
 # --------------------------- user configuration ---------------------------
 # Set to `nothing` to disable start/end filtering.
 # Input format: dd.mm.yyyy HH:MM:SS
-const START_TIME = "01.01.2024 00:00:00"
-const END_TIME = "31.12.2024 23:59:59"
+const START_TIME = "22.02.2024 00:00:00"
+const END_TIME = "27.02.2024 00:00:0"
 
 # If your CSV has a run column, set it here (e.g. "run_id"), else keep `nothing`.
 const RUN_COLUMN = nothing
 
 const LEFT_AXIS_LABEL = "Leistung [kW]"
-const RIGHT_AXIS_LABEL = "Preis [EUR/MWh] / SOC (%)"
+const RIGHT_AXIS_LABEL = "SOC (%)"  #Preis [EUR/MWh] / 
 
 # `col`: exact CSV column name
 # `name`: legend display name (free text)
 # `scale`: multiply raw values for plotting
 const LEFT_SERIES = [
-    #(col="HeatPump_baseline_in m_power OUT", name="Wärmepumpe Strom-Input Baseline", scale=1 / 1e3 * 4),
-    #(col="HeatPump m_power IN", name="Wärmepumpe Strom-Input", scale=1 / 1e3 * 4),    
+    (col="HeatPump_baseline_in m_power OUT", name="Wärmepumpe Strom-Input Baseline [kW]", scale=1 / 1e3 * 4),
+    (col="HeatPump m_power IN", name="Wärmepumpe Strom-Input [kW]", scale=1 / 1e3 * 4),    
     ### Demands
-    (col="Demand_Heat Demand", name="Wärmebedarf th. Leistung [kW]", scale=1 / 1e3 * 4),
+    #(col="Demand_Heat Demand", name="Wärmebedarf th. Leistung [kW]", scale=1 / 1e3 * 4),
     #(col="Demand_Power Demand", name="Strombedarf el. Leistung [kW]", scale=1 / 1e3 * 4),
     ### Regelreserve
     #(col="NegControlReserve_in Scaling_Factor", name="Negative Leistungsvorhaltung (el.) [kW]", scale=1 / 1e3),
@@ -56,7 +56,7 @@ const LEFT_SERIES = [
     #(col="HeatPump_baseline_in m_power OUT", name="el. Leistung Wärmepumpen (Baseline) [kW]", scale=1 / 1e3 * 4),
     #(col="HeatPump m_power IN", name="el. Leistung Wärmepumpe [kW]", scale=1 / 1e3 * 4),
     #(col="HeatPump m_heat OUT", name="th. Leistung Wärmepumpe [kW]", scale=1 / 1e3 * 4),
-    (col="HeatPump secondary_m_heat OUT", name="th. Leistung Wärmepumpen [kW]", scale=1 / 1e3 * 4),
+    #(col="HeatPump secondary_m_heat OUT", name="th. Leistung Wärmepumpe [kW]", scale=1 / 1e3 * 4),
     #(col="m_heat EnergyFlow HeatPump->BufferTank", name="th. Leistung Wärmepumpe in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
     #(col="secondary_m_heat EnergyFlow secondary_HeatPump->BufferTank", name="th. Leistung Wärmepumpe in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
     #(col="m_heat EnergyFlow HeatPump->Demand_Heat", name="th. Leistung Wärmepumpe in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
@@ -65,13 +65,13 @@ const LEFT_SERIES = [
     #(col="ElectrodeBoiler_baseline_in m_power OUT", name="el. Leistung Elektrodenkessel (Baseline) [kW]", scale=1 / 1e3 * 4),
     #(col="ElectrodeBoiler m_power IN", name="el. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
     #(col="ElectrodeBoiler m_heat OUT", name="th. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
-    (col="ElectrodeBoiler secondary_m_heat OUT", name="th. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    #(col="ElectrodeBoiler secondary_m_heat OUT", name="th. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
     #(col="m_heat EnergyFlow ElectrodeBoiler->BufferTank", name="th. Leistung Elektrodenkessel in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
     #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->BufferTank", name="th. Leistung Elektrodenkessel in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
     #(col="m_heat EnergyFlow ElectrodeBoiler->Demand_Heat", name="th. Leistung Elektrodenkessel in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
     #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->Demand_Heat", name="th. Leistung Elektrodenkessel in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
     ### BufferTank
-    (col="m_heat EnergyFlow BufferTank->Demand_Heat", name="Wärmespeicher Wärme-Output", scale=1 / 1e3 * 4),
+    #(col="m_heat EnergyFlow BufferTank->Demand_Heat", name="Wärmespeicher Wärme-Output [kW]", scale=1 / 1e3 * 4),
     ### Battery
     #(col="m_power EnergyFlow Battery->Demand_Power", name="el. Leistung Batterie in Strombedarf [kW]", scale=1 / 1e3 * 4),
     #(col="m_power EnergyFlow Battery->Grid_OUT", name="el. Leistung Batterie in Stromnetz [kW]", scale=1 / 1e3 * 4),
@@ -80,9 +80,9 @@ const LEFT_SERIES = [
 
 const RIGHT_SERIES = [
     ### Börsenstrompreis
-    (col="StockMarket_IN m_money OUT", name="Börsenstrompreis [€/MWh]", scale=1.0),
+    #(col="StockMarket_IN m_money OUT", name="Börsenstrompreis [€/MWh]", scale=1.0),
     ### Speicherstände
-    (col="BufferTank Load%", name="SOC Wärmespeicher [%]", scale=1.0),
+    #(col="BufferTank Load%", name="SOC Wärmespeicher [%]", scale=1.0),
     #(col="Battery Load%", name="SOC Batterie [%]", scale=1.0),   
 ]
 
@@ -106,7 +106,7 @@ const LEFT_COLOR_BY_COL = Dict(
 const RIGHT_COLOR_BY_COL = Dict(
     "BufferTank Load%" => "#595959",
     "Battery Load%" => "#00B8D9",
-    "StockMarket_IN m_money OUT" => "#8B5A2B",
+    "StockMarket_IN m_money OUT" => "#00CD00",
 )
 
 const STACKED_LEFT_SERIES_ORDER = [
@@ -338,7 +338,172 @@ function write_fullpage_html(fig::PlotlyJS.Plot, html_path::String)
     const data = $data_json;
     const layout = $layout_json;
     const config = $config_json;
-    Plotly.newPlot('plot', data, layout, config);
+    const plotEl = document.getElementById('plot');
+    let isApplyingTicks = false;
+
+    function parseTime(value) {
+      const t = new Date(value).getTime();
+      return Number.isFinite(t) ? t : null;
+    }
+
+    function pad2(value) {
+      return String(value).padStart(2, '0');
+    }
+
+    function toIsoWithoutMs(timestamp) {
+      return new Date(timestamp).toISOString().slice(0, 19);
+    }
+
+    function startOfHour(timestamp) {
+      const dt = new Date(timestamp);
+      dt.setUTCMinutes(0, 0, 0);
+      return dt.getTime();
+    }
+
+    function startOfDay(timestamp) {
+      const dt = new Date(timestamp);
+      dt.setUTCHours(0, 0, 0, 0);
+      return dt.getTime();
+    }
+
+    function startOfMonth(timestamp) {
+      const dt = new Date(timestamp);
+      dt.setUTCDate(1);
+      dt.setUTCHours(0, 0, 0, 0);
+      return dt.getTime();
+    }
+
+    function addMonths(timestamp, months) {
+      const dt = new Date(timestamp);
+      dt.setUTCMonth(dt.getUTCMonth() + months, 1);
+      dt.setUTCHours(0, 0, 0, 0);
+      return dt.getTime();
+    }
+
+    function chooseTickStep(spanMs) {
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (spanMs <= 6 * hour) return { unit: 'minute', step: 15 };
+      if (spanMs <= 12 * hour) return { unit: 'minute', step: 30 };
+      if (spanMs <= 2 * day) return { unit: 'hour', step: 1 };
+      if (spanMs <= 7 * day) return { unit: 'hour', step: 6 };
+      if (spanMs <= 21 * day) return { unit: 'hour', step: 12 };
+      if (spanMs <= 90 * day) return { unit: 'day', step: 1 };
+      if (spanMs <= 370 * day) return { unit: 'day', step: 7 };
+      return { unit: 'month', step: 1 };
+    }
+
+    function alignStart(timestamp, stepInfo) {
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (stepInfo.unit === 'minute') {
+        const dt = new Date(timestamp);
+        dt.setUTCSeconds(0, 0);
+        const minutes = dt.getUTCMinutes();
+        dt.setUTCMinutes(Math.floor(minutes / stepInfo.step) * stepInfo.step);
+        return dt.getTime();
+      }
+      if (stepInfo.unit === 'hour') {
+        const alignedHour = stepInfo.step === 12 ? startOfDay(timestamp) : startOfHour(timestamp);
+        if (stepInfo.step === 1) return alignedHour;
+        const hoursSinceDayStart = Math.floor((alignedHour - startOfDay(alignedHour)) / hour);
+        return alignedHour - (hoursSinceDayStart % stepInfo.step) * hour;
+      }
+      if (stepInfo.unit === 'day') {
+        const alignedDay = startOfDay(timestamp);
+        if (stepInfo.step === 1) return alignedDay;
+        const epochDay = Math.floor(alignedDay / day);
+        return (epochDay - (epochDay % stepInfo.step)) * day;
+      }
+      return startOfMonth(timestamp);
+    }
+
+    function nextTick(timestamp, stepInfo) {
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (stepInfo.unit === 'minute') return timestamp + stepInfo.step * minute;
+      if (stepInfo.unit === 'hour') return timestamp + stepInfo.step * hour;
+      if (stepInfo.unit === 'day') return timestamp + stepInfo.step * day;
+      return addMonths(timestamp, stepInfo.step);
+    }
+
+    function formatTick(timestamp, stepInfo) {
+      const dt = new Date(timestamp);
+      const hh = pad2(dt.getUTCHours());
+      const mm = pad2(dt.getUTCMinutes());
+      const dd = pad2(dt.getUTCDate());
+      const mo = pad2(dt.getUTCMonth() + 1);
+      const yyyy = dt.getUTCFullYear();
+      const isMidnight = dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0;
+      if (stepInfo.unit === 'month') return mo + '.' + yyyy;
+      if (stepInfo.unit === 'day') return dd + '.' + mo + '.' + yyyy;
+      return isMidnight ? '00:00<br>' + dd + '.' + mo + '.' + yyyy : hh + ':' + mm;
+    }
+
+    function collectXExtent() {
+      let min = null;
+      let max = null;
+      for (const trace of data) {
+        if (!Array.isArray(trace.x)) continue;
+        for (const value of trace.x) {
+          const ts = parseTime(value);
+          if (ts === null) continue;
+          min = min === null ? ts : Math.min(min, ts);
+          max = max === null ? ts : Math.max(max, ts);
+        }
+      }
+      return { min, max };
+    }
+
+    function buildTickArrays(rangeStart, rangeEnd) {
+      const spanMs = Math.max(rangeEnd - rangeStart, 1);
+      const stepInfo = chooseTickStep(spanMs);
+      const tickvals = [];
+      const ticktext = [];
+      let current = alignStart(rangeStart, stepInfo);
+      if (current < rangeStart) current = nextTick(current, stepInfo);
+      let guard = 0;
+      while (current <= rangeEnd && guard < 2000) {
+        tickvals.push(toIsoWithoutMs(current));
+        ticktext.push(formatTick(current, stepInfo));
+        current = nextTick(current, stepInfo);
+        guard += 1;
+      }
+      return { tickvals, ticktext };
+    }
+
+    function applyDynamicXAxisTicks() {
+      if (isApplyingTicks) return;
+      const fullLayout = plotEl._fullLayout;
+      if (!fullLayout || !fullLayout.xaxis) return;
+      const extent = collectXExtent();
+      if (extent.min === null || extent.max === null) return;
+
+      const xaxis = fullLayout.xaxis;
+      const range = Array.isArray(xaxis.range) ? xaxis.range : [extent.min, extent.max];
+      const rangeStart = parseTime(range[0]) ?? extent.min;
+      const rangeEnd = parseTime(range[1]) ?? extent.max;
+      const { tickvals, ticktext } = buildTickArrays(rangeStart, rangeEnd);
+
+      isApplyingTicks = true;
+      Plotly.relayout(plotEl, {
+        'xaxis.tickmode': 'array',
+        'xaxis.tickvals': tickvals,
+        'xaxis.ticktext': ticktext
+      }).finally(() => {
+        isApplyingTicks = false;
+      });
+    }
+
+    Plotly.newPlot(plotEl, data, layout, config).then(() => {
+      applyDynamicXAxisTicks();
+      plotEl.on('plotly_relayout', () => {
+        applyDynamicXAxisTicks();
+      });
+    });
   </script>
 </body>
 </html>
@@ -453,7 +618,6 @@ function make_run_plot(
             range=[x_start, x_end],
             domain=[0.0, 1.0],
             rangebreaks=rangebreaks,
-            tickformat="%d.%m.%Y",
             showgrid=true,
             gridcolor="rgba(110,110,110,0.28)",
             gridwidth=1.0,
