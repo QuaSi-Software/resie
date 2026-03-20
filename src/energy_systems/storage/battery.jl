@@ -1,7 +1,7 @@
 using Plots: Plots
 
 #! format: off
-const BATTERY_PARAMETERS = Dict(
+const BATTERY_COMPONENT_PARAMETERS = Dict(
     "m_el_in" => (
         default="m_e_ac_230v",
         description="Electricity input medium",
@@ -351,6 +351,34 @@ const BATTERY_PARAMETERS = Dict(
         unit="°C"
     ),
 )
+
+const BATTERY_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 12,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => -0.031,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.05,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/Wh"
+    )
+)
+
+const BATTERY_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 12,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/Wh"
+    ),
+)
 #! format: on
 
 """
@@ -367,8 +395,11 @@ Base.@kwdef mutable struct Battery <: Component
     m_el_in::Symbol
     m_el_out::Symbol
     m_heat_lt_out::Symbol
-    model_type::String
 
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
+
+    model_type::String
     capacity::Float64
     load::Float64
     # simplified
@@ -445,7 +476,15 @@ Base.@kwdef mutable struct Battery <: Component
 end
 
 function component_parameters(x::Type{Battery})::Dict{String,NamedTuple}
-    return deepcopy(BATTERY_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(BATTERY_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{Battery})::Dict{String,NamedTuple}
+    return deepcopy(BATTERY_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{Battery})::Dict{String,NamedTuple}
+    return deepcopy(BATTERY_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{Battery}, config::Dict{String,Any}, param_name::String,
@@ -459,7 +498,16 @@ end
 
 function validate_config(x::Type{Battery}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(Battery))
+    if param_type == "economy"
+        parameter = economy_parameters(Battery)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(Battery)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(Battery)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any},
@@ -505,6 +553,8 @@ function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any
             m_el_in,
             m_el_out,
             m_heat_lt_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
             params["model_type"],
             params["capacity"],
             params["initial_load"] * params["capacity"],

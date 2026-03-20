@@ -260,10 +260,12 @@ const BUFFER_TANK_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
-            "capex_price_change_rate_per_year" => 0.01,
-            "maintenance_repair_rate_per_year" =>  0.025,
-            "maintenance_repair_price_change_rate_per_year" =>  0.01,
-            "operational_labour_hour_per_year" =>  0.5,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  0.0,
             "subsidy_rate_of_capex" =>  nothing,
             "subsidy_max" =>  nothing
     ),
@@ -307,13 +309,13 @@ upper temperature of the tank.
 mutable struct BufferTank <: Component
     uac::String
     controller::Controller
-    economy_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
     sys_function::SystemFunction
-
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     medium::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     model_type::Symbol
 
@@ -412,12 +414,12 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
 
     return (uac,
             Controller(params["control_parameters"]),
-            params["economy_parameters"],
-            params["emission_parameters"],
             sf_storage,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
             medium,
+            params["economy_parameters"],
+            params["emission_parameters"],
             Symbol(params["model_type"]),
             params["capacity"],
             params["volume"],

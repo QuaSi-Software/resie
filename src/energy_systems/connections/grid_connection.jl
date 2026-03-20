@@ -64,8 +64,11 @@ const GRID_CONNECTION_PARAMETERS = Dict(
 const GRID_ECONOMY_PARAMETERS = get_economy_standard_params("connection", 
     Dict{String,Any}(
         "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
         "constant_energy_price" => nothing,
-        "energy_price_change_rate_per_year" =>  0.03,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(),
 )
@@ -73,12 +76,12 @@ const GRID_ECONOMY_PARAMETERS = get_economy_standard_params("connection",
 const GRID_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
+        "energy_emissions_profile_scale" => 1.0,
         "constant_energy_emissions" => nothing,
-        "energy_emissions_change_rate_per_year" =>  -0.02,
+        "energy_emissions_change_rate_per_year" =>  0.0
     ),
     Dict{String,Any}(),
 )
-
 #! format: on
 
 """
@@ -174,23 +177,16 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
 
         # do the same for economy
         if sim_params["economy_parameter"]["calculate_economy"]
-            if haskey(config, "economy_parameters") # only check for mutex if economy parameters are given
-                validate_mutex_params(config, uac, GRID_ECONOMY_PARAMETERS)
-            end
-            config_economy = haskey(config, "economy_parameters") ? config["economy_parameters"] : Dict{String,Any}()
-            validate_config(GridConnection{IsSource}, config_economy, extracted_economy_params, uac, sim_params,
-                            "economy")
+            validate_mutex_params(economy_parameters_config, uac, GRID_ECONOMY_PARAMETERS)
+            validate_config(GridConnection{IsSource}, economy_parameters_config, extracted_economy_params, uac,
+                            sim_params, "economy")
         end
 
         # do the same for emissions
         if sim_params["emissions_parameter"]["calculate_emissions"]
-            if haskey(config, "emission_parameters") # only check for mutex if economy parameters are given
-                validate_mutex_params(config, uac, GRID_EMISSION_PARAMETERS)
-            end
-            config_emissions = haskey(config, "emission_parameters") ? config["emission_parameters"] :
-                               Dict{String,Any}()
-            validate_config(GridConnection{IsSource}, config_emissions, extracted_emission_params, uac, sim_params,
-                            "emission")
+            validate_mutex_params(emission_parameters_config, uac, GRID_EMISSION_PARAMETERS)
+            validate_config(GridConnection{IsSource}, emission_parameters_config, extracted_emission_params, uac,
+                            sim_params, "emission")
         end
     catch e
         @error "$(sprint(showerror, e))"
@@ -286,6 +282,12 @@ function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{Strin
         return load_optional_profile(config, param_name, sim_params)
     elseif param_name == "constant_temperature"
         return convert(Temperature, default(config, param_name, nothing))
+    end
+
+    if param_name == "energy_price_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "energy_emissions_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
     end
 
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)

@@ -1784,6 +1784,14 @@ function check_validation(validation::Tuple, name::String, value::Any,
         if !(value <= validation[3])
             throw(InputError("Value of `$name` in component `$uac` must be less than or equal to $(validation[3])"))
         end
+    elseif validation[2] == "value_lt_num_or_nothing"
+        if !(value === nothing || value < validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_lte_num_or_nothing"
+        if !(value === nothing || value <= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater or equal than $(validation[3])"))
+        end
     elseif validation[2] == "value_gt_num"
         if !(value > validation[3])
             throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
@@ -2148,21 +2156,14 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
 
         # do the same for economy
         if sim_params["economy_parameter"]["calculate_economy"]
-            if haskey(config, "economy_parameters") # only check for mutex if economy parameters are given
-                validate_mutex_params(config, uac, type_def_economy)
-            end
-            config_economy = haskey(config, "economy_parameters") ? config["economy_parameters"] : Dict{String,Any}()
-            validate_config(T, config_economy, extracted_economy_params, uac, sim_params, "economy")
+            validate_mutex_params(economy_parameters_config, uac, type_def_economy)
+            validate_config(T, economy_parameters_config, extracted_economy_params, uac, sim_params, "economy")
         end
 
         # do the same for emissions
         if sim_params["emissions_parameter"]["calculate_emissions"]
-            if haskey(config, "emission_parameters") # only check for mutex if emissions parameters are given
-                validate_mutex_params(config, uac, type_def_emissions)
-            end
-            config_emissions = haskey(config, "emission_parameters") ? config["emission_parameters"] :
-                               Dict{String,Any}()
-            validate_config(T, config_emissions, extracted_emission_params, uac, sim_params, "emission")
+            validate_mutex_params(emission_parameters_config, uac, type_def_emissions)
+            validate_config(T, emission_parameters_config, extracted_emission_params, uac, sim_params, "emission")
         end
 
     catch e
@@ -2249,30 +2250,50 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="%/year"
+                unit="1/year"
             ),
-            "maintenance_repair_rate_per_year" => (
-                default=defaults["maintenance_repair_rate_per_year"],
-                description="Yearly rate of maintenance/repair with respect to the initial capex",
-                display_name="maintenance/repair rate per year",
+            "maintenance_inspection_rate_per_year" => (
+                default=defaults["maintenance_inspection_rate_per_year"],
+                description="Yearly rate of maintenance and inspection costs with respect to the initial capex",
+                display_name="maintenance/inspection rate per year",
                 required=false,
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="%/capex"
+                unit="1/capex"
             ),
-            "maintenance_repair_price_change_rate_per_year" => (
-                default=defaults["maintenance_repair_price_change_rate_per_year"],
-                description="Yearly change rate of the maintenance/repair costs",
-                display_name="maintenance/repair change rate per year",
+            "maintenance_inspection_price_change_rate_per_year" => (
+                default=defaults["maintenance_inspection_price_change_rate_per_year"],
+                description="Yearly change rate of the maintenance and inspection costs",
+                display_name="maintenance/inspection change rate per year",
                 required=false,
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="%/year"
+                unit="1/year"
             ),
-            "operational_labour_hour_per_year" => (
-                default=defaults["operational_labour_hour_per_year"],
+            "repair_rate_per_year" => (
+                default=defaults["repair_rate_per_year"],
+                description="Yearly rate of repair costs with respect to the initial capex",
+                display_name="repair rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="1/capex"
+            ),
+            "repair_price_change_rate_per_year" => (
+                default=defaults["repair_price_change_rate_per_year"],
+                description="Yearly change rate of the repair costs",
+                display_name="repair change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+            "operational_labour_hours_per_year" => (
+                default=defaults["operational_labour_hours_per_year"],
                 description="Hours of labour per year for operation",
                 display_name="operational labour per year",
                 required=false,
@@ -2286,10 +2307,10 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 description="Subsidy rate of initial capex",
                 display_name="subsidy rate of capex",
                 required=false,
-                validations=[("self", "value_lte_num", 1.0)],
+                validations=[("self", "value_lte_num_or_nothing", 1.0)],
                 type=Floathing,
                 json_type="number",
-                unit="%/capex"
+                unit="1/capex"
             ),
             "subsidy_max" => (
                 default=defaults["subsidy_max"],
@@ -2313,6 +2334,15 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 json_type="string",
                 unit="€/Wh"
             ),
+            "energy_price_profile_scale" => (
+                default=defaults["energy_price_profile_scale"],
+                description="Scale factor for energy price profile",
+                display_name="Scale factor energy price profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
             "constant_energy_price" => (
                 default=defaults["constant_energy_price"],
                 description="Constant energy price",
@@ -2330,8 +2360,27 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 required=false,
                 type=Float64,
                 json_type="number",
-                unit="%/year"
-            )
+                unit="1/year"
+            ),
+            "base_cost_per_year" => (
+                default=defaults["base_cost_per_year"],
+                description="Yearly base cost (independent of energies)",
+                display_name="base cost per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="€"
+            ),
+            "base_cost_change_rate_per_year" => (
+                default=defaults["base_cost_change_rate_per_year"],
+                description="Yearly change rate of the base cost)",
+                display_name="base cost change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+
         )
     else
         @error "Unknown type in function get_economy_defaults."
@@ -2389,6 +2438,15 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 json_type="string",
                 unit="g CO2/Wh"
             ),
+            "energy_emissions_profile_scale" => (
+                default=defaults["energy_emissions_profile_scale"],
+                description="Scale factor for energy emissions profile",
+                display_name="Scale factor energy emissions profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
             "constant_energy_emissions" => (
                 default=defaults["constant_energy_emissions"],
                 description="Constant specific emission for the grid connection",
@@ -2406,7 +2464,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 required=false,
                 type=Float64,
                 json_type="number",
-                unit="%/year"
+                unit="1/year"
             )
         )
     else
@@ -2959,7 +3017,7 @@ the key does not occur in the config.
 """
 function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
                                sim_params::Dict{String,Any})
-    if haskey(config, parameter_name)
+    if haskey(config, parameter_name) && config[parameter_name] !== nothing
         path = config[parameter_name]
         return Profile(path, sim_params)
     end

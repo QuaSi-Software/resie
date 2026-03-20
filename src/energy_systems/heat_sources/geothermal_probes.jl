@@ -10,7 +10,7 @@ using Plots: Plots
 using Roots
 
 #! format: off
-const GEOTHERMAL_PROBES_PARAMETERS = Dict(
+const GEOTHERMAL_PROBES_COMPONENT_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for regeneration/loading)",
@@ -423,6 +423,34 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         unit="-"
     )
 )
+
+const GEOTHERMAL_PROBES_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 50,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.02,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m"
+    )
+)
+
+const GEOTHERMAL_PROBES_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 50,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/m"
+    ),
+)
 #! format: on
 
 mutable struct GeothermalProbes <: Component
@@ -433,6 +461,9 @@ mutable struct GeothermalProbes <: Component
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     model_type::String
 
@@ -524,7 +555,15 @@ mutable struct GeothermalProbes <: Component
 end
 
 function component_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_PROBES_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(GEOTHERMAL_PROBES_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_PROBES_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_PROBES_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{GeothermalProbes}, config::Dict{String,Any}, param_name::String,
@@ -534,7 +573,16 @@ end
 
 function validate_config(x::Type{GeothermalProbes}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalProbes))
+    if param_type == "economy"
+        parameter = economy_parameters(GeothermalProbes)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(GeothermalProbes)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(GeothermalProbes)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{GeothermalProbes}, uac::String, params::Dict{String,Any},
@@ -550,6 +598,8 @@ function init_from_params(x::Type{GeothermalProbes}, uac::String, params::Dict{S
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
             params["model_type"],
             params["max_probe_temperature_loading"],
             params["min_probe_temperature_unloading"],

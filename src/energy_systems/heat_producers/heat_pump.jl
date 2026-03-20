@@ -2,7 +2,7 @@ using Optim: optimize, minimizer, Options, NelderMead
 using ..Resie: get_run
 
 #! format: off
-const HEAT_PUMP_PARAMETERS = Dict(
+const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
     "m_el_in" => (
         default="m_e_ac_230v",
         description="Electrical input medium",
@@ -324,6 +324,34 @@ const HEAT_PUMP_PARAMETERS = Dict(
         unit="W"
     ),
 )
+
+const HEAT_PUMP_ECONOMY_PARAMETERS = get_economy_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.015,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  5,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const HEAT_PUMP_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -354,6 +382,9 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_out_secondary::Symbol
     m_heat_in::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     has_secondary_interface::Bool
     primary_el_sources::Vector{String}
@@ -405,7 +436,15 @@ mutable struct HeatPump <: Component
 end
 
 function component_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
-    return deepcopy(HEAT_PUMP_PARAMETERS) # Return a copy to prevent external modification
+    return deepcopy(HEAT_PUMP_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
+    return deepcopy(HEAT_PUMP_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
+    return deepcopy(HEAT_PUMP_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_name::String,
@@ -425,12 +464,21 @@ end
 
 function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(HeatPump))
+    if param_type == "economy"
+        parameter = economy_parameters(HeatPump)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(HeatPump)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(HeatPump)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 
     if param_type == "component"
         model_type = extracted["model_type"]
-        cop_func_def = default(config, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
-        plf_func_def = default(config, "plf_function", HEAT_PUMP_PARAMETERS["plf_function"].default)
+        cop_func_def = default(config, "cop_function", HEAT_PUMP_COMPONENT_PARAMETERS["cop_function"].default)
+        plf_func_def = default(config, "plf_function", HEAT_PUMP_COMPONENT_PARAMETERS["plf_function"].default)
 
         if model_type in ("inverter", "on-off") && occursin("const", cop_func_def)
             @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
@@ -460,7 +508,7 @@ function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,An
 
     # set constant COP if the function is defined that way
     constant_cop = nothing
-    func_def = default(raw_params, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
+    func_def = default(raw_params, "cop_function", HEAT_PUMP_COMPONENT_PARAMETERS["cop_function"].default)
     if occursin("const", func_def)
         constant_cop = params["cop_function"](0.0, 0.0)
     end
@@ -480,6 +528,8 @@ function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,An
             m_heat_out,
             m_heat_out_secondary,
             m_heat_in,
+            params["economy_parameters"],
+            params["emission_parameters"],
             params["has_secondary_interface"],
             params["primary_el_sources"],
             params["secondary_el_sources"],

@@ -1,5 +1,5 @@
 #! format: off
-const ELECTROLYSER_PARAMETERS = Dict(
+const ELECTROLYSER_COMPONENT_PARAMETERS = Dict(
     "m_el_in" => (
         default="m_e_ac_230v",
         description="Electricity input medium",
@@ -232,6 +232,93 @@ const ELECTROLYSER_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const ELECTROLYSER_ECONOMY_PARAMETERS = Base.merge(get_economy_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "capex_specific" => nothing,
+        "capex_price_change_rate_per_year" => -0.02,
+        "maintenance_inspection_rate_per_year" => 0.025,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+        "repair_rate_per_year" => 0.01,
+        "repair_price_change_rate_per_year" =>  0.005,
+        "operational_labour_hours_per_year" =>  50,
+        "subsidy_rate_of_capex" =>  nothing,
+        "subsidy_max" =>  nothing
+        ),
+    Dict{String,Any}(
+        "capex_specific" => "€/W"
+        )
+    ),
+    Dict{String,Any}(
+        "water_price" => (
+            default=3.5,
+            description="Price per m^3 of fresh water",
+            display_name="water price per cubic meter",
+            required=false,
+            validations=[("self", "value_gte_num", 0.0)],
+            type=Float64,
+            json_type="number",
+            unit="€/m^3 water"
+        ),
+        "water_price_change_rate_per_year" => (
+            default=0.02,
+            description="Yearly change rate of water price",
+            display_name="water price change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+        "water_demand_ratio" => (
+            default=0.36,
+            description="Water demand per kWh of produced hydrogen",
+            display_name="water demand ratio",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="l/kWh H2"
+        ),
+        "oxygen_price" => (
+            default=0.14,
+            description="Price per kg of produced oxygen",
+            display_name="oxygen price",
+            required=false,
+            validations=[("self", "value_gte_num", 0.0)],
+            type=Float64,
+            json_type="number",
+            unit="€/kg O2"
+        ),
+        "oxygen_price_change_rate_per_year" => (
+            default=0.02,
+            description="Yearly change rate of oxygen price",
+            display_name="oxygen price change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+        "oxygen_production_ratio" => (
+            default=0.239,
+            description="Oxygen production per kWh of produced hydrogen",
+            display_name="oxygen production factor",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="kg O2/kWh H2"
+        ),
+    )
+)
+
+const ELECTROLYSER_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -264,6 +351,9 @@ mutable struct Electrolyser <: Component
     m_heat_lt_out::Symbol
     m_h2_out::Symbol
     m_o2_out::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     power::Float64
     power_total::Float64
@@ -298,7 +388,15 @@ mutable struct Electrolyser <: Component
 end
 
 function component_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
-    return deepcopy(ELECTROLYSER_PARAMETERS) # Return a copy to prevent external modification
+    return deepcopy(ELECTROLYSER_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
+    return deepcopy(ELECTROLYSER_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
+    return deepcopy(ELECTROLYSER_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{Electrolyser}, config::Dict{String,Any}, param_name::String,
@@ -308,7 +406,16 @@ end
 
 function validate_config(x::Type{Electrolyser}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(Electrolyser))
+    if param_type == "economy"
+        parameter = economy_parameters(Electrolyser)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(Electrolyser)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(Electrolyser)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{String,Any},
@@ -361,6 +468,8 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
             m_heat_lt_out,
             m_h2_out,
             m_o2_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
             power,
             power_total,
             nr_units,

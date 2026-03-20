@@ -1,5 +1,5 @@
 #! format: off
-const FUEL_BOILER_PARAMETERS = Dict(
+const FUEL_BOILER_COMPONENT_PARAMETERS = Dict(
     "m_fuel_in" => (
         description="Fuel input medium",
         display_name="Medium fuel_in",
@@ -94,6 +94,34 @@ const FUEL_BOILER_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const FUEL_BOILER_ECONOMY_PARAMETERS = get_economy_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  20,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const FUEL_BOILER_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -121,6 +149,9 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -141,7 +172,15 @@ mutable struct FuelBoiler <: Component
 end
 
 function component_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
-    return deepcopy(FUEL_BOILER_PARAMETERS) # Return a copy to prevent external modification
+    return deepcopy(FUEL_BOILER_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
+    return deepcopy(FUEL_BOILER_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
+    return deepcopy(FUEL_BOILER_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,
@@ -151,7 +190,16 @@ end
 
 function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(FuelBoiler))
+    if param_type == "economy"
+        parameter = economy_parameters(FuelBoiler)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(FuelBoiler)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FuelBoiler)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,Any},
@@ -176,6 +224,8 @@ function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,
             InterfaceMap(m_heat_out => nothing),
             m_fuel_in,
             m_heat_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
             params["power_th"] / efficiencies[Symbol("heat_out")](1.0),
             linear_interface,
             params["min_power_fraction"],

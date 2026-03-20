@@ -14,7 +14,7 @@ using LinearAlgebra
 using GLMakie
 
 #! format: off
-const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
+const SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for loading)",
@@ -544,6 +544,35 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     )
 )
 
+const SEASONAL_THERMAL_STORAGE_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 50,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.02,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m^3"
+    )
+)
+
+const SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/m^3"
+    ),
+)
+#! format: on
+
 mutable struct SeasonalThermalStorage <: Component
     # Note: layer numbering within the STES starts at the bottom with index 1 and ends at
     # the top with index number_of_layer_total
@@ -552,11 +581,13 @@ mutable struct SeasonalThermalStorage <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
-
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     ## geometry and physical properties
     # capacity of the STES [Wh]
@@ -726,7 +757,15 @@ mutable struct SeasonalThermalStorage <: Component
 end
 
 function component_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
-    return deepcopy(SEASONAL_THERMAL_STORAGE_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, param_name::String,
@@ -744,7 +783,16 @@ end
 
 function validate_config(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(SeasonalThermalStorage))
+    if param_type == "economy"
+        parameter = economy_parameters(SeasonalThermalStorage)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(SeasonalThermalStorage)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(SeasonalThermalStorage)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::Dict{String,Any},
@@ -760,6 +808,8 @@ function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
 
             # geometry and physical properties
             0.0, # capacity
@@ -2259,7 +2309,7 @@ end
 
 function handle_component_update!(unit::SeasonalThermalStorage, step::String, sim_params::Dict{String,Any})
     if unit.capacity <= sim_params["epsilon"]
-        return 
+        return
     end
     if step == "process"
         unit.process_done = true

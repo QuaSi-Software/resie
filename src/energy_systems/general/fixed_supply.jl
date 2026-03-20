@@ -1,5 +1,5 @@
 #! format: off
-const FIXED_SUPPLY_PARAMETERS = Dict(
+const FIXED_SUPPLY_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         description="Medium of the supply (e.g. electricity, heat, gas, etc.)",
         display_name="Medium",
@@ -118,6 +118,28 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         unit="J/(kg*K)"
     ),
 )
+
+const FIXED_SUPPLY_ECONOMY_PARAMETERS = get_economy_standard_params("connection", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(),
+)
+
+const FIXED_SUPPLY_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+    Dict{String,Any}(
+        "energy_emissions_profile_file_path" => nothing,
+        "energy_emissions_profile_scale" => 1.0,
+        "constant_energy_emissions" => nothing,
+        "energy_emissions_change_rate_per_year" =>  0.0,
+    ),
+    Dict{String,Any}(),
+)
 #! format: on
 
 """
@@ -139,6 +161,9 @@ mutable struct FixedSupply <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
+
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
@@ -159,7 +184,15 @@ mutable struct FixedSupply <: Component
 end
 
 function component_parameters(x::Type{FixedSupply})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SUPPLY_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(FIXED_SUPPLY_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{FixedSupply})::Dict{String,NamedTuple}
+    return deepcopy(FIXED_SUPPLY_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{FixedSupply})::Dict{String,NamedTuple}
+    return deepcopy(FIXED_SUPPLY_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -172,12 +205,27 @@ function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param
         return convert(Temperature, default(config, param_name, nothing))
     end
 
+    if param_name == "energy_price_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "energy_emissions_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    end
+
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{FixedSupply}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(FixedSupply))
+    if param_type == "economy"
+        parameter = economy_parameters(FixedSupply)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(FixedSupply)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FixedSupply)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String,Any},
@@ -196,6 +244,8 @@ function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
+            params["economy_parameters"],
+            params["emission_parameters"],
             energy_profile,                          # energy_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor

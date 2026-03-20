@@ -1,5 +1,5 @@
 #! format: off
-const STORAGE_PARAMETERS = Dict(
+const STORAGE_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         description="Medium of the storage (e.g. electricity, heat, gas, etc.)",
         display_name="Medium",
@@ -34,6 +34,34 @@ const STORAGE_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const STORAGE_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.01,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.05,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  0.5,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/Wh"
+    )
+)
+
+const STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/Wh"
+    ),
+)
 #! format: on
 
 """
@@ -52,6 +80,9 @@ mutable struct Storage <: Component
 
     medium::Symbol
 
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
+
     capacity::Float64
     load::Float64
     load_end_of_last_timestep::Float64
@@ -68,7 +99,15 @@ mutable struct Storage <: Component
 end
 
 function component_parameters(x::Type{Storage})::Dict{String,NamedTuple}
-    return deepcopy(STORAGE_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(STORAGE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{Storage})::Dict{String,NamedTuple}
+    return deepcopy(STORAGE_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{Storage})::Dict{String,NamedTuple}
+    return deepcopy(STORAGE_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{Storage}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -78,7 +117,16 @@ end
 
 function validate_config(x::Type{Storage}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(Storage))
+    if param_type == "economy"
+        parameter = economy_parameters(Storage)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(Storage)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(Storage)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any},
@@ -93,6 +141,8 @@ function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any
             InterfaceMap(medium => nothing), # input_interfaces
             InterfaceMap(medium => nothing), # output_interfaces
             medium,                          # medium
+            params["economy_parameters"],
+            params["emission_parameters"],
             params["capacity"],              # capacity
             params["initial_load"] * params["capacity"], # load
             0.0,                             # load_end_of_last_timestep

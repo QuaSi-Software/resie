@@ -6,7 +6,7 @@ using SparseArrays
 using LinearAlgebra
 
 #! format: off
-const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
+const GEOTHERMAL_HEAT_COLLECTOR_COMPONENT_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for regeneration/loading)",
@@ -641,6 +641,34 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         unit="K"
     ),
 )
+
+const GEOTHERMAL_HEAT_COLLECTOR_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 30,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.005,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  nothing,
+            "subsidy_max" =>  nothing
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m"
+    )
+)
+
+const GEOTHERMAL_HEAT_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 30,
+        "embodied_emissions_specific" => 0.0,
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "kg CO2/m"
+    ),
+)
 #! format: on
 
 """
@@ -661,6 +689,9 @@ mutable struct GeothermalHeatCollector <: Component
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
 
     ambient_temperature_profile::Union{Profile,Nothing}
     constant_ambient_temperature::Temperature
@@ -793,7 +824,15 @@ mutable struct GeothermalHeatCollector <: Component
 end
 
 function component_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS) # return a copy to prevent external modification
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function economy_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function emission_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_EMISSION_PARAMETERS) # return a copy to prevent external modification
 end
 
 function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, param_name::String,
@@ -818,7 +857,16 @@ end
 
 function validate_config(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalHeatCollector))
+    if param_type == "economy"
+        parameter = economy_parameters(GeothermalHeatCollector)
+        uac = uac * " - economy_parameters"
+    elseif param_type == "emission"
+        parameter = emission_parameters(GeothermalHeatCollector)
+        uac = uac * " - emission_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(GeothermalHeatCollector)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params::Dict{String,Any},
@@ -834,6 +882,8 @@ function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params:
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
+            params["economy_parameters"],
+            params["emission_parameters"],
             some_or_none(params["ambient_temperature_profile_file_path"],
                          params["ambient_temperature_from_global_file"]),
             params["constant_ambient_temperature"],
