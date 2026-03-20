@@ -132,7 +132,6 @@ end
 function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     medium = Symbol(params["medium"])
-    register_media([medium])
 
     # return tuple in the order expected by new()
     return (uac,                             # uac

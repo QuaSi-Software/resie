@@ -620,7 +620,6 @@ end
 function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     m_heat_out = Symbol(params["m_heat_out"])
-    register_media([m_heat_out])
 
     const_wind_speed = params["constant_wind_speed"]
     if const_wind_speed === nothing
@@ -1091,10 +1090,9 @@ function check_temperature_and_get_max_energy(unit::SolarthermalCollector,
                                               temperature_output::Temperature,
                                               limit_max_output_energy_to_avoid_pulsing::Bool)::Tuple{Temperature,
                                                                                                      Float64}
-    # get max output temperature of solarthermal collector
-    _, source_max_out_temperature = get_output_temperature_bounds(unit, sim_params)
-
-    if temperature_output === nothing || temperature_output > source_max_out_temperature
+    if unit.collector_gross_area == 0 || temperature_output === nothing ||
+       temperature_output > get_output_temperature_bounds(unit, sim_params)[2]
+        # end of expression 
         # the requested temperature is higher than the current output temperature or
         # no temperature information is given, the collector doesn't run and produces no energy
         temperature_output = nothing

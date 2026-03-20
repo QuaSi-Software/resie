@@ -512,12 +512,11 @@ end
 
 function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
-    # turn media names into Symbol and register them
+    # turn media names into Symbol
     heat_lt_is_usable = params["heat_lt_is_usable"]
     m_el_in = Symbol(params["m_el_in"])
     m_el_out = Symbol(params["m_el_out"])
     m_heat_lt_out = Symbol(params["m_heat_lt_out"])
-    register_media([m_el_in, m_el_out, m_heat_lt_out])
 
     output_interfaces = InterfaceMap(m_el_in => nothing, m_el_out => nothing)
     if heat_lt_is_usable
@@ -618,7 +617,7 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
     unit.load_end_of_last_timestep = copy(unit.load)
     unit.self_discharge_rate *= sim_params["time_step_seconds"] / (30 * 24 * 3600)
 
-    unit.SOC = (unit.load / unit.capacity) * 100
+    unit.SOC = unit.capacity > 0 ? (unit.load / unit.capacity) * 100 : 0
     if unit.SOC < unit.SOC_min || unit.SOC > unit.SOC_max
         @warn "Starting load for battery $(unit.uac) is not in the defined SOC range." *
               "The load is set to the closest valid value."
@@ -702,7 +701,9 @@ function control(unit::Battery,
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.max_discharge_energy)
 
     charge_current = unit.max_charge_C_rate * unit.capacity_cell_Ah
-    if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.SOC_max - 0.01
+    if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.SOC_max - 0.01 &&
+       unit.capacity > 0
+        # end of expression
         charge_current = -unit.max_charge_C_rate * unit.capacity_cell_Ah
         unit.charge_efficiency,
         unit.V_cell_charge,
@@ -1078,7 +1079,7 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
 
         if unit.model_type == "simplified"
             unit.load = max(unit.load - unit.losses, 0)
-            unit.SOC = unit.load / unit.capacity * 100
+            unit.SOC = unit.capacity > 0 ? (unit.load / unit.capacity) * 100 : 0
         else
             # calculate current and check for different conditions
             charge_diff = unit.extracted_charge - unit.extracted_charge_last
@@ -1091,7 +1092,7 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                     unit.load -= unit.losses
                     unit.extracted_charge += self_loss / unit.n_cell_p / unit.n_cell_s / unit.V_n
                 end
-                unit.SOC = unit.load / unit.capacity * 100
+                unit.SOC = unit.capacity > 0 ? (unit.load / unit.capacity) * 100 : 0
 
                 # check for constant voltage charging cutoff point 
                 # CV charging current cutoff is set at 0.3% of the nominal cell capacity

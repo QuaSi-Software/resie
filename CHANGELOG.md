@@ -4,6 +4,24 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.12
+* Simplify internal use of COP functions with constant value
+* Simplify internal loading of optional profiles and constant values for all components
+* Fix some misconfigured test cases that may break in rare cases depending on undefined order of iteration
+* Update parameter "probe_type" of GeothermalProbes to use string options instead of numbers
+  * Previously it had options "1" and "2", now has options "single U-pipe" and "double U-pipe"
+* Split GridConnection into two components GridInput and GridOutput
+  * It is still possible to use GridConnection as type, but using GridInput and GridOutput is the new recommended use
+  * GridInput and GridOutput do not require the parameter "is_source" as that is implicit in the type name
+* Refactor all components to use a new mechanism of construction of instances during project loading
+  * This new mechanism uses a single source of truth (SSOT) concept to define all metadata about parameters in a single location in the code, such that changes only have to be done at one point instead of multiple
+  * The metadata captures the previously implemented logic of parameters concerning valid values, defaults and inter-dependencies between parameters, as well as some new logic. This also includes metadata that ReSiE does not utilise directly, but connecting systems, in particular user interfaces, might require or find useful.
+* Add a function that systems programmatically interfacing with ReSiE via a shared Julia environment can access to get a complete definition of all parameters of all component types
+* Add IO setting "show_detailed_errors" which, when enabled, shows more detailed error messages during component construction
+* Ensure that most transformer and storage component can accept zero power / capacity
+  * This is prepatory work for optimisation and parameter studies, where a component might be reduced to zero sizing while still maintaining its place in the energy system (whereas completely removing the component is much more complicated)
+* Fix rare race condition with multithreading when module-global variable EnergySystems.medium_categories is checked during output generation.
+
 ## Version 0.13.11
 * Changed transformer potential handling so `MaxEnergy` is no longer updated in interfaces toward (proxy) buses and is instead written only to the bus balance table, allowing `balance_on()` of the bus to correctly handle multiple transformers with multiple potential steps; linked interfaces remain an exception and still require to update `MaxEnergy` in the interfaces during potential step for correct communication.
 * Fixed `inner_distribute` in buses to avoid `Inf - Inf`, which previously produced `NaN` values in the bus balance table in some rare cases

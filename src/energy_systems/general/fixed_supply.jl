@@ -231,7 +231,6 @@ end
 function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     medium = Symbol(params["medium"])
-    register_media([medium])
 
     energy_profile = params["energy_profile_file_path"] !== nothing ?
                      Profile(params["energy_profile_file_path"], sim_params) :

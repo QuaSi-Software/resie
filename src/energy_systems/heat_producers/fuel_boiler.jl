@@ -207,7 +207,6 @@ function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,
     # turn media names into Symbol and register them
     m_fuel_in = Symbol(params["m_fuel_in"])
     m_heat_out = Symbol(params["m_heat_out"])
-    register_media([m_fuel_in, m_heat_out])
     interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
     linear_interface = Symbol(params["linear_interface"])
 
