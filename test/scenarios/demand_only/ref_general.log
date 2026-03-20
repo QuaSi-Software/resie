@@ -1,0 +1,13 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:09:51
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_01_HZG_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_DEM', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\demand_only\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] -- Finished time step loop
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\demand_only\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\demand_only\out.csv
+[Info] general log saved to .\test\scenarios\demand_only\general.log

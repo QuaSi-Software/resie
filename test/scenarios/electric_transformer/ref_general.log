@@ -1,0 +1,36 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:09:52
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_DEM_01', no 'temperature' is set.
+[Info] For 'TST_GRO_HEAT', no 'temperature' is set.
+[Info] For 'TST_GRI_GAS', no 'temperature' is set.
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/669 in 0.837 s. ETA: 16.1313 s
+[Info] Progress: 66/669 in 0.028 s. ETA: 0.5116 s
+[Info] Progress: 99/669 in 0.035 s. ETA: 0.6045 s
+[Info] Progress: 132/669 in 0.036 s. ETA: 0.5858 s
+[Info] Progress: 165/669 in 0.034 s. ETA: 0.5193 s
+[Info] Progress: 198/669 in 0.028 s. ETA: 0.3996 s
+[Info] Progress: 231/669 in 0.041 s. ETA: 0.5442 s
+[Info] Progress: 264/669 in 0.037 s. ETA: 0.4541 s
+[Info] Progress: 297/669 in 0.031 s. ETA: 0.3495 s
+[Info] Progress: 330/669 in 0.036 s. ETA: 0.3698 s
+[Info] Progress: 363/669 in 0.04 s. ETA: 0.3524 s
+[Info] Progress: 396/669 in 0.03 s. ETA: 0.2482 s
+[Info] Progress: 429/669 in 0.029 s. ETA: 0.2109 s
+[Info] Progress: 462/669 in 0.044 s. ETA: 0.2760 s
+[Info] Progress: 495/669 in 0.021 s. ETA: 0.1107 s
+[Info] Progress: 528/669 in 0.045 s. ETA: 0.1923 s
+[Info] Progress: 561/669 in 0.03 s. ETA: 0.0982 s
+[Info] Progress: 594/669 in 0.038 s. ETA: 0.0864 s
+[Info] Progress: 627/669 in 0.037 s. ETA: 0.0471 s
+[Info] Progress: 660/669 in 0.037 s. ETA: 0.0101 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\out.csv
+[Info] general log saved to .\test\scenarios\electric_transformer\general.log

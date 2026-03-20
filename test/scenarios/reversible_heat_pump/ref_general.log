@@ -1,0 +1,35 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:17:35
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_TH_DEM_01', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_temp_var_avg55.prf
+[Info] For 'TST_EL_GRI_01', no 'temperature' is set.
+[Info] For 'TST_TH_DEM_02', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\src_heat_temp_dailyvar_avg30.prf
+[Info] Successfully calculated g-function for geothermal probe field "TST_TH_GTP_01" with 1 probes.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\reversible_heat_pump\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 4.841 s. ETA: 93.7394 s
+[Info] Progress: 66/672 in 0.085 s. ETA: 1.5609 s
+[Info] Progress: 99/672 in 0.103 s. ETA: 1.7885 s
+[Info] Progress: 132/672 in 0.049 s. ETA: 0.7855 s
+[Info] Progress: 165/672 in 0.035 s. ETA: 0.5377 s
+[Info] Progress: 198/672 in 0.032 s. ETA: 0.4596 s
+[Info] Progress: 231/672 in 0.035 s. ETA: 0.4677 s
+[Info] Progress: 264/672 in 0.038 s. ETA: 0.4698 s
+[Info] Progress: 297/672 in 0.037 s. ETA: 0.4205 s
+[Info] Progress: 330/672 in 0.023 s. ETA: 0.2384 s
+[Info] Progress: 363/672 in 0.069 s. ETA: 0.6461 s
+[Info] Progress: 396/672 in 0.12 s. ETA: 1.0036 s
+[Info] Progress: 429/672 in 0.074 s. ETA: 0.5449 s
+[Info] Progress: 462/672 in 0.174 s. ETA: 1.1073 s
+[Info] Progress: 495/672 in 0.044 s. ETA: 0.2360 s
+[Info] Progress: 528/672 in 0.018 s. ETA: 0.0785 s
+[Info] Progress: 561/672 in 0.016 s. ETA: 0.0538 s
+[Info] Progress: 594/672 in 0.039 s. ETA: 0.0922 s
+[Info] Progress: 627/672 in 0.031 s. ETA: 0.0423 s
+[Info] Progress: 660/672 in 0.016 s. ETA: 0.0058 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\reversible_heat_pump\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\reversible_heat_pump\sankey_plot.html
+[Info] general log saved to .\test\scenarios\reversible_heat_pump\general.log

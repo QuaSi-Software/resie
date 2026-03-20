@@ -131,6 +131,7 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
                                         Integer(floor(nr_of_steps / 20))),
         "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
                                               false),
+        "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
     )
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
@@ -163,8 +164,9 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         weather_interpolation_type_general = default(project_config["simulation_parameters"],
                                                      "weather_interpolation_type_general", "linear_classic")
         # WeatherData() writes the lat and long to sim_params if they are not given in the input file
-        sim_params["weather_data"] = WeatherData(weather_file_path,
+        sim_params["weather_data"] = WeatherData(sim_params["run_path"](weather_file_path),
                                                  sim_params,
+                                                 guess_file_format(sim_params["run_path"](weather_file_path)),
                                                  weather_interpolation_type_solar,
                                                  weather_interpolation_type_general)
     end
@@ -245,6 +247,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                            default(project_config["io_settings"], "csv_output_weather", false)
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
+    do_write_CSV_continuously = default(project_config["io_settings"], "write_csv_continuously", false)
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
@@ -255,18 +258,22 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
     do_return_data = output_keys_return !== nothing 
 
-    # Initialize the array for output plots
+    # Initialize the arrays for output
     output_data_lineplot = do_create_plot_data ?
                            zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_lineplot)) :
                            nothing
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
+    output_csv = do_write_CSV && !do_write_CSV_continuously ?
+                 Matrix{String}(undef, sim_params["number_of_time_steps_output"],
+                                1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
+                 nothing
     output_return_data = do_return_data ?
                         zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return)) :
                         nothing
 
-    # reset CSV file
+    # write CSV file headers
     if do_write_CSV
         header = get_output_header(output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
         # Reset the output file and add headers for the given outputs.
@@ -326,18 +333,21 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                 end
             end
 
-            # write requested output data of the components to CSV-file
-            # This is currently done in every time step to keep data even if 
-            # an error occurs.
+            # write requested output data to the CSV file if configured, or to output
+            # storage if not
             if do_write_CSV
                 row = get_output_row(output_keys_to_CSV, 
                                      weather_CSV_keys, 
                                      sim_params, 
                                      csv_time_unit)
-                # Write row to the output file
-                open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
-                    row = replace(row, "." => ",")
-                    write(file_handle, join(row, ';') * "\n")
+                if do_write_CSV_continuously
+                    # Write row to the output file
+                    open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+                        row = replace(row, "." => ",")
+                        write(file_handle, join(row, ';') * "\n")
+                    end
+                else
+                    output_csv[output_steps, :] = row
                 end
             end
 
@@ -380,6 +390,15 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         end
     end
     @info "-- Finished time step loop"
+
+    # write output to CSV if not done continuously
+    if do_write_CSV && !do_write_CSV_continuously
+        open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+            for row_idx in 1:size(output_csv)[1]
+                write(file_handle, join(output_csv[row_idx, :], ";") * "\n")
+            end
+        end
+    end
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather

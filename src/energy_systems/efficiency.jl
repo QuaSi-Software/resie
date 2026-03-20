@@ -242,11 +242,10 @@ Four different function prototypes are implemented:
 # Arguments
 - `eff_def::String`: The function definition as described above
 # Returns
-- `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
 - `Function`: A callable function which, when called with the input and output temperatures
     as arguments, returns the COP value at a PLR of 1.0.
 """
-function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
+function parse_cop_function(eff_def::String)::Function
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
@@ -255,22 +254,22 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
 
         if method_cop == "const"
             c = parse(Float64, data_cop)
-            return c, function (src, snk)
-                       return c
-                   end
+            return function (src, snk)
+                return c
+            end
 
         elseif method_cop == "carnot"
             c = parse(Float64, data_cop)
-            return nothing, function (src, snk)
-                       if src === nothing || snk === nothing
-                           return nothing
-                       end
-                       return c * (273.15 + snk) / (snk - src)
-                   end
+            return function (src, snk)
+                if src === nothing || snk === nothing
+                    return nothing
+                end
+                return c * (273.15 + snk) / (snk - src)
+            end
 
         elseif method_cop == "poly-2"
             poly = parse_2dim_function(method_cop * ":" * data_cop)
-            return nothing, poly
+            return poly
 
         elseif method_cop == "field"
             rows = split(data_cop, ';')
@@ -287,40 +286,39 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
             # first dim of values is source, second is sink. source is vertical (one row is
             # at the same source temp), sink is horizontal (one column is at the same sink
             # temp). first row is sink temperatures, first column is source temperatures
-            return nothing,
-                   function (src, snk)
-                       src_idx = nothing
-                       for idx in 2:(dim_src - 1)
-                           if src >= values[idx, 1] && src <= values[idx + 1, 1]
-                               src_idx = idx
-                           end
-                       end
-                       snk_idx = nothing
-                       for idx in 2:(dim_snk - 1)
-                           if snk >= values[1, idx] && snk <= values[1, idx + 1]
-                               snk_idx = idx
-                           end
-                       end
-                       if snk_idx === nothing || src_idx === nothing
-                           @error "Given temperatures $src and $snk outside of COP field."
-                           throw(BoundsError(values, (src_idx, snk_idx)))
-                       end
-                       return bilinear_interpolate(values[1, snk_idx],
-                                                   snk,
-                                                   values[1, snk_idx + 1],
-                                                   values[src_idx, 1],
-                                                   src,
-                                                   values[src_idx + 1, 1],
-                                                   values[src_idx, snk_idx],
-                                                   values[src_idx, snk_idx + 1],
-                                                   values[src_idx + 1, snk_idx],
-                                                   values[src_idx + 1, snk_idx + 1])
-                   end
+            return function (src, snk)
+                src_idx = nothing
+                for idx in 2:(dim_src - 1)
+                    if src >= values[idx, 1] && src <= values[idx + 1, 1]
+                        src_idx = idx
+                    end
+                end
+                snk_idx = nothing
+                for idx in 2:(dim_snk - 1)
+                    if snk >= values[1, idx] && snk <= values[1, idx + 1]
+                        snk_idx = idx
+                    end
+                end
+                if snk_idx === nothing || src_idx === nothing
+                    @error "Given temperatures $src and $snk outside of COP field."
+                    throw(BoundsError(values, (src_idx, snk_idx)))
+                end
+                return bilinear_interpolate(values[1, snk_idx],
+                                            snk,
+                                            values[1, snk_idx + 1],
+                                            values[src_idx, 1],
+                                            src,
+                                            values[src_idx + 1, 1],
+                                            values[src_idx, snk_idx],
+                                            values[src_idx, snk_idx + 1],
+                                            values[src_idx + 1, snk_idx],
+                                            values[src_idx + 1, snk_idx + 1])
+            end
         end
     end
 
     @error "Cannot parse COP function from: $eff_def"
-    return nothing, ((x, y) -> 0.0)
+    return (x, y) -> 0.0
 end
 
 """
@@ -647,7 +645,7 @@ uacs of the sources as vectors.
     floating point value signifying an infinite value
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR},
+function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR,ThermalBooster},
                              sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
         &&
@@ -683,7 +681,7 @@ Checks the available energy on the input heat interface.
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+function check_heat_in_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
@@ -998,11 +996,12 @@ actual input priority of the primary and secondary input interface at the target
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
 - `Vector{Stringing}`: The UACs of the targets on the interface.
 """
-function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
+function check_heat_out_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
+    has_secondary_interface = hasproperty(unit, :has_secondary_interface) && unit.has_secondary_interface
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)) ||
-       (unit.has_secondary_interface &&
+       (has_secondary_interface &&
         unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function == sf_transformer &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_secondary].max_energy))
         # direct connection to transformer that has not had its potential
@@ -1014,7 +1013,7 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
-            if unit.has_secondary_interface
+            if has_secondary_interface
                 # If a secondary interface exists, call balance_on on this interface as well...
                 exchanges_secondary = balance_on(unit.output_interfaces[unit.m_heat_out_secondary],
                                                  unit.output_interfaces[unit.m_heat_out_secondary].target)

@@ -1,0 +1,48 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:17:48
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted using linear interpolation to fit the simulation start time. 
+[Info] For 'TST_GTC_01', the 'ambient_temperature' is taken from the project-wide weather file: temp_ambient_air
+[Info] For 'TST_GTC_01', the 'global_solar_radiation' is taken from the project-wide weather file: globHorIrr
+[Info] For 'TST_GTC_01', the 'infrared_sky_radiation' is taken from the project-wide weather file: longWaveIrr
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_DEM_01', the 'temperature' is set to the constant value of 55.0.
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_collector\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 37/744 in 2.047 s. ETA: 39.1143 s
+[Info] Progress: 74/744 in 0.213 s. ETA: 3.8570 s
+[Info] Progress: 111/744 in 0.279 s. ETA: 4.7732 s
+[Info] Progress: 148/744 in 0.211 s. ETA: 3.3988 s
+[Info] Progress: 185/744 in 0.23 s. ETA: 3.4749 s
+[Info] Progress: 222/744 in 0.187 s. ETA: 2.6382 s
+[Info] Progress: 259/744 in 0.186 s. ETA: 2.4381 s
+[Info] Progress: 296/744 in 0.17 s. ETA: 2.0584 s
+[Info] Progress: 333/744 in 0.15 s. ETA: 1.6662 s
+[Info] Progress: 370/744 in 0.17 s. ETA: 1.6982 s
+[Info] Progress: 407/744 in 0.167 s. ETA: 1.5211 s
+[Info] Progress: 444/744 in 0.146 s. ETA: 1.1838 s
+[Info] Progress: 481/744 in 0.219 s. ETA: 1.5567 s
+[Info] Progress: 518/744 in 0.265 s. ETA: 1.6186 s
+[Info] Progress: 555/744 in 0.283 s. ETA: 1.4456 s
+[Info] Progress: 592/744 in 0.236 s. ETA: 0.9695 s
+[Info] Progress: 629/744 in 0.277 s. ETA: 0.8609 s
+[Info] Progress: 666/744 in 0.31 s. ETA: 0.6535 s
+[Info] Progress: 703/744 in 0.238 s. ETA: 0.2637 s
+[Info] Progress: 740/744 in 0.252 s. ETA: 0.0272 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_collector\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_collector\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_collector\out.csv
+[Info] general log saved to .\test\scenarios\simple_geothermal_collector\general.log

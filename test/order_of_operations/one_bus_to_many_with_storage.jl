@@ -49,14 +49,14 @@ function test_ooo_one_bus_to_many_with_storage()
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_02"],
             "capacity" => 1000,
-            "load" => 500,
+            "initial_load" => 0.5,
         ),
         "TST_TES_02" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_03"],
             "capacity" => 1000,
-            "load" => 500,
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

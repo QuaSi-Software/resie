@@ -544,7 +544,7 @@ function reorder_operations(components::Grouping,
                             sim_params::Dict{String,Any})::OrderOfOperations
     for unit in each(components)
         for mod in unit.controller.modules
-            if !has_method_for(mod, cmf_change_bus_priorities)
+            if !has_method_for(mod, cmf_reorder_operations)
                 continue
             end
 

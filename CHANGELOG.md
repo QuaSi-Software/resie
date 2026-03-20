@@ -4,6 +4,58 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.12
+* Simplify internal use of COP functions with constant value
+* Simplify internal loading of optional profiles and constant values for all components
+* Fix some misconfigured test cases that may break in rare cases depending on undefined order of iteration
+* Update parameter "probe_type" of GeothermalProbes to use string options instead of numbers
+  * Previously it had options "1" and "2", now has options "single U-pipe" and "double U-pipe"
+* Split GridConnection into two components GridInput and GridOutput
+  * It is still possible to use GridConnection as type, but using GridInput and GridOutput is the new recommended use
+  * GridInput and GridOutput do not require the parameter "is_source" as that is implicit in the type name
+* Refactor all components to use a new mechanism of construction of instances during project loading
+  * This new mechanism uses a single source of truth (SSOT) concept to define all metadata about parameters in a single location in the code, such that changes only have to be done at one point instead of multiple
+  * The metadata captures the previously implemented logic of parameters concerning valid values, defaults and inter-dependencies between parameters, as well as some new logic. This also includes metadata that ReSiE does not utilise directly, but connecting systems, in particular user interfaces, might require or find useful.
+* Add a function that systems programmatically interfacing with ReSiE via a shared Julia environment can access to get a complete definition of all parameters of all component types
+* Add IO setting "show_detailed_errors" which, when enabled, shows more detailed error messages during component construction
+* Ensure that most transformer and storage component can accept zero power / capacity
+  * This is prepatory work for optimisation and parameter studies, where a component might be reduced to zero sizing while still maintaining its place in the energy system (whereas completely removing the component is much more complicated)
+* Fix rare race condition with multithreading when module-global variable EnergySystems.medium_categories is checked during output generation.
+
+## Version 0.13.11
+* Changed transformer potential handling so `MaxEnergy` is no longer updated in interfaces toward (proxy) buses and is instead written only to the bus balance table, allowing `balance_on()` of the bus to correctly handle multiple transformers with multiple potential steps; linked interfaces remain an exception and still require to update `MaxEnergy` in the interfaces during potential step for correct communication.
+* Fixed `inner_distribute` in buses to avoid `Inf - Inf`, which previously produced `NaN` values in the bus balance table in some rare cases
+
+### Version 0.13.10
+* Fix function reorder_src_snk_connected_to-transformer not working after merges of new battery model
+
+### Version 0.13.9
+* Add new transformer component ThermalBooster that uses low temperature heat to preheat a thermal demand and a second energy source to reach the desired output temperature
+* Add new scenario low_ex_district_heating to show the use of a ThermalBooster
+* Ensure correct handling of add!() or sub!() of a value of zero for direct connections between transformers and other components that have some interfaces set to an energy > 0 and one interface to an energy of 0 in their process step
+* Improve handling of 1-to-1 interfaces between transformers and other components (except buses and transformers) in set_max_energy() to allow transformers to increase the demanded or delivered energy in process compared to the potential step; therefore the max energy is no longer written into the interface of the direct 1-to-1 connections during the potential step of transformers
+* Fix ooo to always place the process/load step of flexible sources, flexible sinks and storages that are connected to a transformer directly or via busses always behind the process of this transformer in the order of operations
+* Add possibility to calculate the ooo for energy systems with multiple transformers that are all connected in their input and output to the same (proxy) bus without a warning saying that contradictions were found or other ooo warnings
+* Add general_log as reference in all scenarios
+* Update scenarios interconnected_STES and p2h_stes_stc due to changed ooo (results have not changed)
+
+### Version 0.13.8
+* Implement complex model for battery simulation
+  * A simple model remains with adjusted parameters. This model includes constant efficiency of dis-/charging, dis-/charging rate limitations and self-discharge as well as simple load/capacity tracking
+  * The complex model is designed around calculating the state of the battery with a detailed electrical model. The capacity, current load and dis-/charging power is calculated dynamically and includes effect such as aging (through cycling and chemical deterioration), heat build-up and varying efficiency of dis-/charging depending on power and cell temperature.
+  * The complex model works for different battery chemistries if manufacturer data is available. Redox-flow batteries are not included in the model.
+* Rename parameter `load` of generic model `Storage` to `initial_load` and change meaning to a percentage of capacity as initial charge
+* Fix typo in default parameters of control module `storage_driven`
+* Fix problem with loading profiles for model `GenericHeatSource`
+* Fix wrong check for control module functionality in callback `reorder_operations`
+* Fix that the exact value of the upper limit of `field` COP-functions was not included in the interpolation, leading to errors even though the value was within the field definition
+* Fix an issue with auxiliary output plots formats
+
+### Version 0.13.7
+* Fix reading of global weather file not working correctly in some cases
+* Add option to write CSV output continuously, meaning in every timestep
+  * The old behaviour was to always do it this way. The new behaviour changes the default to writing the output after the simulation loop and adds a IO setting to enable continuous output if desired.
+
 ### Version 0.13.6
 * fix bug of missing process step in OOO of transformers connected to grids in middle-bus-branches
 

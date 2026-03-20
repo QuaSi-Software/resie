@@ -1,0 +1,38 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:07:50
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_01_ELT_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_HZG_02_SRC', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\source_heat_temperature.prf
+[Info] For 'TST_01_HZG_01_DEM', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] For 'TST_01_ELT_01_DEM', no 'temperature' is set.
+[Info] For 'TST_01_ELT_01_GRO', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\2_sector\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 30.996 s. ETA: 599.8661 s
+[Info] Progress: 66/672 in 0.131 s. ETA: 2.4056 s
+[Info] Progress: 99/672 in 0.036 s. ETA: 0.6251 s
+[Info] Progress: 132/672 in 0.039 s. ETA: 0.6382 s
+[Info] Progress: 165/672 in 0.14 s. ETA: 2.1509 s
+[Info] Progress: 198/672 in 0.037 s. ETA: 0.5315 s
+[Info] Progress: 231/672 in 0.05 s. ETA: 0.6682 s
+[Info] Progress: 264/672 in 0.069 s. ETA: 0.8531 s
+[Info] Progress: 297/672 in 0.044 s. ETA: 0.5000 s
+[Info] Progress: 330/672 in 0.021 s. ETA: 0.2176 s
+[Info] Progress: 363/672 in 0.05 s. ETA: 0.4682 s
+[Info] Progress: 396/672 in 0.041 s. ETA: 0.3429 s
+[Info] Progress: 429/672 in 0.041 s. ETA: 0.3019 s
+[Info] Progress: 462/672 in 0.059 s. ETA: 0.3755 s
+[Info] Progress: 495/672 in 0.05 s. ETA: 0.2682 s
+[Info] Progress: 528/672 in 0.05 s. ETA: 0.2182 s
+[Info] Progress: 561/672 in 0.026 s. ETA: 0.0875 s
+[Info] Progress: 594/672 in 0.05 s. ETA: 0.1182 s
+[Info] Progress: 627/672 in 0.047 s. ETA: 0.0641 s
+[Info] Progress: 660/672 in 0.055 s. ETA: 0.0200 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\2_sector\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\2_sector\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\2_sector\out.csv
+[Info] general log saved to .\test\scenarios\2_sector\general.log

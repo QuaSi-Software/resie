@@ -1,3 +1,41 @@
+#! format: off
+const STORAGE_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the storage (e.g. electricity, heat, gas, etc.)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "capacity" => (
+        default=nothing,
+        description="Energy capacity of the storage",
+        display_name="Capacity",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="Wh"
+    ),
+    "initial_load" => (
+        default=0.0,
+        description="Initial load relative to capacity",
+        display_name="Initial load",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a component modeling a generic storage of a chosen medium.
 
@@ -19,26 +57,47 @@ mutable struct Storage <: Component
     load_end_of_last_timestep::Float64
     losses::Float64
 
+    # indicates if the process step has already been performed in the current time step
     process_done::Bool
+    # indicates if the load step has already been performed in the current time step
     load_done::Bool
 
     function Storage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(config["medium"])
-        register_media([medium])
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage,                      # sys_function
-                   InterfaceMap(medium => nothing), # input_interfaces
-                   InterfaceMap(medium => nothing), # output_interfaces
-                   medium,
-                   config["capacity"],  # capacity
-                   config["load"],      # load
-                   0.0,                 # load_end_of_last_timestep::Float64
-                   0.0,                 # losses
-                   false,  # process_done, bool indicating if the process step has already been performed in the current time step
-                   false)  # load_done, bool indicating if the load step has already been performed in the current time step
+        return new(SSOT_parameter_constructor(Storage, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{Storage})::Dict{String,NamedTuple}
+    return deepcopy(STORAGE_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{Storage}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{Storage}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(Storage))
+end
+
+function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+
+    # return tuple in the order expected by new()
+    return (uac,                             # uac
+            Controller(params["control_parameters"]),
+            sf_storage,                      # sys_function
+            InterfaceMap(medium => nothing), # input_interfaces
+            InterfaceMap(medium => nothing), # output_interfaces
+            medium,                          # medium
+            params["capacity"],              # capacity
+            params["initial_load"] * params["capacity"], # load
+            0.0,                             # load_end_of_last_timestep
+            0.0,                             # losses
+            false,                           # process_done
+            false)                           # load_done
 end
 
 function initialise!(unit::Storage, sim_params::Dict{String,Any})
@@ -64,7 +123,7 @@ function process(unit::Storage, sim_params::Dict{String,Any})
     exchanges = balance_on(outface, outface.target)
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
-    if energy_demand >= 0.0
+    if energy_demand >= 0.0 || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
@@ -100,7 +159,7 @@ function load(unit::Storage, sim_params::Dict{String,Any})
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
-    if energy_available <= 0.0
+    if energy_available <= 0.0 || unit.capacity <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return # load is only concerned with receiving energy from the source

@@ -1,0 +1,35 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:10:30
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_TH_DEM_01', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_temp_var_avg55.prf
+[Info] For 'TST_TH_GRO_01', no 'temperature' is set.
+[Info] For 'TST_EL_GRI_01', no 'temperature' is set.
+[Info] For 'TST_TH_DEM_02', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\src_heat_temp_dailyvar_avg30.prf
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\heating_and_cooling\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 0.945 s. ETA: 18.2986 s
+[Info] Progress: 66/672 in 0.043 s. ETA: 0.7896 s
+[Info] Progress: 99/672 in 0.047 s. ETA: 0.8161 s
+[Info] Progress: 132/672 in 0.044 s. ETA: 0.7200 s
+[Info] Progress: 165/672 in 0.052 s. ETA: 0.7989 s
+[Info] Progress: 198/672 in 0.045 s. ETA: 0.6464 s
+[Info] Progress: 231/672 in 0.043 s. ETA: 0.5746 s
+[Info] Progress: 264/672 in 0.048 s. ETA: 0.5935 s
+[Info] Progress: 297/672 in 0.028 s. ETA: 0.3182 s
+[Info] Progress: 330/672 in 0.04 s. ETA: 0.4145 s
+[Info] Progress: 363/672 in 0.051 s. ETA: 0.4775 s
+[Info] Progress: 396/672 in 0.036 s. ETA: 0.3011 s
+[Info] Progress: 429/672 in 0.054 s. ETA: 0.3976 s
+[Info] Progress: 462/672 in 0.042 s. ETA: 0.2673 s
+[Info] Progress: 495/672 in 0.042 s. ETA: 0.2253 s
+[Info] Progress: 528/672 in 0.039 s. ETA: 0.1702 s
+[Info] Progress: 561/672 in 0.031 s. ETA: 0.1043 s
+[Info] Progress: 594/672 in 0.046 s. ETA: 0.1087 s
+[Info] Progress: 627/672 in 0.019 s. ETA: 0.0259 s
+[Info] Progress: 660/672 in 0.041 s. ETA: 0.0149 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\heating_and_cooling\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\heating_and_cooling\sankey_plot.html
+[Info] general log saved to .\test\scenarios\heating_and_cooling\general.log
