@@ -1800,6 +1800,10 @@ function component_has_minimum_part_load(unit::HeatPump)
     return unit.min_usage_fraction > 0.0
 end
 
+function get_capex_reference(unit::HeatPump)
+    return unit.design_power_th # [W]
+end
+
 # has its own reset function as here more parameters are present that need to be reset in
 # every timestep
 function reset(unit::HeatPump)

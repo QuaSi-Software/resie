@@ -329,6 +329,10 @@ function component_has_minimum_part_load(unit::CHPP)
     return unit.min_power_fraction > 0.0
 end
 
+function get_capex_reference(unit::CHPP)
+    return unit.power # [W]
+end
+
 function output_values(unit::CHPP)::Vector{String}
     return [string(unit.m_fuel_in) * ":IN",
             string(unit.m_el_out) * ":OUT",

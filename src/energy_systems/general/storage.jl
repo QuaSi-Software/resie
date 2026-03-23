@@ -227,6 +227,10 @@ function load(unit::Storage, sim_params::Dict{String,Any})
     handle_component_update!(unit, "load", sim_params)
 end
 
+function get_capex_reference(unit::Storage)
+    return unit.capacity # [Wh]
+end
+
 function output_values(unit::Storage)::Vector{String}
     return [string(unit.medium) * ":IN",
             string(unit.medium) * ":OUT",

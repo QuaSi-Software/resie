@@ -1000,6 +1000,10 @@ function reset(unit::ThermalBooster)
     unit.balance = 0.0
 end
 
+function get_capex_reference(unit::ThermalBooster)
+    return unit.power_el # [Wh]
+end
+
 function output_values(unit::ThermalBooster)::Vector{String}
     output_vals = [string(unit.m_el_in) * ":IN",
                    string(unit.m_heat_in) * ":IN",

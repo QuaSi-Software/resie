@@ -2466,6 +2466,10 @@ function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real
     return (1 - β) * Tr1 + β * Tr2
 end
 
+function get_capex_reference(unit::SeasonalThermalStorage)
+    return unit.volume # [m^3]
+end
+
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
     output_vals = [string(unit.m_heat_in) * ":IN",
                    string(unit.m_heat_out) * ":OUT",

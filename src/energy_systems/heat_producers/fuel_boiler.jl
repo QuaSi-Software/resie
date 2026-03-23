@@ -303,6 +303,10 @@ function component_has_minimum_part_load(unit::FuelBoiler)
     return unit.min_power_fraction > 0.0
 end
 
+function get_capex_reference(unit::FuelBoiler)
+    return unit.power # [W]
+end
+
 function output_values(unit::FuelBoiler)::Vector{String}
     return [string(unit.m_fuel_in) * ":IN",
             string(unit.m_heat_out) * ":OUT",

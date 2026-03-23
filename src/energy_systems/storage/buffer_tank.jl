@@ -690,6 +690,10 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     handle_component_update!(unit, "load", sim_params)
 end
 
+function get_capex_reference(unit::BufferTank)
+    return unit.volume # [m^3]
+end
+
 function output_values(unit::BufferTank)::Vector{String}
     return [string(unit.medium) * ":IN",
             string(unit.medium) * ":OUT",

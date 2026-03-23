@@ -1334,6 +1334,10 @@ function f_V_cell(extracted_charge::Number, current::Number, unit::Battery, n::N
     return V_cell
 end
 
+function get_capex_reference(unit::Battery)
+    return unit.capacity # [Wh]
+end
+
 function output_values(unit::Battery)::Vector{String}
     channels = [string(unit.m_el_in) * ":IN",
                 string(unit.m_el_out) * ":OUT",

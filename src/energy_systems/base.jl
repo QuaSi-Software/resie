@@ -24,7 +24,7 @@ export check_balances_of_components, check_balances_of_interfaces, Component, ea
        link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
        calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
-       create_secondary_name
+       create_secondary_name, get_capex_reference
 
 using ..Profiles
 using UUIDs
@@ -1596,6 +1596,19 @@ function emission_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
     # base method of the function shouldn't be called on the abstract type
     return Dict{String,NamedTuple}()
 end
+
+"""
+    get_capex_reference(unit)
+
+Returns the reference value to calculate the capes from the specific capex for each component. 
+E.g. a heat pump returns its thermal design power that is reference for the specific capex.
+"""
+function get_capex_reference(unit::Component)
+    @error "No function `get_capex_reference` specified for component $(typeof(unit))."
+    throw(MethodError)
+    # base implementation should not be called as the function has to be specified in every component.
+end
+
 """
     extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
 

@@ -1317,6 +1317,10 @@ function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::Solarther
     spec_flow_rate * 2 * unit.vol_heat_cap * independent_target_temp
 end
 
+function get_capex_reference(unit::SolarthermalCollector)
+    return unit.collector_gross_area # [m^2]
+end
+
 function output_values(unit::SolarthermalCollector)::Vector{String}
     return [string(unit.m_heat_out) * ":OUT",
             "Temperature_Output",

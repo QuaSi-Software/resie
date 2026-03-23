@@ -1824,6 +1824,10 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     handle_component_update!(unit, "load", sim_params)
 end
 
+function get_capex_reference(unit::GeothermalHeatCollector)
+    return unit.pipe_length * unit.number_of_pipes # [m]
+end
+
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
     output_vals = []
     if unit.regeneration

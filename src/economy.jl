@@ -17,7 +17,7 @@ Base.@kwdef mutable struct EconomyResult
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
     annuity_energies::Float64 = 0.0
-    breakdown::Dict{Any,Any} = Dict{Any,Any}()
+    breakdown::Dict{String,Any} = Dict{String,Any}()
 end
 
 function prepare_economy_emissions_data(components::Grouping,
@@ -134,13 +134,11 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
         elseif sf in [EnergySystems.sf_storage, EnergySystems.sf_transformer]
             # start and end energy of storage?! TODO
             # calculate capex and optional additional component-specific opex
-            result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
-                                                                                                              sim_params::Dict{String,
-                                                                                                                               Any},
-                                                                                                              result.annuity_capex::Float64,
-                                                                                                              result.annuity_opex::Float64,
-                                                                                                              result.breakdown::Dict{String,
-                                                                                                                                     Any})
+            result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component,
+                                                                                                              sim_params,
+                                                                                                              result.annuity_capex,
+                                                                                                              result.annuity_opex,
+                                                                                                              result.breakdown)
         end
     end
     return result
@@ -180,18 +178,20 @@ function calculate_annuity_of_energies(energy::Vector{Float64}, price_profile::V
 end
 
 function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component, sim_params::Dict{String,Any},
-                                             annuity_capex::Float64,
-                                             annuity_opex::Float64, breakdown::Dict{String,Any})
+                                             annuity_capex::Float64, annuity_opex::Float64, breakdown::Dict{String,Any})
     # calculate capex including replacements and residual returns and subsidies
-    capex_per_year, capex_first_year, residuals_per_year, subsidies_per_year = get_capex_from_component(component,
+    capex_first_year, capex_per_year, residuals_per_year, subsidies_per_year = get_capex_from_component(component,
                                                                                                         sim_params)
     annuity_capex += get_annuity(capex_per_year, sim_params)
     annuity_capex += get_annuity(residuals_per_year, sim_params)
     annuity_capex += get_annuity(subsidies_per_year, sim_params)
 
     # calculate opex (no energy flows here, as they are handled differently)
-    opex_per_year = get_opex_from_component(component, capex_first_year, sim_params)
-    annuity_opex += get_annuity(opex_per_year, sim_params)
+    maintenance_per_year, repair_per_year, labour_per_year = get_opex_from_component(component, capex_first_year,
+                                                                                     sim_params) # TODO differ between different opex
+    annuity_opex += get_annuity(maintenance_per_year, sim_params)
+    annuity_opex += get_annuity(repair_per_year, sim_params)
+    annuity_opex += get_annuity(labour_per_year, sim_params)
 
     add_to_breakdown!(breakdown, uac,
                       Dict("annuity_capex" => annuity_capex,
@@ -199,7 +199,9 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                            "capex" => capex_per_year,
                            "residuals" => residuals_per_year,
                            "subsidies" => subsidies_per_year,
-                           "opex" => opex_per_year
+                           "maintenance_per_year" => maintenance_per_year,
+                           "repair_per_year" => repair_per_year,
+                           "labour_per_year" => labour_per_year
                            ))
 
     return annuity_capex, annuity_opex, breakdown
@@ -207,31 +209,70 @@ end
 
 function get_capex_from_component(component::EnergySystems.Component, sim_params::Dict{String,Any})
     # capex including replacements, residuals and subsidies
+    # this is probably a component-specific implementation with a default implementation? No, I guess its only general.
 
-    # this is probably a component-specific implementation with a default implementation
-    # check if parameters are provided by the input:
-    component.capex_specific
-    component.lifetime_year
-    component.capex_price_change_rate_per_year
-    component.subsidy_rate_of_capex
-    component.subsidy_max
+    # parameter component
+    lifetime_years = component.economy_parameter["lifetime_years"]
+    capex_specific = component.economy_parameter["capex_specific"]
+    capex_price_change_rate_per_year = component.economy_parameter["capex_price_change_rate_per_year"]
+    subsidy_rate_of_capex = component.economy_parameter["subsidy_rate_of_capex"]
+    subsidy_max = component.economy_parameter["subsidy_max"]
 
-    # get installed power and calculate A0
+    capex_reference = get_capex_reference(component)  # e.g. installed power, area, etc.
 
-    # calculate capex of replacements and convert
+    # parameter general
+    observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
+
+    # factors
+    r = 1.0 + capex_price_change_rate_per_year  # price change factor of capex
+
+    # results
+    capex_per_year = zeros(Float64, observation_period)
+    residuals_per_year = zeros(Float64, observation_period)
+    subsidies_per_year = zeros(Float64, observation_period)
+
+    # calculate initial investment (A0)
+    capex_first_year = capex_specific * capex_reference   # € at time 0
+    capex_per_year[1] = capex_first_year
+
+    # subsidies as one-time event at the beginning of the observation period
+    cap = (subsidy_max > 0.0) ? subsidy_max : Inf
+    subsidies_first_year = min(capex_first_year * subsidy_rate_of_capex, cap)
+    subsidies_per_year[1] += subsidies_first_year
+
+    # calculate capex of replacements
+    # number of replacements n within observation period
+    n = max(0, Int(floor((observation_period - 1e-9) / lifetime_years)))
+    for j in 1:n
+        t = j * lifetime_years      # years since start
+        idx = Int(round(t)) + 1     # index for t=0 -> 1, t=1 -> 2, ...
+
+        if 1 <= idx <= observation_period
+            capex_per_year[idx] += capex_first_year * r^t
+        end
+    end
 
     # calculate residual value
+    t_last = n * lifetime_years
+    remaining_fraction = max(0.0, ((n + 1) * lifetime_years - observation_period) / lifetime_years)
+    residuals_per_year[observation_period] = (capex_first_year * r^t_last) * remaining_fraction
 
-    # calculate total cash value of all capex under consideration of subsidies
-
+    return capex_first_year, capex_per_year, residuals_per_year, subsidies_per_year
 end
 
 function get_opex_from_component(component::EnergySystems.Component, capex_first_year::Float64,
                                  sim_params::Dict{String,Any})
     # opex, here only for component-specific opex, energy are calculated separately.
-    # So here only for e.g. electrolysers water demand, labour, maintenance?
-    component.maintenance_repair_rate_per_year
-    component.operational_labour_hour_per_year
+    maintenance_inspection_rate_per_year = component.economy_parameter["maintenance_inspection_rate_per_year"]
+    maintenance_inspection_price_change_rate_per_year = component.economy_parameter["maintenance_inspection_price_change_rate_per_year"]
+    repair_rate_per_year = component.economy_parameter["repair_rate_per_year"]
+    repair_price_change_rate_per_year = component.economy_parameter["repair_price_change_rate_per_year"]
+    operational_labour_hours_per_year = component.economy_parameter["operational_labour_hours_per_year"]
+
+    # call component-specific function to get special opex, e.g. electrolysers water demand and oxygen production
+    # Or put this somewhere else? How to handle them dynamically while keeping the categories? 
+
+    return maintenance_per_year, repair_per_year, labour_per_year
 end
 
 # ----------------------------------------------------------------------------------------------

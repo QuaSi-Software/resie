@@ -356,6 +356,7 @@ mutable struct Electrolyser <: Component
     emission_parameter::Dict{String,Any}
 
     power::Float64
+    power_rated_el::Float64
     power_total::Float64
     nr_units::Integer
     dispatch_strategy::String
@@ -453,7 +454,8 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
     end
 
     nr_units = params["nr_switchable_units"]
-    power_total = params["power_el"] / efficiencies[Symbol("el_in")](1.0)
+    power_rated_el = params["power_el"]
+    power_total = power_rated_el / efficiencies[Symbol("el_in")](1.0)
     power = power_total / nr_units
 
     # return tuple in the order expected by new()
@@ -470,6 +472,7 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
             params["economy_parameters"],
             params["emission_parameters"],
             power,
+            power_rated_el,
             power_total,
             nr_units,
             params["dispatch_strategy"],
@@ -772,6 +775,10 @@ end
 function component_has_minimum_part_load(unit::Electrolyser)
     return (unit.dispatch_strategy == "equal_with_mpf" && unit.min_power_fraction > 0.0) ||
            unit.min_power_fraction_total > 0.0
+end
+
+function get_capex_reference(unit::Electrolyser)
+    return unit.power_rated_el # [W]
 end
 
 function output_values(unit::Electrolyser)::Vector{String}
