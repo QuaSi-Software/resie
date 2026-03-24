@@ -300,6 +300,9 @@ function get_economy_parameter(project_config::AbstractDict{AbstractString,Any})
             "observation_period_in_years" => default(project_config["economy_parameter"], "observation_period_in_years",
                                                      20.0),
             "interest_rate" => default(project_config["economy_parameter"], "interest_rate", 0.02),
+            "labour_costs_per_hour" => default(project_config["economy_parameter"], "labour_costs_per_hour", 100.0),
+            "labour_costs_price_change_rate_per_year" => default(project_config["economy_parameter"],
+                                                                 "labour_costs_price_change_rate_per_year", 0.035),
         )
     else
         return Dict{String,Any}(

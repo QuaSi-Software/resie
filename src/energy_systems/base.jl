@@ -24,7 +24,7 @@ export check_balances_of_components, check_balances_of_interfaces, Component, ea
        link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
        calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
-       create_secondary_name, get_capex_reference
+       create_secondary_name, get_capex_reference, get_additional_opex_from_component, handle_profiles
 
 using ..Profiles
 using UUIDs
@@ -1610,6 +1610,23 @@ function get_capex_reference(unit::Component)
 end
 
 """
+    get_additional_opex_from_component(unit)
+
+Component-specific function that returns special additional opex costs for different categories 
+for each year. This can be used to include costs that are not represented by any interfaces 
+or the other opex of all components. Used e.g. for oxygen production of electrolyser.
+
+Returns:
+- `names::Vector{String}`: The name of the additional opex cost(s)
+- `yearly_costs::Vector[Vector{Float64}]`: Yearly opex values for each name in names
+
+"""
+function get_additional_opex_from_component(component::Component, sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return String[], Float64[]
+end
+
+"""
     extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
 
 Helper to extract and process a parameter from config using its definition.
@@ -2138,9 +2155,22 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     end
 
     # initialize the parameters ready for feeding into new()
-    extracted_params["economy_parameters"] = extracted_economy_params
-    extracted_params["emission_parameters"] = extracted_emission_params
+    extracted_params["economy_parameters"] = handle_profiles(extracted_economy_params)
+    extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
     return init_from_params(T, uac, extracted_params, config, sim_params)
+end
+
+# copy profiles that are stored in "xxx_profile_file_path" to new key "xxx_profile"
+function handle_profiles(extracted_params::Dict{String,Any})
+    new_dict = copy(extracted_params)
+    for (key, value) in extracted_params
+        if endswith(key, "_profile_file_path")
+            new_key = key[1:(end - 10)]
+            new_dict[new_key] = value
+            new_dict[key] = nothing
+        end
+    end
+    return new_dict
 end
 
 """

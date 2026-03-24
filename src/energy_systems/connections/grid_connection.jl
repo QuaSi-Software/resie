@@ -201,8 +201,8 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     end
 
     # initialize and construct the object
-    extracted_params["economy_parameters"] = extracted_economy_params
-    extracted_params["emission_parameters"] = extracted_emission_params
+    extracted_params["economy_parameters"] = handle_profiles(extracted_economy_params)
+    extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
     init_values = init_from_params(GridConnection{IsSource}, uac, extracted_params, config, sim_params)
     return GridConnection{IsSource}(init_values...)
 end

@@ -383,6 +383,9 @@ mutable struct Electrolyser <: Component
 
     balance::Float64
 
+    water_demand::Vector{Float64}
+    oxygen_production::Vector{Float64}
+
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         return new(SSOT_parameter_constructor(Electrolyser, uac, config, sim_params)...)
     end
@@ -490,7 +493,9 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
             0.0, # losses
             0.0, # losses_heat
             0.0, # losses_hydrogen
-            0.0) # balance
+            0.0, # balance
+            zeros(sim_params["number_of_time_steps_output"]),  # water_demand
+            zeros(sim_params["number_of_time_steps_output"]))  # oxygen_production
 end
 
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
@@ -750,6 +755,15 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
                    sum(energies[4]; init=0.0) -    # output h2
                    (unit.heat_lt_is_usable ? energies[3] : 0.0) -   # output lt
                    unit.losses                     # losses
+
+    # calculate non-energy commodities
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        step = Int(floor(Dates.value(sim_params["start_date_output"] - sim_params["current_date"]) /
+                         (1000 * Dates.Second(sim_params["time_step_seconds"]))))
+
+        unit.water_demand[step] = unit.water_demand_ratio * sum(energies[4]; init=0.0) / 1000  # liter water
+        unit.oxygen_production[step] = unit.oxygen_production_ratio * sum(energies[4]; init=0.0) / 1000  # kg Oxygen
+    end
 end
 
 # has its own reset function as here more losses are present that need to be reset in every timestep
@@ -775,6 +789,31 @@ end
 function component_has_minimum_part_load(unit::Electrolyser)
     return (unit.dispatch_strategy == "equal_with_mpf" && unit.min_power_fraction > 0.0) ||
            unit.min_power_fraction_total > 0.0
+end
+
+function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict{String,Any})
+    # prices only on yearly basis here as simplification
+    observation_period_in_years = sim_params["economy_parameter"]["observation_period_in_years"]
+    # liter water in each time step as Vector
+    water_demand_profile = extend_profile(unit.water_demand, observation_period_in_years, sim_params)
+    # kg oxygen in each time step as Vector
+    oxygen_production_profile = extend_profile(unit.oxygen_production, observation_period_in_years, sim_params)
+
+    timesteps_per_year = Int(floor(length(water_demand_profile) / observation_period_in_years))
+    r_water = 1.0 + unit.water_price_change_rate_per_year
+    r_oxygen = 1.0 + unit.oxygen_price_change_rate_per_year
+
+    # get yearly sums
+    yearly_water_costs = zeros(Float64, observation_period_in_years)
+    yearly_oxygen_revenue = zeros(Float64, observation_period_in_years)
+    for year in 1:observation_period_in_years
+        annual_water_demand = sum(water_demand_profile[((year - 1) * timesteps_per_year):(year * timesteps_per_year)])
+        annual_oxygen_production = sum(oxygen_production_profile[((year - 1) * timesteps_per_year):(year * timesteps_per_year)])
+
+        yearly_water_costs[year] = annual_water_demand * unit.water_price * r_water^(year - 1)
+        yearly_oxygen_revenue[year] = annual_oxygen_production * unit.oxygen_price * r_oxygen^(year - 1)
+    end
+    return ["water_costs_per_year", "oxygen_revenue_per_year"], [.-yearly_water_costs, yearly_oxygen_revenue]
 end
 
 function get_capex_reference(unit::Electrolyser)
