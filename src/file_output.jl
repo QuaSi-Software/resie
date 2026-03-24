@@ -131,10 +131,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output_keys")
-    do_economy = economy_parameter !== nothing && haskey(economy_parameter, "calculate_economy") &&
-                 economy_parameter["calculate_economy"]
-    do_emissions = emissions_parameter !== nothing && haskey(emissions_parameter, "calculate_emissions") &&
-                   emissions_parameter["calculate_emissions"]
+    do_economy = economy_parameter["calculate_economy"]
+    do_emissions = emissions_parameter["calculate_emissions"]
 
     # Decide if we need all-keys lists
     need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy || do_emissions
