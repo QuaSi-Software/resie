@@ -124,7 +124,8 @@ function generate_output(name::String, subdir::String)
     sim_params = nothing
     try
         if project_config !== nothing
-            sim_params = Resie.get_simulation_params(project_config)
+            io_settings = Resie.get_io_settings(project_config)
+            sim_params = Resie.get_simulation_params(project_config, io_settings)
             print("|  ✓  ")
         else
             print("|     ")
@@ -172,11 +173,12 @@ function generate_output(name::String, subdir::String)
 
     if (project_config !== nothing
         && sim_params !== nothing
+        && io_settings !== nothing
         && components !== nothing
         && step_order !== nothing)
         # end of condition
-        Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, components, step_order)
-        Resie.run_simulation_loop(project_config, sim_params, components, step_order)
+        Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, io_settings, components, step_order)
+        Resie.run_simulation_loop(project_config, sim_params, io_settings, components, step_order)
         print("|  ✓  ")
     else
         print("|     ")

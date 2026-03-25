@@ -540,20 +540,20 @@ function listify_operations(operations::OrderOfOperations)::String
 end
 
 """
-    dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
+function dump_auxiliary_outputs(io_settings::Dict{String,Any},
                                 components::Grouping,
                                 order_of_operations::OrderOfOperations,
                                 sim_params::Dict{String,Any})
     # export order of operations
-    if default(project_config["io_settings"], "auxiliary_info", false)
-        aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
+    if io_settings["auxiliary_info"]
+        aux_info_file_path = io_settings["auxiliary_info_file"]
         open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
@@ -581,11 +581,9 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     end
 
     # plot additional figures potentially available from components after initialisation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
-        aux_plots_output_path = sim_params["run_path"](default(project_config["io_settings"],
-                                                               "auxiliary_plots_path",
-                                                               "./output/"))
-        aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+    if io_settings["auxiliary_plots"]
+        aux_plots_output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        aux_plots_formats = io_settings["auxiliary_plots_formats"]
         aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
@@ -616,18 +614,18 @@ function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::
 end
 
 """
-create_profile_line_plots(data, keys, user_input)
+    create_profile_line_plots(data, keys, weather_data, weather_keys, io_settings, sim_params)
 
-create a line plot with data and label. user_input is dict from input file
+Creates the line plots for the given output configuration.
 """
 function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                                    outputs_plot_weather::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_weather_keys::Union{Nothing,Vector{String}},
-                                   project_config::AbstractDict{AbstractString,Any},
+                                   io_settings::AbstractDict{AbstractString,Any},
                                    sim_params::Dict{String,Any})
-    plot_all = isa(project_config["io_settings"]["output_plot"], String) &&
-               project_config["io_settings"]["output_plot"][1:3] == "all"
+    plot_all = isa(io_settings["output_plot"], String) &&
+               io_settings["output_plot"][1:3] == "all"
     plot_data = outputs_plot_data !== nothing
     plot_weather = outputs_plot_weather !== nothing
 
@@ -655,7 +653,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         unit = String[]
         scale_fact = Float64[]
         if plot_data
-            for plot in project_config["io_settings"]["output_plot"]
+            for plot in io_settings["output_plot"]
                 if occursin("->", first(plot[2]["key"])[2][1])
                     # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
                     # temperature should be plotted
@@ -755,8 +753,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             end
         end
     end
-    output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
-                            project_config["io_settings"]["output_plot_time_unit"] : "date"
+    output_plot_time_unit = io_settings["output_plot_time_unit"]
     if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
         @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
               "It will be set to `date` as default."
@@ -820,14 +817,13 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     p = plot(traces, layout)
 
-    file_path = sim_params["run_path"](default(project_config["io_settings"],
-                                               "output_plot_file",
-                                               "./output/output_plot.html"))
+    file_path = sim_params["run_path"](io_settings["output_plot_file"])
     savefig(p, file_path)
 end
 
 """
-create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
+    create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values,
+                  medium_of_interfaces, nr_of_interfaces, io_settings, sim_params)
 
 create a sankey plot. 
 Inputs:
@@ -841,7 +837,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::AbstractDict{String,Any},
+                       io_settings::Dict{String,Any},
                        sim_params::Dict{String,Any})
 
     # sum up data of each interface
@@ -980,6 +976,6 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
+    file_path = sim_params["run_path"](io_settings["sankey_plot_file"])
     savefig(p, file_path)
 end

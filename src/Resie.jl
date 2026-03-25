@@ -18,6 +18,7 @@ type.
 """
 mutable struct SimulationRun
     parameters::Dict{String,Any}
+    io_settings::Dict{String,Any}
     components::Dict{String,Any}
     order_of_operations::Vector{Any}
 end
@@ -94,25 +95,27 @@ using JSON
 using Dates
 
 """
-    run_simulation_loop()
+    run_simulation_loop(project_config, sim_params, io_settings, components, operations)
 
 Performs the simulation as loop over time steps and records outputs.
 
 # Arguments
 -`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
+-`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
 -`operations::OrderOfOperations`:: Order of operations
 """
 function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              sim_params::Dict{String,Any},
+                             io_settings::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
     economy_parameter = haskey(project_config, "economy_parameter") ? project_config["economy_parameter"] : nothing
     emissions_parameter = haskey(project_config, "emissions_parameter") ? project_config["emissions_parameter"] :
                           nothing
-    output_keys_lineplot, output_keys_to_CSV, output_keys_economy_emission = get_output_keys(project_config["io_settings"],
+    output_keys_lineplot, output_keys_to_CSV, output_keys_economy_emission = get_output_keys(io_settings,
                                                                                              economy_parameter,
                                                                                              emissions_parameter,
                                                                                              components)
@@ -122,17 +125,13 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
-    do_create_plot_weather = weather_data_keys !== nothing &&
-                             default(project_config["io_settings"], "plot_weather_data", false)
-    do_write_CSV_weather = weather_data_keys !== nothing &&
-                           default(project_config["io_settings"], "csv_output_weather", false)
+    do_create_plot_weather = weather_data_keys !== nothing && io_settings["plot_weather_data"]
+    do_write_CSV_weather = weather_data_keys !== nothing && io_settings["csv_output_weather"]
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
-    do_write_CSV_continuously = default(project_config["io_settings"], "write_csv_continuously", false)
-    csv_output_file_path = default(project_config["io_settings"],
-                                   "csv_output_file",
-                                   "./output/out.csv")
-    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
+    do_write_CSV_continuously = io_settings["write_csv_continuously"]
+    csv_output_file_path = io_settings["csv_output_file"]
+    csv_time_unit = io_settings["csv_time_unit"]
     if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError())
@@ -164,8 +163,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # check if sankey should be plotted
-    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
-                       project_config["io_settings"]["sankey_plot"] !== "nothing"
+    do_create_sankey = haskey(io_settings, "sankey_plot") && io_settings["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get information about all interfaces for Sankey
         nr_of_interfaces,
@@ -177,7 +175,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(project_config, components, operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, operations, sim_params)
 
     @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
@@ -311,9 +309,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                                   output_keys_lineplot,
                                   output_weather_lineplot,
                                   weather_data_keys,
-                                  project_config,
+                                  io_settings,
                                   sim_params)
-        filepath = default(project_config["io_settings"], "output_plot_file", "./output/output_plot.html")
+        filepath = io_settings["output_plot_file"]
         @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
     end
 
@@ -324,9 +322,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                       output_interface_values,
                       medium_of_interfaces,
                       nr_of_interfaces,
-                      project_config["io_settings"],
+                      io_settings,
                       sim_params)
-        filepath = default(project_config["io_settings"], "sankey_plot_file", "./output/output_sankey.html")
+        filepath = io_settings["sankey_plot_file"]
         @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
     end
 
@@ -335,9 +333,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # plot additional figures potentially available from components after simulation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
+    if io_settings["auxiliary_plots"]
         component_list = []
-        output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        output_path = io_settings["auxiliary_plots_path"]
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
                 push!(component_list, component[2].uac)
@@ -392,13 +390,13 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     end
 
     @info "-- Now preparing inputs"
-    sim_params, components, operations = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+    sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
+    current_runs[run_ID] = SimulationRun(sim_params, io_settings, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, operations)
+    run_simulation_loop(project_config, sim_params, io_settings, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     return true
 end

@@ -20,17 +20,74 @@ function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
 end
 
 """
-    get_simulation_params(project_config)
+    get_io_settings(project_config)
+
+Constructs the dictionary of IO settings from the given config, considering default values.
+
+# Arguments
+-`project_config::Dict{AbstractString,Any}`: The project config
+# Returns
+-`Dict{String,Any}`: The IO settings dictionary
+"""
+function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+    io_settings = Dict{String,Any}(
+        "plot_weather_data" => default(project_config["io_settings"], "plot_weather_data", false),
+        "csv_output_weather" => default(project_config["io_settings"], "csv_output_weather", false),
+        "write_csv_continuously" => default(project_config["io_settings"], "write_csv_continuously", false),
+        "csv_output_file" => default(project_config["io_settings"], "csv_output_file", "./output/out.csv"),
+        "csv_time_unit" => default(project_config["io_settings"], "csv_time_unit", "seconds"),
+        "output_plot_file" => default(project_config["io_settings"], "output_plot_file", "./output/output_plot.html"),
+        "output_plot_time_unit" => default(project_config["io_settings"], "output_plot_time_unit", "date"),
+        "sankey_plot_file" => default(project_config["io_settings"], "sankey_plot_file", "./output/output_sankey.html"),
+        "auxiliary_plots" => default(project_config["io_settings"], "auxiliary_plots", false),
+        "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
+        "auxiliary_info" => default(project_config["io_settings"], "auxiliary_info", false),
+        "auxiliary_info_file" => default(project_config["io_settings"], "auxiliary_info_file",
+                                         "./output/auxiliary_info.md"),
+        "auxiliary_plots_path" => default(project_config["io_settings"], "auxiliary_plots_path", "./output/"),
+        "auxiliary_plots_formats" => default(project_config["io_settings"], "auxiliary_plots_formats", ["png"]),
+    )
+
+    if haskey(project_config["io_settings"], "sankey_plot")
+        io_settings["sankey_plot"] = project_config["io_settings"]["sankey_plot"]
+    end
+
+    if haskey(project_config["io_settings"], "output_plot")
+        io_settings["output_plot"] = project_config["io_settings"]["output_plot"]
+    end
+
+    if haskey(project_config["io_settings"], "step_info_interval")
+        io_settings["step_info_interval"] = project_config["io_settings"]["step_info_interval"]
+    end
+
+    if haskey(project_config["io_settings"], "base_path")
+        io_settings["base_path"] = abspath(project_config["io_settings"]["base_path"])
+    else
+        io_settings["base_path"] = abspath(joinpath(dirname(@__FILE__), ".."))
+    end
+
+    return io_settings
+end
+
+"""
+    get_simulation_params(project_config, io_settings)
 
 Constructs the dictionary of simulation parameters.
 
 # Arguments
 -`project_config::Dict{AbstractString,Any}`: The project config
+-`io_settings::Dict{String,Any}`: IO settings, already extracted from the project config
 # Returns
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
-function get_simulation_params(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
+function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
+                               io_settings::Dict{String,Any})::Dict{String,Any}
+    time_step,
+    start_date,
+    start_date_output,
+    end_date,
+    nr_of_steps,
+    nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
         "time" => 0,
@@ -46,12 +103,10 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
         "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
-        "step_info_interval" => default(project_config["io_settings"],
-                                        "step_info_interval",
-                                        Integer(floor(nr_of_steps / 20))),
+        "step_info_interval" => default(io_settings, "step_info_interval", Integer(floor(nr_of_steps / 20))),
         "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
                                               false),
-        "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
+        "show_detailed_errors" => io_settings["show_detailed_errors"],
     )
     sim_params["economy_parameter"] = get_economy_parameter(project_config)
     sim_params["emissions_parameter"] = get_emission_parameter(project_config)
@@ -66,13 +121,8 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
     end
 
     # add helper function for using paths, absolute or relative to the run base path
-    if haskey(project_config["io_settings"], "base_path")
-        run_base_path = abspath(project_config["io_settings"]["base_path"])
-    else
-        run_base_path = abspath(joinpath(dirname(@__FILE__), ".."))
-    end
     sim_params["run_path"] = function (path)
-        return isabspath(path) ? path : abspath(joinpath(run_base_path, path))
+        return isabspath(path) ? path : abspath(joinpath(io_settings["base_path"], path))
     end
 
     # load weather profiles accesible for all components
@@ -105,11 +155,13 @@ Construct and prepare parameters, energy system components and the order of oper
 -`project_config::Dict{AbstractString,Any}`: The project config
 # Returns
 -`Dict{String,Any}`: Simulation parameters
+-`Dict{String,Any}`: IO settings
 -`Grouping`: The constructed energy system components
 -`OrderOfOperations`: Order of operations
 """
 function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
-    sim_params = get_simulation_params(project_config)
+    io_settings = get_io_settings(project_config)
+    sim_params = get_simulation_params(project_config, io_settings)
     sim_params["run_ID"] = run_ID
 
     components = load_components(project_config["components"], sim_params)
@@ -123,7 +175,7 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
         operations = calculate_order_of_operations(components)
     end
 
-    return sim_params, components, operations
+    return sim_params, io_settings, components, operations
 end
 
 """
