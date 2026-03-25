@@ -2225,11 +2225,12 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
             ),
             "capex_specific" => (
                 default=defaults["capex_specific"],
-                description="Invest costs per storage volume",
-                display_name="capex",
+                description="Function for specific invest costs",
+                display_name="capex function",
                 required=true,
-                type=Floathing, # TODO can also be a function
-                json_type="number",
+                type=String,
+                json_type="string",
+                function_type="1dim",
                 unit=units["capex_specific"]
             ),
             "capex_price_change_rate_per_year" => (

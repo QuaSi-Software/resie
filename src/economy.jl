@@ -302,20 +302,17 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     # capex including replacements, residuals and subsidies
     # this is probably a component-specific implementation with a default implementation? No, I guess its only general.
 
-    # parameter component
+    # parameter of the component
     lifetime_years = component.economy_parameter["lifetime_years"]
-    capex_specific = component.economy_parameter["capex_specific"]
-    capex_price_change_rate_per_year = component.economy_parameter["capex_price_change_rate_per_year"]
     subsidy_rate_of_capex = component.economy_parameter["subsidy_rate_of_capex"]
     subsidy_max = component.economy_parameter["subsidy_max"]
-
     capex_reference = get_capex_reference(component)  # e.g. installed power, area, etc.
 
     # parameter general
     observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
 
     # factors
-    r = 1.0 + capex_price_change_rate_per_year  # price change factor of capex
+    r = 1.0 + component.economy_parameter["capex_price_change_rate_per_year"]  # price change factor of capex
 
     # results
     investments_per_year = zeros(Float64, observation_period)
@@ -323,7 +320,7 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     subsidies_per_year = zeros(Float64, observation_period)
 
     # calculate initial investment (A0)
-    investment_first_year = capex_specific * capex_reference   # € at time 0
+    investment_first_year = component.economy_parameter["capex_specific"](capex_reference)   # € at time 0
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period
