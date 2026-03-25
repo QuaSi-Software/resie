@@ -757,15 +757,16 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
                    unit.losses                     # losses
 
     # calculate non-energy commodities
-    if sim_params["current_date"] >= sim_params["start_date_output"]
-        step = Int(floor(Dates.value(sim_params["start_date_output"] - sim_params["current_date"]) /
-                         (1000 * Dates.Second(sim_params["time_step_seconds"]))))
+    if sim_params["economy_parameter"]["calculate_economy"] &&
+       sim_params["current_date"] >= sim_params["start_date_output"]
+        step = Int(floor(Dates.value(Dates.Millisecond(sim_params["start_date_output"] - sim_params["current_date"])) /
+                         (1000 * Int(sim_params["time_step_seconds"]))))
 
-        unit.water_demand[step] = unit.water_demand_ratio * sum(energies[4]; init=0.0) / 1000  # liter water
-        unit.oxygen_production[step] = unit.oxygen_production_ratio * sum(energies[4]; init=0.0) / 1000  # kg Oxygen
+        unit.water_demand[step] = unit.economy_parameter["water_demand_ratio"] * sum(energies[4]; init=0.0) / 1000  # liter water
+        unit.oxygen_production[step] = unit.economy_parameter["oxygen_production_ratio"] *
+                                       sum(energies[4]; init=0.0) / 1000  # kg Oxygen
     end
 end
-
 # has its own reset function as here more losses are present that need to be reset in every timestep
 function reset(unit::Electrolyser)
     for inface in values(unit.input_interfaces)
