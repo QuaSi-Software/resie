@@ -239,20 +239,20 @@ end
 
 function get_annuity(costs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
     q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
-    T = length(costs)
+    years = length(costs)
 
     # Timing convention: costs[1] occurs at t=0, costs[k] at t=k-1
     # Present value of the given cost stream
     present_value = 0.0
-    for k in 1:T
+    for k in 1:years
         present_value += costs[k] / q^(k - 1)
     end
 
-    # Annuity factor a(q,T)
+    # Annuity factor a(q,years)
     a = if abs(sim_params["economy_parameter"]["interest_rate"]) < sim_params["epsilon"]
-        1.0 / T
+        1.0 / years
     else
-        (q^T * (q - 1.0)) / (q^T - 1.0)
+        (q^years * (q - 1.0)) / (q^years - 1.0)
     end
 
     return present_value * a
@@ -288,8 +288,8 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                       Dict("annuity_capex" => annuity_capex,
                            "annuity_opex" => annuity_opex,
                            "investments_cost_per_year" => investments_per_year,
-                           "residuals_cost_per_year" => .-residuals_per_year,
-                           "subsidies_cost_per_year" => .-subsidies_per_year,
+                           "residual_revenues_per_year" => .-residuals_per_year,
+                           "subsidy_revenues_per_year" => .-subsidies_per_year,
                            "maintenance_cost_per_year" => maintenance_per_year,
                            "repairs_cost_per_year" => repair_per_year,
                            "labour_cost_per_year" => labour_per_year
@@ -388,45 +388,34 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     return maintenance_per_year, repair_per_year, labour_per_year
 end
 
-function plot_economy_results!(result::EconomyResult, output_file_path::String)
+function plot_economy_results!(result::EconomyResult, output_file_path::String, sim_params::Dict{String,Any})
     suffix = "_per_year"
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
 
     # collect yearly series from result struct
     series = Dict{String,Vector{Float64}}()
+    for (component, component_results) in result.breakdown
+        for (key, values) in component_results
+            values isa AbstractVector{<:Real} || continue   # consider only vectors, no floats
+            endswith(key, suffix) || continue               # consider entries with a key ending with suffix
+            all(iszero, values) && continue                 # consider only entries that contain values
 
-    for (comp, comp_any) in result.breakdown
-        comp_any isa Dict{String,Any} || continue
-        comp_dict = comp_any::Dict{String,Any}
-
-        for (k, v_any) in comp_dict
-            v_any isa AbstractVector{<:Real} || continue
-            endswith(k, suffix) || continue
-
-            v = Float64.(v_any)
-            name = "$(comp) | $(k)"
-
-            if haskey(series, name)
-                series[name] .+= v
-            else
-                series[name] = copy(v)
-            end
+            name = "$(component) | $(key)"
+            series[name] = copy(values)
         end
     end
-
     isempty(series) && return false
 
-    # Align all to common length T (truncate to shortest)
-    T = minimum(length.(values(series)))
-    for (k, v) in collect(series)
-        length(v) == T || (series[k] = v[1:T])
-    end
+    # parameter 
+    observation_period_in_years = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    start_year = year(sim_params["start_date_output"])
 
-    years = collect(1:T)
+    # x-axis label
+    years = collect(start_year:(start_year + observation_period_in_years - 1))
 
-    # Net and cumulative
-    net = zeros(T)
+    # Net and cumulative costs
+    net = zeros(observation_period_in_years)
     for v in values(series)
         net .+= v
     end
@@ -441,16 +430,16 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
 
     # Breakeven year (first sign change / zero crossing of cumulative)
     breakeven = nothing
-    for t in 2:T
+    for t in 2:observation_period_in_years
         if cum[t - 1] == 0.0
-            breakeven = t - 1
+            breakeven = start_year + t - 2
             break
         elseif cum[t - 1] * cum[t] < 0
-            breakeven = t
+            breakeven = start_year + t - 1
             break
         end
     end
-    breakeven === nothing && cum[1] == 0.0 && (breakeven = 1)
+    breakeven === nothing && cum[1] == 0.0 && (breakeven = start_year)
 
     # build traces
     traces = PlotlyJS.AbstractTrace[]
@@ -473,7 +462,6 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
     # layout with dual axis and optional breakeven marker
     shapes = Any[]
     ann = Any[]
-
     if breakeven !== nothing
         push!(shapes,
               attr(; type="line", xref="x", yref="paper",
@@ -481,19 +469,20 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
                    line=attr(; width=1, dash="dot")))
         push!(ann,
               attr(; x=breakeven, y=1.02, xref="x", yref="paper",
-                   text="Breakeven ≈ year $(breakeven)", showarrow=false))
+                   text="Breakeven ≈ year $(breakeven) (in $(breakeven - start_year + 1)th year)", showarrow=false))
     end
 
     layout = Layout(;
                     title=attr(;
-                               text="Economy results (yearly cashflows). Costs are positive, benefits are negative." *
-                                    "<br><sup>Total yearly annuity: $(round(total_yearly_annuity; digits=2)) €/a, " *
-                                    "Total costs over period: $(round(total_costs_over_period; digits=2)) €</sup>"),
-                    xaxis_title_text="Year [a]",
-                    yaxis_title_text="Cashflow [€/a]",
+                               text="Economy results (yearly cashflows). Costs are positive, revenues are negative." *
+                                    "<br><sup>Total yearly annuity: $(Int(round(total_yearly_annuity))) €/a, " *
+                                    "Total costs over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
+                    xaxis_title_text="Year",
+                    yaxis_title_text="Cashflow [€/year]",
                     barmode="relative",
                     xaxis=attr(; dtick=1),
-                    yaxis2=attr(; title="", overlaying="y", side="right"),
+                    yaxis2=attr(; title="Cumulative cashflow [€/year]", overlaying="y", side="right"),
+                    legend=attr(; x=1.05, y=1.0, xanchor="left", yanchor="top"),
                     shapes=shapes,
                     annotations=ann)
 
