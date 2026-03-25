@@ -494,10 +494,10 @@ function plot_economy_results(result::EconomyResult, output_file_path::String, s
                                     "<br><sup>Total yearly annuity: $(Int(round(result.total_annuity))) €/a, " *
                                     "Total costs ($cost_name) over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
                     xaxis_title_text="Year",
-                    yaxis_title_text="Cashflow [€/year]",
+                    yaxis_title_text="$cost_name [€/year]",
                     barmode="relative",
                     xaxis=attr(; dtick=1),
-                    yaxis2=attr(; title="Cumulative cashflow [€/year]", overlaying="y", side="right"),
+                    yaxis2=attr(; title="Cumulative $cost_name [€]", overlaying="y", side="right"),
                     legend=attr(; x=1.05, y=1.0, xanchor="left", yanchor="top"),
                     shapes=shapes,
                     annotations=ann)
