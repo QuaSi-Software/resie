@@ -17,6 +17,7 @@ end
 Holds results of the economy calculation
 """
 Base.@kwdef mutable struct EconomyResult
+    total_annuity::Float64 = 0.0
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
     annuity_energies::Float64 = 0.0
@@ -147,6 +148,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                                                                                                               result.breakdown)
         end
     end
+    result.total_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
     return result
 end
 
@@ -385,7 +387,8 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     return maintenance_per_year, repair_per_year, labour_per_year
 end
 
-function plot_economy_results!(result::EconomyResult, output_file_path::String, sim_params::Dict{String,Any})
+function plot_economy_results(result::EconomyResult, output_file_path::String, sim_params::Dict{String,Any},
+                              cost_type::String)
     suffix = "_per_year"
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
@@ -404,6 +407,23 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String, 
     end
     isempty(series) && return false
 
+    if cost_type == "cashflows"
+        # do nothing, values are already cashflows
+        cost_name = "yearly cashflows"
+    elseif cost_type == "present_values"
+        # calculate net present values
+        cost_name = "present values"
+        q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
+
+        for (key, values) in series
+            present_values = similar(values)
+            for t in eachindex(values)
+                present_values[t] = values[t] / q^(t - 1)
+            end
+            series[key] = present_values
+        end
+    end
+
     # parameter 
     observation_period_in_years = Int(sim_params["economy_parameter"]["observation_period_in_years"])
     start_year = year(sim_params["start_date_output"])
@@ -419,7 +439,6 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String, 
     cum = cumsum(net)
 
     # calculate overlays
-    total_yearly_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
     total_costs_over_period = 0.0
     for v in values(series)
         total_costs_over_period += sum(v)  # total costs - revenues
@@ -471,9 +490,9 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String, 
 
     layout = Layout(;
                     title=attr(;
-                               text="Economy results (yearly cashflows). Costs are positive, revenues are negative." *
-                                    "<br><sup>Total yearly annuity: $(Int(round(total_yearly_annuity))) €/a, " *
-                                    "Total costs over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
+                               text="Economy results ($cost_name). Costs are positive, revenues are negative." *
+                                    "<br><sup>Total yearly annuity: $(Int(round(result.total_annuity))) €/a, " *
+                                    "Total costs ($cost_name) over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
                     xaxis_title_text="Year",
                     yaxis_title_text="Cashflow [€/year]",
                     barmode="relative",

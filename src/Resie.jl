@@ -451,8 +451,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     if do_calculate_economy
-        filepath = default(project_config["io_settings"], "economy_plot_file", "./output/economy_results.html")
-        success = plot_economy_results!(economy_result, filepath, sim_params)
+        filepath = default(project_config["io_settings"], "economy_plot_file_cashflows",
+                           "./output/economy_results_cashflows.html")
+        success = plot_economy_results(economy_result, filepath, sim_params, "cashflows")
+        success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+
+        filepath = default(project_config["io_settings"], "economy_plot_file_present_values",
+                           "./output/economy_results_present_values.html")
+        success = plot_economy_results(economy_result, filepath, sim_params, "present_values")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
     end
 end
