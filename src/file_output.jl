@@ -752,11 +752,6 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         end
     end
     output_plot_time_unit = io_settings["output_plot_time_unit"]
-    if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
-        @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
-              "It will be set to `date` as default."
-        output_plot_time_unit = "date"
-    end
     if output_plot_time_unit == "seconds"
         x = time_x
     elseif output_plot_time_unit == "minutes"

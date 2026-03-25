@@ -129,10 +129,6 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
     csv_output_file_path = io_settings["csv_output_file"]
     csv_time_unit = io_settings["csv_time_unit"]
-    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
-        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(InputError())
-    end
     do_calculate_economy = sim_params["economy_parameter"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameter"]["calculate_emissions"]
 
@@ -339,7 +335,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     if do_calculate_economy
-        filepath = default(project_config["io_settings"], "economy_plot_file", "./output/economy_results.html")
+        filepath = io_settings["economy_plot_file"]
         success = plot_economy_results!(economy_result, filepath)
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
     end

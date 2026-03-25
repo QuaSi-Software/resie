@@ -46,7 +46,20 @@ function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict
                                          "./output/auxiliary_info.md"),
         "auxiliary_plots_path" => default(project_config["io_settings"], "auxiliary_plots_path", "./output/"),
         "auxiliary_plots_formats" => default(project_config["io_settings"], "auxiliary_plots_formats", ["png"]),
+        "economy_plot_file" => default(project_config["io_settings"], "economy_plot_file",
+                                       "./output/economy_results.html"),
     )
+
+    if !(io_settings["csv_time_unit"] in ["seconds", "minutes", "hours", "date"])
+        @error "The IO setting `csv_time_unit` has to be one of: seconds, minutes, hours, date"
+        throw(InputError())
+    end
+
+    if !(io_settings["output_plot_time_unit"] in ["seconds", "minutes", "hours", "date"])
+        @info "The IO setting `output_plot_time_unit` has to be one of: seconds, minutes, " *
+              "hours, date. It will be set to date as default."
+        io_settings["output_plot_time_unit"] = "date"
+    end
 
     if haskey(project_config["io_settings"], "sankey_plot")
         io_settings["sankey_plot"] = project_config["io_settings"]["sankey_plot"]
