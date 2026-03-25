@@ -1,3 +1,4 @@
+using PlotlyJS
 
 export extend_profile
 
@@ -75,12 +76,10 @@ function prepare_economy_emissions_data(components::Grouping,
     return data
 end
 
-function calculate_economy(shared_data::Vector{EconomyEmissionData},
-                           sim_params::Dict{String,Any},
-                           economy_parameter::AbstractDict{String,Any})
+function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params::Dict{String,Any})
     # set initials
     result = EconomyResult()
-    observation_period_in_years_economy = Year(economy_parameter["observation_period_in_years"])
+    economy_parameter = sim_params["economy_parameter"]
 
     # get time stamp of extended simulation results
     economy_end_date = sim_params["start_date_output"] + Year(economy_parameter["observation_period_in_years"])
@@ -106,29 +105,37 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
                   EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
             # get energy profiles
             if sf === EnergySystems.sf_fixed_source
-                energy = extend_profile(.-item.energy_out, economy_parameter["observation_period_in_years"], sim_params) # source output
-                energy_supply = extend_profile(.-item.energy_supply, economy_parameter["observation_period_in_years"], sim_params) # source supply
+                energy = extend_profile(item.energy_out, economy_parameter["observation_period_in_years"], sim_params) # source output
+                energy_supply = extend_profile(item.energy_supply, economy_parameter["observation_period_in_years"],
+                                               sim_params) # source supply
                 energy_unmet = energy_supply .- energy # unmet supply of source
+                type = :source
             elseif sf === EnergySystems.sf_flexible_source
-                energy = extend_profile(.-item.energy_out, economy_parameter["observation_period_in_years"], sim_params) #  source output
+                energy = extend_profile(item.energy_out, economy_parameter["observation_period_in_years"], sim_params) #  source output
                 energy_unmet = nothing # unmet supply of source
+                type = :source
             elseif sf === EnergySystems.sf_flexible_sink
                 energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
                 energy_demand = extend_profile(item.energy_demand, economy_parameter["observation_period_in_years"],
                                                sim_params) # sink demand
                 energy_unmet = energy_demand .- energy # unmet demand of sink
+                type = :sink
             elseif sf === EnergySystems.sf_fixed_sink
                 energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
                 energy_unmet = nothing  # unmet demand of sink
+                type = :sink
             end
 
             # Note: (unmet) energies from sources are negative, (unmet) energies into sinks are positive at this point
             # TODO Unmet energies not considered yet!
 
             # calculate annuity for energies (demand-related costs)
-            result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy, component,
-                                                                                      sim_params, annuity_energies,
-                                                                                      breakdown)
+            result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy,
+                                                                                      component,
+                                                                                      sim_params,
+                                                                                      result.annuity_energies,
+                                                                                      result.breakdown,
+                                                                                      type)
 
         elseif sf in [EnergySystems.sf_storage, EnergySystems.sf_transformer]
             # start and end energy of storage?! TODO
@@ -143,19 +150,23 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData},
     return result
 end
 
-function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years_economy::Float64,
+function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years::Union{Float64,Int64},
                         sim_params::Dict{String,Any})
     if profile === nothing
         return nothing
     end
     # currently only a very simple algorithm is used. The profile is taken as it is and it is repeated until the 
-    # observation_period_in_years_economy is reached. If the profile does not cover a whole year, this is may not
+    # observation_period_in_years is reached. If the profile does not cover a whole year, this is may not
     # the best way to extend the profile...
     # Add: Repeat only last year/month TODO
-    economy_end_date = sim_params["start_date_output"] + Year(observation_period_in_years_economy)
+    economy_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
     nr_to_repeat = Int(ceil((economy_end_date - sim_params["end_date"]) /
                             (sim_params["end_date"] - sim_params["start_date_output"])))
     profile_extended = repeat(profile, nr_to_repeat + 1)
+
+    # cut profile to observation_period_in_years * 365 days
+    number_of_timesteps = Int(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"])
+    profile_extended = profile_extended[1:number_of_timesteps]
 
     return profile_extended
 end
@@ -166,22 +177,25 @@ end
 
 function calculate_annuity_of_energies(energy_profile::Vector{Float64}, component::EnergySystems.Component,
                                        sim_params::Dict{String,Any}, annuity_energies::Float64,
-                                       breakdown::Dict{String,Any})
-    # get price profile from component
-    if isnothing(component.economy_parameter["constant_energy_price"])
-        price_profile_energy = component.economy_parameter["energy_price_profile_scale"] .*
-                               component.economy_parameter["energy_price_profile"]
-    else
-        price_profile_energy = fill(component.economy_parameter["constant_energy_price"],
-                                    sim_params["number_of_time_steps_output"])
-    end
-    price_profile_energy = extend_profile(price_profile_energy, economy_parameter["observation_period_in_years"],
-                                          sim_params)
-
+                                       breakdown::Dict{String,Any}, type::Symbol)
     energy_price_change_rate_per_year = component.economy_parameter["energy_price_change_rate_per_year"]
     base_cost_per_year = component.economy_parameter["base_cost_per_year"]
     base_cost_change_rate_per_year = component.economy_parameter["base_cost_change_rate_per_year"]
     observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
+
+    if isnothing(component.economy_parameter["constant_energy_price"])
+        # get price profile from component (one of them is given)
+        step = Millisecond(round(Int, sim_params["time_step_seconds"] * 1000))
+        times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
+        times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
+        price_profile_energy = component.economy_parameter["energy_price_profile_scale"] .*
+                               [component.economy_parameter["energy_price_profile"].data[t] for t in times]
+    else
+        # create profile from constant energy price
+        price_profile_energy = fill(component.economy_parameter["constant_energy_price"],
+                                    sim_params["number_of_time_steps_output"])
+    end
+    price_profile_energy = extend_profile(price_profile_energy, observation_period, sim_params)
 
     # factors
     r_energy_costs = 1.0 + energy_price_change_rate_per_year  # price change factor of energy costs/revenues
@@ -193,18 +207,32 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     energy_costs_per_timestep = energy_profile .* price_profile_energy
     timesteps_per_year = Int(floor(length(energy_costs_per_timestep) / observation_period))
     for y in 1:observation_period
-        energy_base_costs_per_year[year] = base_cost_per_year * r_base_costs^(y - 1)
-        energy_costs_per_year[year] = sum(energy_costs_per_timestep[((y - 1) * timesteps_per_year):(y * timesteps_per_year)];
-                                          init=1.0) * r_energy_costs^(y - 1)
+        energy_base_costs_per_year[y] = base_cost_per_year * r_base_costs^(y - 1)
+        energy_costs_per_year[y] = sum(energy_costs_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
+                                       init=1.0) * r_energy_costs^(y - 1)
+    end
+
+    if type == :source
+        # costs remain positive
+        energy_costs_per_year_result = energy_costs_per_year
+        energy_base_costs_per_year_result = energy_base_costs_per_year
+        energy_name = "energy_costs_per_year"
+        base_name = "energy_base_costs_per_year"
+    elseif type == :sink
+        # revenues will be negative
+        energy_costs_per_year_result = .-energy_costs_per_year
+        energy_base_costs_per_year_result = .-energy_base_costs_per_year
+        energy_name = "energy_revenues_per_year"
+        base_name = "energy_base_revenues_per_year"
     end
 
     # calculate annuity
-    annuity_energies += get_annuity(energy_costs_per_year .+ energy_base_costs_per_year, sim_params)
+    annuity_energies += get_annuity(energy_costs_per_year_result .+ energy_base_costs_per_year_result, sim_params)
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_energies" => annuity_energies,
-                           "energy_costs_per_year" => energy_costs_per_year,
-                           "energy_base_costs_per_year" => energy_base_costs_per_year))
+                           energy_name => energy_costs_per_year_result,
+                           base_name => energy_base_costs_per_year_result))
 
     return annuity_energies, breakdown
 end
@@ -260,8 +288,8 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                       Dict("annuity_capex" => annuity_capex,
                            "annuity_opex" => annuity_opex,
                            "investments_cost_per_year" => investments_per_year,
-                           "residuals_cost_per_year" => residuals_per_year,
-                           "subsidies_cost_per_year" => subsidies_per_year,
+                           "residuals_cost_per_year" => .-residuals_per_year,
+                           "subsidies_cost_per_year" => .-subsidies_per_year,
                            "maintenance_cost_per_year" => maintenance_per_year,
                            "repairs_cost_per_year" => repair_per_year,
                            "labour_cost_per_year" => labour_per_year
@@ -299,9 +327,11 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period
-    cap = (subsidy_max > 0.0) ? subsidy_max : Inf
-    subsidies_first_year = min(investment_first_year * subsidy_rate_of_capex, cap)
-    subsidies_per_year[1] += subsidies_first_year
+    if !isnothing(subsidy_rate_of_capex)
+        cap = (isnothing(subsidy_max) || subsidy_max ≤ 0) ? Inf : subsidy_max
+        subsidies_first_year = min(investment_first_year * subsidy_rate_of_capex, cap)
+        subsidies_per_year[1] += subsidies_first_year
+    end
 
     # calculate capex of replacements
     # number of replacements n within observation period
@@ -358,6 +388,121 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     return maintenance_per_year, repair_per_year, labour_per_year
 end
 
+function plot_economy_results!(result::EconomyResult, output_file_path::String)
+    suffix = "_per_year"
+    # Note: costs are positive and revenues are negative at this point! 
+    # We will keep this in the figure for now...
+
+    # collect yearly series from result struct
+    series = Dict{String,Vector{Float64}}()
+
+    for (comp, comp_any) in result.breakdown
+        comp_any isa Dict{String,Any} || continue
+        comp_dict = comp_any::Dict{String,Any}
+
+        for (k, v_any) in comp_dict
+            v_any isa AbstractVector{<:Real} || continue
+            endswith(k, suffix) || continue
+
+            v = Float64.(v_any)
+            name = "$(comp) | $(k)"
+
+            if haskey(series, name)
+                series[name] .+= v
+            else
+                series[name] = copy(v)
+            end
+        end
+    end
+
+    isempty(series) && return false
+
+    # Align all to common length T (truncate to shortest)
+    T = minimum(length.(values(series)))
+    for (k, v) in collect(series)
+        length(v) == T || (series[k] = v[1:T])
+    end
+
+    years = collect(1:T)
+
+    # Net and cumulative
+    net = zeros(T)
+    for v in values(series)
+        net .+= v
+    end
+    cum = cumsum(net)
+
+    # calculate overlays
+    total_yearly_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
+    total_costs_over_period = 0.0
+    for v in values(series)
+        total_costs_over_period += sum(v)  # total costs - revenues
+    end
+
+    # Breakeven year (first sign change / zero crossing of cumulative)
+    breakeven = nothing
+    for t in 2:T
+        if cum[t - 1] == 0.0
+            breakeven = t - 1
+            break
+        elseif cum[t - 1] * cum[t] < 0
+            breakeven = t
+            break
+        end
+    end
+    breakeven === nothing && cum[1] == 0.0 && (breakeven = 1)
+
+    # build traces
+    traces = PlotlyJS.AbstractTrace[]
+
+    # stacked bars
+    for (name, v) in sort(collect(series); by=first)
+        push!(traces, bar(; x=years, y=v, name=name))
+    end
+
+    # net line
+    push!(traces, scatter(; x=years, y=net, mode="lines+markers",
+                          name="Net per year", line=attr(; width=3)))
+
+    # cumulative line on secondary axis
+    push!(traces,
+          scatter(; x=years, y=cum, mode="lines",
+                  name="Cumulative net", yaxis="y2",
+                  line=attr(; width=3, dash="dot")))
+
+    # layout with dual axis and optional breakeven marker
+    shapes = Any[]
+    ann = Any[]
+
+    if breakeven !== nothing
+        push!(shapes,
+              attr(; type="line", xref="x", yref="paper",
+                   x0=breakeven, x1=breakeven, y0=0, y1=1,
+                   line=attr(; width=1, dash="dot")))
+        push!(ann,
+              attr(; x=breakeven, y=1.02, xref="x", yref="paper",
+                   text="Breakeven ≈ year $(breakeven)", showarrow=false))
+    end
+
+    layout = Layout(;
+                    title=attr(;
+                               text="Economy results (yearly cashflows). Costs are positive, benefits are negative." *
+                                    "<br><sup>Total yearly annuity: $(round(total_yearly_annuity; digits=2)) €/a, " *
+                                    "Total costs over period: $(round(total_costs_over_period; digits=2)) €</sup>"),
+                    xaxis_title_text="Year [a]",
+                    yaxis_title_text="Cashflow [€/a]",
+                    barmode="relative",
+                    xaxis=attr(; dtick=1),
+                    yaxis2=attr(; title="", overlaying="y", side="right"),
+                    shapes=shapes,
+                    annotations=ann)
+
+    p = plot(traces, layout)
+    savefig(p, output_file_path)
+
+    return true
+end
+
 # ----------------------------------------------------------------------------------------------
 # Emissions
 
@@ -366,10 +511,9 @@ Base.@kwdef mutable struct EmissionsResult
     breakdown::Dict{Any,Any} = Dict{Any,Any}()
 end
 
-function calculate_emissions(shared_data::Vector{EconomyEmissionData},
-                             sim_params::Dict{String,Any},
-                             emissions_parameter::AbstractDict{String,Any})
+function calculate_emissions(shared_data::Vector{EconomyEmissionData}, sim_params::Dict{String,Any})
     result = EmissionsResult()
+    emissions_parameter = sim_params["emissions_parameter"]
 
     for item in shared_data
         component = item.component

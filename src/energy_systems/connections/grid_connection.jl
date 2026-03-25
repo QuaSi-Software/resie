@@ -98,8 +98,8 @@ provide a given temperature.
 mutable struct GridConnection{IsSource} <: Component
     uac::String
     controller::Controller
-    economy_parameters::Dict{String,Any}
-    emission_parameters::Dict{String,Any}
+    economy_parameter::Dict{String,Any}
+    emission_parameter::Dict{String,Any}
     sys_function::SystemFunction
     medium::Symbol
 
