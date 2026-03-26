@@ -24,6 +24,10 @@ Base.@kwdef mutable struct EconomyResult
     breakdown::Dict{String,Any} = Dict{String,Any}()
 end
 
+# Components that are only modeled by their energy flow and not with capex
+ConnectionComponent = Union{GridInput,GridOutput,PVPlant,FixedSink,FixedSupply,
+                            FlexibleSink,FlexibleSupply,GenericHeatSource}
+
 function prepare_economy_emissions_data(components::Grouping,
                                         output_keys::Vector{EnergySystems.OutputKey},
                                         output_data::AbstractMatrix{<:Real})
@@ -50,25 +54,31 @@ function prepare_economy_emissions_data(components::Grouping,
         # add all other components without additional information
         entry = EconomyEmissionData(; component=component)
 
-        # add fixed and flexible sources and sinks with actual input/output energies and for fixed ones also
-        # with the demand or supply to calculate unmet demands/supplies.
-        if sf === EnergySystems.sf_fixed_source
-            entry = EconomyEmissionData(; component=component,
-                                        energy_out=copy(@view output_data[:, find_key(component, output_keys, "OUT")]),
-                                        energy_supply=copy(@view output_data[:,
-                                                                             find_key(component, output_keys, "Supply")]))
-        elseif sf === EnergySystems.sf_flexible_source
-            entry = EconomyEmissionData(; component=component,
-                                        energy_out=copy(@view output_data[:, find_key(component, output_keys, "OUT")]))
+        if isa(component, ConnectionComponent)
+            # add fixed and flexible sources and sinks with actual input/output energies and for fixed ones also
+            # with the demand or supply to calculate unmet demands/supplies.
+            if sf === EnergySystems.sf_fixed_source
+                entry = EconomyEmissionData(; component=component,
+                                            energy_out=copy(@view output_data[:,
+                                                                              find_key(component, output_keys, "OUT")]),
+                                            energy_supply=copy(@view output_data[:,
+                                                                                 find_key(component, output_keys,
+                                                                                          "Supply")]))
+            elseif sf === EnergySystems.sf_flexible_source
+                entry = EconomyEmissionData(; component=component,
+                                            energy_out=copy(@view output_data[:,
+                                                                              find_key(component, output_keys, "OUT")]))
 
-        elseif sf == EnergySystems.sf_fixed_sink
-            entry = EconomyEmissionData(; component=component,
-                                        energy_in=copy(@view output_data[:, find_key(component, output_keys, "IN")]),
-                                        energy_demand=copy(@view output_data[:,
-                                                                             find_key(component, output_keys, "Demand")]))
-        elseif sf == EnergySystems.sf_flexible_sink
-            entry = EconomyEmissionData(; component=component,
-                                        energy_in=copy(@view output_data[:, find_key(component, output_keys, "IN")]))
+            elseif sf == EnergySystems.sf_fixed_sink
+                entry = EconomyEmissionData(; component=component,
+                                            energy_in=copy(@view output_data[:, find_key(component, output_keys, "IN")]),
+                                            energy_demand=copy(@view output_data[:,
+                                                                                 find_key(component, output_keys,
+                                                                                          "Demand")]))
+            elseif sf == EnergySystems.sf_flexible_sink
+                entry = EconomyEmissionData(; component=component,
+                                            energy_in=copy(@view output_data[:, find_key(component, output_keys, "IN")]))
+            end
         end
 
         push!(data, entry)
@@ -102,8 +112,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
         if sf === EnergySystems.sf_bus
             continue
         end
-        if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source,
-                  EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
+        if isa(component, ConnectionComponent)
             # get energy profiles
             if sf === EnergySystems.sf_fixed_source
                 energy = extend_profile(item.energy_out, economy_parameter["observation_period_in_years"], sim_params) # source output
@@ -117,13 +126,13 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                 type = :source
             elseif sf === EnergySystems.sf_flexible_sink
                 energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
-                energy_demand = extend_profile(item.energy_demand, economy_parameter["observation_period_in_years"],
-                                               sim_params) # sink demand
-                energy_unmet = energy_demand .- energy # unmet demand of sink
+                energy_unmet = nothing  # unmet demand of sink
                 type = :sink
             elseif sf === EnergySystems.sf_fixed_sink
                 energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
-                energy_unmet = nothing  # unmet demand of sink
+                energy_demand = extend_profile(item.energy_demand, economy_parameter["observation_period_in_years"],
+                                               sim_params) # sink demand
+                energy_unmet = energy_demand .- energy # unmet demand of sink
                 type = :sink
             end
 
@@ -138,7 +147,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                                                                                       result.breakdown,
                                                                                       type)
 
-        elseif sf in [EnergySystems.sf_storage, EnergySystems.sf_transformer]
+        else
             # start and end energy of storage?! TODO
             # calculate capex, operation-related opex and optional additional component-specific opex
             result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component,
@@ -154,16 +163,25 @@ end
 
 function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years::Union{Float64,Int64},
                         sim_params::Dict{String,Any})
-    if profile === nothing
+    if profile === nothing || profile == []
         return nothing
+    end
+    if sim_params["start_date_output"] + Year(observation_period_in_years) <= sim_params["end_date"]
+        return profile
     end
     # currently only a very simple algorithm is used. The profile is taken as it is and it is repeated until the 
     # observation_period_in_years is reached. If the profile does not cover a whole year, this is may not
     # the best way to extend the profile...
     # Add: Repeat only last year/month TODO
     economy_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
-    nr_to_repeat = Int(ceil((economy_end_date - sim_params["end_date"]) /
-                            (sim_params["end_date"] - sim_params["start_date_output"])))
+    if sim_params["start_date_output"] == sim_params["end_date"]
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
+                                                                                sim_params["end_date"]))) /
+                                sim_params["time_step_seconds"]))
+    else
+        nr_to_repeat = Int(ceil(sub_ignoring_leap_days(economy_end_date, sim_params["end_date"]) /
+                                sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])))
+    end
     profile_extended = repeat(profile, nr_to_repeat + 1)
 
     # cut profile to observation_period_in_years * 365 days
@@ -173,7 +191,7 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
     return profile_extended
 end
 
-function add_to_breakdown!(breakdown::Dict{String,Any}, uac::String, dict_to_add::Dict{String,Any})
+function add_to_breakdown!(breakdown::Dict{String,Any}, uac::String, dict_to_add::Dict{String,<:Any})
     merge!(get!(breakdown, uac, Dict{String,Any}()), dict_to_add)
 end
 
@@ -183,7 +201,7 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     energy_price_change_rate_per_year = component.economy_parameter["energy_price_change_rate_per_year"]
     base_cost_per_year = component.economy_parameter["base_cost_per_year"]
     base_cost_change_rate_per_year = component.economy_parameter["base_cost_change_rate_per_year"]
-    observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
+    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
 
     if isnothing(component.economy_parameter["constant_energy_price"])
         # get price profile from component (one of them is given)
@@ -311,7 +329,7 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     capex_reference = get_capex_reference(component)  # e.g. installed power, area, etc.
 
     # parameter general
-    observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
+    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
 
     # factors
     r = 1.0 + component.economy_parameter["capex_price_change_rate_per_year"]  # price change factor of capex
@@ -362,7 +380,7 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     operational_labour_hours_per_year = component.economy_parameter["operational_labour_hours_per_year"]
     labour_costs_per_hour = sim_params["economy_parameter"]["labour_costs_per_hour"]
     labour_costs_price_change_rate_per_year = sim_params["economy_parameter"]["labour_costs_price_change_rate_per_year"]
-    observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
+    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
 
     # calculate factors
     r_maintenance = 1.0 + maintenance_inspection_price_change_rate_per_year
