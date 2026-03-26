@@ -46,8 +46,10 @@ function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict
                                          "./output/auxiliary_info.md"),
         "auxiliary_plots_path" => default(project_config["io_settings"], "auxiliary_plots_path", "./output/"),
         "auxiliary_plots_formats" => default(project_config["io_settings"], "auxiliary_plots_formats", ["png"]),
-        "economy_plot_file" => default(project_config["io_settings"], "economy_plot_file",
-                                       "./output/economy_results.html"),
+        "economy_plot_file_cashflows" => default(project_config["io_settings"], "economy_plot_file_cashflows",
+                                                 "./output/economy_results_cashflows.html"),
+        "economy_plot_file_present_values" => default(project_config["io_settings"], "economy_plot_file_present_values",
+                                                      "./output/economy_results_present_values.html"),
     )
 
     if !(io_settings["csv_time_unit"] in ["seconds", "minutes", "hours", "date"])
@@ -67,6 +69,10 @@ function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict
 
     if haskey(project_config["io_settings"], "output_plot")
         io_settings["output_plot"] = project_config["io_settings"]["output_plot"]
+    end
+
+    if haskey(project_config["io_settings"], "csv_output_keys")
+        io_settings["csv_output_keys"] = project_config["io_settings"]["csv_output_keys"]
     end
 
     if haskey(project_config["io_settings"], "step_info_interval")

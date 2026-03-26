@@ -620,7 +620,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
                                    outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                                    outputs_plot_weather::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_weather_keys::Union{Nothing,Vector{String}},
-                                   io_settings::AbstractDict{AbstractString,Any},
+                                   io_settings::Dict{String,Any},
                                    sim_params::Dict{String,Any})
     plot_all = isa(io_settings["output_plot"], String) &&
                io_settings["output_plot"][1:3] == "all"

@@ -122,6 +122,7 @@ function generate_output(name::String, subdir::String)
     end
 
     sim_params = nothing
+    io_settings = nothing
     try
         if project_config !== nothing
             io_settings = Resie.get_io_settings(project_config)
