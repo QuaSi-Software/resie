@@ -40,6 +40,8 @@ Three different function prototypes are implemented:
         coefficients of the highest order. The inverse of the polynomial multiplied with the
         PLR is used as the efficiency function. E.g. `inv_poly:0.5,2.0,0.1`
         means e(x)=x/(0.5x²+2x+0.1)
+    * power_func: A power function of the form e(x) = a * x^b with two coefficients a and b.
+        E.g. `power_func:100,0.95`
     * exp: Takes three numbers and uses them as the coefficients of an exponential function.
         E.g. `exp:0.1,0.2,0.3` means e(x)=0.1+0.2*exp(0.3x)
     * unified_plf: Takes four numbers and uses them as the coefficients of a composite
@@ -96,6 +98,10 @@ function parse_efficiency_function(eff_def::String)::Function
         elseif method == "exp"
             params = map(x -> parse(Float64, x), split(data, ","))
             return plr -> params[1] + params[2] * exp(params[3] * plr)
+
+        elseif method == "power_func"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> params[1] * plr ^ params[2]
 
         elseif method == "unified_plf"
             params = map(x -> parse(Float64, x), split(data, ","))

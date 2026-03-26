@@ -17,6 +17,7 @@ end
 Holds results of the economy calculation
 """
 Base.@kwdef mutable struct EconomyResult
+    total_annuity::Float64 = 0.0
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
     annuity_energies::Float64 = 0.0
@@ -147,6 +148,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                                                                                                               result.breakdown)
         end
     end
+    result.total_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
     return result
 end
 
@@ -239,20 +241,20 @@ end
 
 function get_annuity(costs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
     q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
-    T = length(costs)
+    years = length(costs)
 
     # Timing convention: costs[1] occurs at t=0, costs[k] at t=k-1
     # Present value of the given cost stream
     present_value = 0.0
-    for k in 1:T
+    for k in 1:years
         present_value += costs[k] / q^(k - 1)
     end
 
-    # Annuity factor a(q,T)
+    # Annuity factor a(q,years)
     a = if abs(sim_params["economy_parameter"]["interest_rate"]) < sim_params["epsilon"]
-        1.0 / T
+        1.0 / years
     else
-        (q^T * (q - 1.0)) / (q^T - 1.0)
+        (q^years * (q - 1.0)) / (q^years - 1.0)
     end
 
     return present_value * a
@@ -288,8 +290,8 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                       Dict("annuity_capex" => annuity_capex,
                            "annuity_opex" => annuity_opex,
                            "investments_cost_per_year" => investments_per_year,
-                           "residuals_cost_per_year" => .-residuals_per_year,
-                           "subsidies_cost_per_year" => .-subsidies_per_year,
+                           "residual_revenues_per_year" => .-residuals_per_year,
+                           "subsidy_revenues_per_year" => .-subsidies_per_year,
                            "maintenance_cost_per_year" => maintenance_per_year,
                            "repairs_cost_per_year" => repair_per_year,
                            "labour_cost_per_year" => labour_per_year
@@ -302,20 +304,17 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     # capex including replacements, residuals and subsidies
     # this is probably a component-specific implementation with a default implementation? No, I guess its only general.
 
-    # parameter component
+    # parameter of the component
     lifetime_years = component.economy_parameter["lifetime_years"]
-    capex_specific = component.economy_parameter["capex_specific"]
-    capex_price_change_rate_per_year = component.economy_parameter["capex_price_change_rate_per_year"]
     subsidy_rate_of_capex = component.economy_parameter["subsidy_rate_of_capex"]
     subsidy_max = component.economy_parameter["subsidy_max"]
-
     capex_reference = get_capex_reference(component)  # e.g. installed power, area, etc.
 
     # parameter general
     observation_period = sim_params["economy_parameter"]["observation_period_in_years"]
 
     # factors
-    r = 1.0 + capex_price_change_rate_per_year  # price change factor of capex
+    r = 1.0 + component.economy_parameter["capex_price_change_rate_per_year"]  # price change factor of capex
 
     # results
     investments_per_year = zeros(Float64, observation_period)
@@ -323,7 +322,7 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     subsidies_per_year = zeros(Float64, observation_period)
 
     # calculate initial investment (A0)
-    investment_first_year = capex_specific * capex_reference   # € at time 0
+    investment_first_year = component.economy_parameter["capex_specific"](capex_reference)   # € at time 0
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period
@@ -388,52 +387,58 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     return maintenance_per_year, repair_per_year, labour_per_year
 end
 
-function plot_economy_results!(result::EconomyResult, output_file_path::String)
+function plot_economy_results(result::EconomyResult, output_file_path::String, sim_params::Dict{String,Any},
+                              cost_type::String)
     suffix = "_per_year"
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
 
     # collect yearly series from result struct
     series = Dict{String,Vector{Float64}}()
+    for (component, component_results) in result.breakdown
+        for (key, values) in component_results
+            values isa AbstractVector{<:Real} || continue   # consider only vectors, no floats
+            endswith(key, suffix) || continue               # consider entries with a key ending with suffix
+            all(iszero, values) && continue                 # consider only entries that contain values
 
-    for (comp, comp_any) in result.breakdown
-        comp_any isa Dict{String,Any} || continue
-        comp_dict = comp_any::Dict{String,Any}
+            name = "$(component) | $(key)"
+            series[name] = copy(values)
+        end
+    end
+    isempty(series) && return false
 
-        for (k, v_any) in comp_dict
-            v_any isa AbstractVector{<:Real} || continue
-            endswith(k, suffix) || continue
+    if cost_type == "cashflows"
+        # do nothing, values are already cashflows
+        cost_name = "yearly cashflows"
+    elseif cost_type == "present_values"
+        # calculate net present values
+        cost_name = "present values"
+        q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
 
-            v = Float64.(v_any)
-            name = "$(comp) | $(k)"
-
-            if haskey(series, name)
-                series[name] .+= v
-            else
-                series[name] = copy(v)
+        for (key, values) in series
+            present_values = similar(values)
+            for t in eachindex(values)
+                present_values[t] = values[t] / q^(t - 1)
             end
+            series[key] = present_values
         end
     end
 
-    isempty(series) && return false
+    # parameter 
+    observation_period_in_years = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    start_year = year(sim_params["start_date_output"])
 
-    # Align all to common length T (truncate to shortest)
-    T = minimum(length.(values(series)))
-    for (k, v) in collect(series)
-        length(v) == T || (series[k] = v[1:T])
-    end
+    # x-axis label
+    years = collect(start_year:(start_year + observation_period_in_years - 1))
 
-    years = collect(1:T)
-
-    # Net and cumulative
-    net = zeros(T)
+    # Net and cumulative costs
+    net = zeros(observation_period_in_years)
     for v in values(series)
         net .+= v
     end
     cum = cumsum(net)
 
     # calculate overlays
-    total_yearly_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
     total_costs_over_period = 0.0
     for v in values(series)
         total_costs_over_period += sum(v)  # total costs - revenues
@@ -441,16 +446,16 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
 
     # Breakeven year (first sign change / zero crossing of cumulative)
     breakeven = nothing
-    for t in 2:T
+    for t in 2:observation_period_in_years
         if cum[t - 1] == 0.0
-            breakeven = t - 1
+            breakeven = start_year + t - 2
             break
         elseif cum[t - 1] * cum[t] < 0
-            breakeven = t
+            breakeven = start_year + t - 1
             break
         end
     end
-    breakeven === nothing && cum[1] == 0.0 && (breakeven = 1)
+    breakeven === nothing && cum[1] == 0.0 && (breakeven = start_year)
 
     # build traces
     traces = PlotlyJS.AbstractTrace[]
@@ -473,7 +478,6 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
     # layout with dual axis and optional breakeven marker
     shapes = Any[]
     ann = Any[]
-
     if breakeven !== nothing
         push!(shapes,
               attr(; type="line", xref="x", yref="paper",
@@ -481,19 +485,20 @@ function plot_economy_results!(result::EconomyResult, output_file_path::String)
                    line=attr(; width=1, dash="dot")))
         push!(ann,
               attr(; x=breakeven, y=1.02, xref="x", yref="paper",
-                   text="Breakeven ≈ year $(breakeven)", showarrow=false))
+                   text="Breakeven ≈ year $(breakeven) (in $(breakeven - start_year + 1)th year)", showarrow=false))
     end
 
     layout = Layout(;
                     title=attr(;
-                               text="Economy results (yearly cashflows). Costs are positive, benefits are negative." *
-                                    "<br><sup>Total yearly annuity: $(round(total_yearly_annuity; digits=2)) €/a, " *
-                                    "Total costs over period: $(round(total_costs_over_period; digits=2)) €</sup>"),
-                    xaxis_title_text="Year [a]",
-                    yaxis_title_text="Cashflow [€/a]",
+                               text="Economy results ($cost_name). Costs are positive, revenues are negative." *
+                                    "<br><sup>Total yearly annuity: $(Int(round(result.total_annuity))) €/a, " *
+                                    "Total costs ($cost_name) over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
+                    xaxis_title_text="Year",
+                    yaxis_title_text="$cost_name [€/year]",
                     barmode="relative",
                     xaxis=attr(; dtick=1),
-                    yaxis2=attr(; title="", overlaying="y", side="right"),
+                    yaxis2=attr(; title="Cumulative $cost_name [€]", overlaying="y", side="right"),
+                    legend=attr(; x=1.05, y=1.0, xanchor="left", yanchor="top"),
                     shapes=shapes,
                     annotations=ann)
 
