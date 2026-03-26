@@ -210,8 +210,10 @@ function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
                                     for i in 1:length(bus.output_interfaces)])
 
     # Input side: include is_secondary_interface in the key
-    component_key(uac::AbstractString, is_secondary_interface::Bool) = is_secondary_interface ?
-                                                                       string(uac, "#secondary") : uac
+    function component_key(uac::AbstractString, is_secondary_interface::Bool)
+        is_secondary_interface ?
+        string(uac, "#secondary") : uac
+    end
     input_perm_indices = sortperm([input_order_dict[component_key(bus.input_interfaces[i].source.uac,
                                                                   bus.input_interfaces[i].is_secondary_interface)]
                                    for i in eachindex(bus.input_interfaces)])
@@ -293,16 +295,39 @@ Args:
 Return:
 -`Dict{String,Any}`: The economy parameters from the input file. If non are given, calculate_economy will be set to false.
 """
-function get_economy_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+function get_economy_parameter(project_config::AbstractDict{AbstractString,Any},
+                               sim_params::Dict{String,Any})::Dict{String,Any}
     if haskey(project_config, "economy_parameter")
+
+        # detect repeat_method to extend the simulation results to the observation_period_in_years
+        repeat_method = default(project_config["economy_parameter"], "repeat_method", "last_year")
+        if repeat_method == "all"
+            # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
+            # observation_period_in_years is reached.
+            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])
+        elseif repeat_method == "last_year"
+            repeat_period = Day(365)
+        elseif repeat_method == "last_month"
+            repeat_period = Day(30)
+        elseif repeat_method == "last_week"
+            repeat_period = Day(7)
+        end
+        if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+           Second(sim_params["time_step_seconds"]) < repeat_period
+            @warn "In economic calculation, the repeat_method was set to 'all' as the given period is longer " *
+                  "than the simulation period."
+            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])
+        end
+
         return Dict{String,Any}(
             "calculate_economy" => default(project_config["economy_parameter"], "calculate_economy", false),
             "observation_period_in_years" => default(project_config["economy_parameter"], "observation_period_in_years",
-                                                     20.0),
+                                                     20),
             "interest_rate" => default(project_config["economy_parameter"], "interest_rate", 0.02),
             "labour_costs_per_hour" => default(project_config["economy_parameter"], "labour_costs_per_hour", 100.0),
             "labour_costs_price_change_rate_per_year" => default(project_config["economy_parameter"],
                                                                  "labour_costs_price_change_rate_per_year", 0.035),
+            "repeat_period" => repeat_period,
         )
     else
         return Dict{String,Any}(

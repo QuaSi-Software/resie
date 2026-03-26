@@ -167,25 +167,31 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
         return nothing
     end
     if sim_params["start_date_output"] + Year(observation_period_in_years) <= sim_params["end_date"]
+        # no repeat required, whole period simulated
         return profile
     end
-    # currently only a very simple algorithm is used. The profile is taken as it is and it is repeated until the 
-    # observation_period_in_years is reached. If the profile does not cover a whole year, this is may not
-    # the best way to extend the profile...
-    # Add: Repeat only last year/month TODO
+
     economy_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
     if sim_params["start_date_output"] == sim_params["end_date"]
+        # special case where only 1 time step is simulated
         nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
                                                                                 sim_params["end_date"]))) /
                                 sim_params["time_step_seconds"]))
+        data_to_repeat = profile
     else
-        nr_to_repeat = Int(ceil(sub_ignoring_leap_days(economy_end_date, sim_params["end_date"]) /
-                                sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])))
+        repeat_period = sim_params["economy_parameter"]["repeat_period"] # Days
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
+                                                                                sim_params["end_date"]))) /
+                                Dates.value(Dates.Second(repeat_period))))
+        start_idx = length(profile) -
+                    Int(ceil(Dates.value(Dates.Second((repeat_period))) / sim_params["time_step_seconds"]))
+        end_idx = length(profile)
+        data_to_repeat = profile[start_idx:end_idx]
     end
-    profile_extended = repeat(profile, nr_to_repeat + 1)
+    profile_extended = vcat(profile, repeat(data_to_repeat, nr_to_repeat))
 
     # cut profile to observation_period_in_years * 365 days
-    number_of_timesteps = Int(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"])
+    number_of_timesteps = Int(ceil(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"]))
     profile_extended = profile_extended[1:number_of_timesteps]
 
     return profile_extended
