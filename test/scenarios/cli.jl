@@ -171,14 +171,13 @@ function generate_output(name::String, subdir::String)
         print("|  X  ")
     end
 
-    if (project_config !== nothing
-        && sim_params !== nothing
+    if (sim_params !== nothing
         && io_settings !== nothing
         && components !== nothing
         && step_order !== nothing)
         # end of condition
         Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, io_settings, components, step_order)
-        Resie.run_simulation_loop(project_config, sim_params, io_settings, components, step_order)
+        Resie.run_simulation_loop(sim_params, io_settings, components, step_order)
         print("|  ✓  ")
     else
         print("|     ")

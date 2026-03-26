@@ -95,19 +95,17 @@ using JSON
 using Dates
 
 """
-    run_simulation_loop(project_config, sim_params, io_settings, components, operations)
+    run_simulation_loop(sim_params, io_settings, components, operations)
 
 Performs the simulation as loop over time steps and records outputs.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
 -`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
 -`operations::OrderOfOperations`:: Order of operations
 """
-function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
-                             sim_params::Dict{String,Any},
+function run_simulation_loop(sim_params::Dict{String,Any},
                              io_settings::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
@@ -388,7 +386,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, io_settings, components, operations)
+    run_simulation_loop(sim_params, io_settings, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     return true
 end
