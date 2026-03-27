@@ -254,15 +254,22 @@ function create_matrix_plot(
     d = dfv[mask, :]
 
     values = Dict(c => Vector{Float64}(d[!, c]) for c in needed)
+    scaled_plot_values = Dict(c => values[c] ./ parameter_unit_scale(c) for c in xcols)
+    objective = values[objective_col] ./ 1e6
+
+    axis_style = PlotlyJS.attr(
+        tickformat=".1f",
+        exponentformat="none",
+        showexponent="none",
+    )
 
     dims = [
         PlotlyJS.attr(
-            label=c,
-            values=(contains(c, "/W") || contains(c, "/Wh") ? values[c] ./ 1e6 : values[c]),
+            label=matrix_axis_label(c),
+            values=scaled_plot_values[c],
+            axis=axis_style,
         ) for c in xcols
     ]
-
-    objective = values[objective_col] ./ 1e6
 
     trace = PlotlyJS.splom(
         dimensions=dims,
@@ -275,20 +282,33 @@ function create_matrix_plot(
         ),
     )
 
-    p = PlotlyJS.plot(trace, PlotlyJS.Layout(title="Parameter-Matrix (SPLOM)"))
+    layout_kwargs = Dict{Symbol, Any}(
+        :title => "Parameter-Matrix (SPLOM)",
+        :separators => ",.",
+    )
+    for i in eachindex(xcols)
+        xaxis_key = Symbol(i == 1 ? "xaxis" : "xaxis$(i)")
+        yaxis_key = Symbol(i == 1 ? "yaxis" : "yaxis$(i)")
+        layout_kwargs[xaxis_key] = axis_style
+        layout_kwargs[yaxis_key] = axis_style
+    end
+
+    p = PlotlyJS.plot(trace, PlotlyJS.Layout(; layout_kwargs...))
     isdir(outdir) || mkpath(outdir)
     PlotlyJS.savefig(p, joinpath(outdir, filename))
     return p
 end
 
 function parameter_unit_scale(col::String)
-    return (contains(col, "/W") || contains(col, "/Wh")) ? 1e6 : 1.0
+    unit = strip(last(split(col, "/"; limit=2)))
+    return (unit == "W" || unit == "Wh") ? 1e6 : 1.0
 end
 
 function parameter_unit_label(col::String)
-    if contains(col, "/W")
+    unit = strip(last(split(col, "/"; limit=2)))
+    if unit == "W"
         return "MW"
-    elseif contains(col, "/Wh")
+    elseif unit == "Wh"
         return "MWh"
     end
     return "unit"
@@ -296,6 +316,15 @@ end
 
 function parameter_display_name(col::String)
     return split(col, " / ")[1]
+end
+
+function matrix_axis_label(col::String)
+    labels = Dict(
+        "HeatPump_Power / W" => "Wärmepumpenleistung [MW]",
+        "ElectrodeBoiler_Power / W" => "Elektrodenkesselleistung [MW]",
+        "BufferTank_Capacity / Wh" => "Wärmespeicherkapazität [MWh]",
+    )
+    return get(labels, col, parameter_display_name(col))
 end
 
 function compute_parameter_sensitivities(
@@ -503,10 +532,9 @@ function main()
     co2_csv_path = save_topn_csv(top10_co2; filename="top10_lowest_co2_yearly.csv")
 
     best10 = topn_annuity(df, 10)
-    best25_rows = topn_annuity_rows(df, 25)
     plot_top10_annuity(best10)
     plot_3d_parameter_space(df)
-    create_matrix_plot(best25_rows; xcols=XCOLS[1:3], filename="matrix_plot_top25_no_battery.html")
+    create_matrix_plot(df; xcols=XCOLS[1:3], filename="matrix_plot_all_runs_no_battery.html")
     sensitivity_details, sensitivity_summary = compute_parameter_sensitivities(df)
     sensitivity_csv_path, sensitivity_xlsx_path = save_parameter_sensitivities(sensitivity_details, sensitivity_summary)
 
@@ -516,7 +544,7 @@ function main()
     println("- $(basename(co2_csv_path))")
     println("- top10_annuity.png")
     println("- 3d_parameter_space.html")
-    println("- matrix_plot_top25_no_battery.html")
+    println("- matrix_plot_all_runs_no_battery.html")
     println("- $(basename(sensitivity_csv_path))")
     println("- $(basename(sensitivity_xlsx_path))")
     
