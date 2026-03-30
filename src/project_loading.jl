@@ -286,21 +286,21 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
 end
 
 """
-    get_economy_parameter(project_config)
+    get_economic_parameter(project_config)
 
-Extract economy parameters form input file.
+Extract economic parameters form input file.
 
 Args:
 -`project_config::AbstractDict{}`: The project config data
 Return:
--`Dict{String,Any}`: The economy parameters from the input file. If non are given, calculate_economy will be set to false.
+-`Dict{String,Any}`: The economic parameters from the input file. If non are given, calculate_economy will be set to false.
 """
-function get_economy_parameter(project_config::AbstractDict{AbstractString,Any},
-                               sim_params::Dict{String,Any})::Dict{String,Any}
-    if haskey(project_config, "economy_parameter")
+function get_economic_parameter(project_config::AbstractDict{AbstractString,Any},
+                                sim_params::Dict{String,Any})::Dict{String,Any}
+    if haskey(project_config, "economic_parameter")
 
         # detect repeat_method to extend the simulation results to the observation_period_in_years
-        repeat_method = default(project_config["economy_parameter"], "repeat_method", "last_year")
+        repeat_method = default(project_config["economic_parameter"], "repeat_method", "last_year")
         if repeat_method == "all"
             # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
             # observation_period_in_years is reached.
@@ -322,12 +322,13 @@ function get_economy_parameter(project_config::AbstractDict{AbstractString,Any},
         end
 
         return Dict{String,Any}(
-            "calculate_economy" => default(project_config["economy_parameter"], "calculate_economy", false),
-            "observation_period_in_years" => default(project_config["economy_parameter"], "observation_period_in_years",
+            "calculate_economy" => default(project_config["economic_parameter"], "calculate_economy", false),
+            "observation_period_in_years" => default(project_config["economic_parameter"],
+                                                     "observation_period_in_years",
                                                      20),
-            "interest_rate" => default(project_config["economy_parameter"], "interest_rate", 0.02),
-            "labour_costs_per_hour" => default(project_config["economy_parameter"], "labour_costs_per_hour", 100.0),
-            "labour_costs_price_change_rate_per_year" => default(project_config["economy_parameter"],
+            "interest_rate" => default(project_config["economic_parameter"], "interest_rate", 0.02),
+            "labour_costs_per_hour" => default(project_config["economic_parameter"], "labour_costs_per_hour", 100.0),
+            "labour_costs_price_change_rate_per_year" => default(project_config["economic_parameter"],
                                                                  "labour_costs_price_change_rate_per_year", 0.035),
             "repeat_period" => repeat_period,
         )

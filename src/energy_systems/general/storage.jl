@@ -35,7 +35,7 @@ const STORAGE_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const STORAGE_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+const STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
@@ -80,7 +80,7 @@ mutable struct Storage <: Component
 
     medium::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     capacity::Float64
@@ -102,8 +102,8 @@ function component_parameters(x::Type{Storage})::Dict{String,NamedTuple}
     return deepcopy(STORAGE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{Storage})::Dict{String,NamedTuple}
-    return deepcopy(STORAGE_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{Storage})::Dict{String,NamedTuple}
+    return deepcopy(STORAGE_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{Storage})::Dict{String,NamedTuple}
@@ -118,8 +118,8 @@ end
 function validate_config(x::Type{Storage}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(Storage)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(Storage)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(Storage)
         uac = uac * " - emission_parameters"
@@ -140,7 +140,7 @@ function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any
             InterfaceMap(medium => nothing), # input_interfaces
             InterfaceMap(medium => nothing), # output_interfaces
             medium,                          # medium
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             params["capacity"],              # capacity
             params["initial_load"] * params["capacity"], # load

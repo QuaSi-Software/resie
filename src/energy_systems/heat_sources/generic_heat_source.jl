@@ -143,7 +143,7 @@ const GENERIC_HEAT_SOURCE_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const GENERIC_HEAT_SOURCE_ECONOMY_PARAMETERS = get_economy_standard_params("connection", 
+const GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS = get_economic_standard_params("connection", 
     Dict{String,Any}(
         "energy_price_profile_file_path" => nothing,
         "energy_price_profile_scale" => 1.0,
@@ -183,7 +183,7 @@ mutable struct GenericHeatSource <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     max_power_profile::Union{Profile,Nothing}
@@ -211,8 +211,8 @@ function component_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTupl
     return deepcopy(GENERIC_HEAT_SOURCE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTuple}
-    return deepcopy(GENERIC_HEAT_SOURCE_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTuple}
+    return deepcopy(GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTuple}
@@ -241,8 +241,8 @@ end
 function validate_config(x::Type{GenericHeatSource}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(GenericHeatSource)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(GenericHeatSource)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(GenericHeatSource)
         uac = uac * " - emission_parameters"
@@ -267,7 +267,7 @@ function init_from_params(x::Type{GenericHeatSource}, uac::String, params::Dict{
             medium,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             max_power_profile,
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),

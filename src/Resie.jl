@@ -130,7 +130,7 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
                                               false),
         "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
     )
-    sim_params["economy_parameter"] = get_economy_parameter(project_config, sim_params)
+    sim_params["economic_parameter"] = get_economic_parameter(project_config, sim_params)
     sim_params["emissions_parameter"] = get_emission_parameter(project_config)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
@@ -219,13 +219,13 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV, output_keys_economy_emission = get_output_keys(project_config["io_settings"],
-                                                                                             sim_params["economy_parameter"],
-                                                                                             sim_params["emissions_parameter"],
-                                                                                             components)
+    output_keys_lineplot, output_keys_to_CSV, output_keys_economic_emission = get_output_keys(project_config["io_settings"],
+                                                                                              sim_params["economic_parameter"],
+                                                                                              sim_params["emissions_parameter"],
+                                                                                              components)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
-                                                                                  something(output_keys_economy_emission,
+                                                                                  something(output_keys_economic_emission,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -244,7 +244,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError())
     end
-    do_calculate_economy = sim_params["economy_parameter"]["calculate_economy"]
+    do_calculate_economy = sim_params["economic_parameter"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameter"]["calculate_emissions"]
 
     # Initialize the arrays for output
@@ -384,12 +384,12 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
 
     if do_calculate_economy || do_calculate_emissions
-        output_data_economy_emissions = Matrix(view(output_data_all_requested, :,
-                                                    time_and_subset_cols(key_indexes, output_keys_economy_emission)))
-        economy_emissions_data = prepare_economy_emissions_data(components, output_keys_economy_emission,
-                                                                output_data_economy_emissions)
-        economy_result = do_calculate_economy ? calculate_economy(economy_emissions_data, sim_params) : nothing
-        emissions_result = do_calculate_emissions ? calculate_emissions(economy_emissions_data, sim_params) : nothing
+        output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
+                                                     time_and_subset_cols(key_indexes, output_keys_economic_emission)))
+        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emission,
+                                                                  output_data_economic_emissions)
+        economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
+        emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
     end
 
     # write output to CSV if not done continuously
@@ -451,14 +451,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     if do_calculate_economy
-        filepath = default(project_config["io_settings"], "economy_plot_file_cashflows",
-                           "./output/economy_results_cashflows.html")
-        success = plot_economy_results(economy_result, filepath, sim_params, "cashflows")
+        filepath = default(project_config["io_settings"], "economic_plot_file_cashflows",
+                           "./output/economic_results_cashflows.html")
+        success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
 
-        filepath = default(project_config["io_settings"], "economy_plot_file_present_values",
-                           "./output/economy_results_present_values.html")
-        success = plot_economy_results(economy_result, filepath, sim_params, "present_values")
+        filepath = default(project_config["io_settings"], "economic_plot_file_present_values",
+                           "./output/economic_results_present_values.html")
+        success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
     end
 end

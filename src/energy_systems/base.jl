@@ -1560,19 +1560,19 @@ function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
 end
 
 """
-    economy_parameters(x::Type{Component})::Dict{String,Any}
+    economic_parameters(x::Type{Component})::Dict{String,Any}
 
-Lists all economy parameters accepted by the constructor of the component with the
+Lists all economic parameters accepted by the constructor of the component with the
 given type.
 
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the economy parameters where keys are parameter names and
+-`Dict{String,NamedTuple}`: Definition of the economic parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function economy_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+function economic_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
     return Dict{String,NamedTuple}()
@@ -2001,7 +2001,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
     for (name, value) in pairs(extracted)
         # skip control_parameters, as they have their own validation. also skip is_source
         # from GridConnection as it is an internal parameter
-        if name in ["control_parameters", "is_source", "economy_parameters", "emission_parameters"]
+        if name in ["control_parameters", "is_source", "economic_parameters", "emission_parameters"]
             continue
         end
 
@@ -2088,16 +2088,16 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         end
     end
 
-    # extract economy parameters using the economy parameter dictionary as the source of truth
-    extracted_economy_params = Dict{String,Any}()
-    economy_parameters_config = get(config, "economy_parameters", Dict{String,Any}())
-    if sim_params["economy_parameter"]["calculate_economy"]
-        type_def_economy = economy_parameters(T)
+    # extract economic parameters using the economic parameter dictionary as the source of truth
+    extracted_economic_params = Dict{String,Any}()
+    economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
+    if sim_params["economic_parameter"]["calculate_economy"]
+        type_def_economy = economic_parameters(T)
         for (param_name, param_def) in type_def_economy
             try
-                extracted_economy_params[param_name] = extract_parameter(T, economy_parameters_config, param_name,
-                                                                         param_def, sim_params,
-                                                                         (uac * " - economy_parameters"))
+                extracted_economic_params[param_name] = extract_parameter(T, economic_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - economic_parameters"))
             catch e
                 constructor_errored = handle_extraction_error(e, sim_params)
             end
@@ -2132,9 +2132,9 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         validate_config(T, config, extracted_params, uac, sim_params, "component")
 
         # do the same for economy
-        if sim_params["economy_parameter"]["calculate_economy"]
-            validate_mutex_params(economy_parameters_config, uac, type_def_economy)
-            validate_config(T, economy_parameters_config, extracted_economy_params, uac, sim_params, "economy")
+        if sim_params["economic_parameter"]["calculate_economy"]
+            validate_mutex_params(economic_parameters_config, uac, type_def_economy)
+            validate_config(T, economic_parameters_config, extracted_economic_params, uac, sim_params, "economy")
         end
 
         # do the same for emissions
@@ -2155,7 +2155,7 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     end
 
     # initialize the parameters ready for feeding into new()
-    extracted_params["economy_parameters"] = handle_profiles(extracted_economy_params)
+    extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
     extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
     return init_from_params(T, uac, extracted_params, config, sim_params)
 end
@@ -2196,21 +2196,21 @@ function handle_extraction_error(e, sim_params)
 end
 
 """
-    get_economy_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+    get_economic_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
 
-Returns the standard parameter definition of the SSOT for economy parameters, differently for
+Returns the standard parameter definition of the SSOT for economic parameters, differently for
 Storages/Transformer and Connection components.
 Defaults have to be passed using the "defaults" dict.
 
 Args:
 -`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
--`defaults::Dict{String,Any}`: Defaults for the standard economy parameter
--`units::Dict{String,Any}`: Units for some of the standard economy parameter
+-`defaults::Dict{String,Any}`: Defaults for the standard economic parameter
+-`units::Dict{String,Any}`: Units for some of the standard economic parameter
 Returns:
-- `Dict{String,NamedTuple}`: A Dict with the economy standard parameter settings for the SSOT
+- `Dict{String,NamedTuple}`: A Dict with the economic standard parameter settings for the SSOT
 """
-function get_economy_standard_params(type::String, defaults::Dict{String,Any},
-                                     units::Dict{String,Any})::Dict{String,NamedTuple}
+function get_economic_standard_params(type::String, defaults::Dict{String,Any},
+                                      units::Dict{String,Any})::Dict{String,NamedTuple}
     #! format: off
     if type in ["transformer", "storage"]
         return Dict{String,NamedTuple}(
@@ -2376,7 +2376,7 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
 
         )
     else
-        @error "Unknown type in function get_economy_defaults."
+        @error "Unknown type in function get_economic_defaults."
     end
     #! format: on
 end
@@ -2463,7 +2463,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             )
         )
     else
-        @error "Unknown type in function get_economy_defaults."
+        @error "Unknown type in function get_economic_defaults."
     end
     #! format: on
 end

@@ -16,7 +16,7 @@ end
 """
 Holds results of the economy calculation
 """
-Base.@kwdef mutable struct EconomyResult
+Base.@kwdef mutable struct EconomicResult
     total_annuity::Float64 = 0.0
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
@@ -28,9 +28,9 @@ end
 ConnectionComponent = Union{GridInput,GridOutput,PVPlant,FixedSink,FixedSupply,
                             FlexibleSink,FlexibleSupply,GenericHeatSource}
 
-function prepare_economy_emissions_data(components::Grouping,
-                                        output_keys::Vector{EnergySystems.OutputKey},
-                                        output_data::AbstractMatrix{<:Real})
+function prepare_economic_emissions_data(components::Grouping,
+                                         output_keys::Vector{EnergySystems.OutputKey},
+                                         output_data::AbstractMatrix{<:Real})
     # Helper: Find index of required value_key in output_keys for a given component
     function find_key(component::EnergySystems.Component, output_keys::Vector{EnergySystems.OutputKey},
                       value_key::String)
@@ -89,12 +89,12 @@ end
 
 function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params::Dict{String,Any})
     # set initials
-    result = EconomyResult()
-    economy_parameter = sim_params["economy_parameter"]
+    result = EconomicResult()
+    economic_parameter = sim_params["economic_parameter"]
 
     # get time stamp of extended simulation results
-    economy_end_date = sim_params["start_date_output"] + Year(economy_parameter["observation_period_in_years"])
-    number_of_timesteps = Int(Dates.value(Second(sub_ignoring_leap_days(economy_end_date,
+    economic_end_date = sim_params["start_date_output"] + Year(economic_parameter["observation_period_in_years"])
+    number_of_timesteps = Int(Dates.value(Second(sub_ignoring_leap_days(economic_end_date,
                                                                         sim_params["start_date_output"]))) /
                               sim_params["time_step_seconds"])
     # simulation_result_timestamp = Vector{DateTime}(undef, number_of_timesteps)
@@ -115,22 +115,22 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
         if isa(component, ConnectionComponent)
             # get energy profiles
             if sf === EnergySystems.sf_fixed_source
-                energy = extend_profile(item.energy_out, economy_parameter["observation_period_in_years"], sim_params) # source output
-                energy_supply = extend_profile(item.energy_supply, economy_parameter["observation_period_in_years"],
+                energy = extend_profile(item.energy_out, economic_parameter["observation_period_in_years"], sim_params) # source output
+                energy_supply = extend_profile(item.energy_supply, economic_parameter["observation_period_in_years"],
                                                sim_params) # source supply
                 energy_unmet = energy_supply .- energy # unmet supply of source
                 type = :source
             elseif sf === EnergySystems.sf_flexible_source
-                energy = extend_profile(item.energy_out, economy_parameter["observation_period_in_years"], sim_params) #  source output
+                energy = extend_profile(item.energy_out, economic_parameter["observation_period_in_years"], sim_params) #  source output
                 energy_unmet = nothing # unmet supply of source
                 type = :source
             elseif sf === EnergySystems.sf_flexible_sink
-                energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
+                energy = extend_profile(item.energy_in, economic_parameter["observation_period_in_years"], sim_params) # sink input
                 energy_unmet = nothing  # unmet demand of sink
                 type = :sink
             elseif sf === EnergySystems.sf_fixed_sink
-                energy = extend_profile(item.energy_in, economy_parameter["observation_period_in_years"], sim_params) # sink input
-                energy_demand = extend_profile(item.energy_demand, economy_parameter["observation_period_in_years"],
+                energy = extend_profile(item.energy_in, economic_parameter["observation_period_in_years"], sim_params) # sink input
+                energy_demand = extend_profile(item.energy_demand, economic_parameter["observation_period_in_years"],
                                                sim_params) # sink demand
                 energy_unmet = energy_demand .- energy # unmet demand of sink
                 type = :sink
@@ -171,16 +171,16 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
         return profile
     end
 
-    economy_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
+    economic_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
     if sim_params["start_date_output"] == sim_params["end_date"]
         # special case where only 1 time step is simulated
-        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economic_end_date,
                                                                                 sim_params["end_date"]))) /
                                 sim_params["time_step_seconds"]))
         data_to_repeat = profile
     else
-        repeat_period = sim_params["economy_parameter"]["repeat_period"] # Days
-        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
+        repeat_period = sim_params["economic_parameter"]["repeat_period"] # Days
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economic_end_date,
                                                                                 sim_params["end_date"]))) /
                                 Dates.value(Dates.Second(repeat_period))))
         start_idx = length(profile) + 1 -
@@ -204,21 +204,21 @@ end
 function calculate_annuity_of_energies(energy_profile::Vector{Float64}, component::EnergySystems.Component,
                                        sim_params::Dict{String,Any}, annuity_energies::Float64,
                                        breakdown::Dict{String,Any}, type::Symbol)
-    energy_price_change_rate_per_year = component.economy_parameter["energy_price_change_rate_per_year"]
-    base_cost_per_year = component.economy_parameter["base_cost_per_year"]
-    base_cost_change_rate_per_year = component.economy_parameter["base_cost_change_rate_per_year"]
-    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    energy_price_change_rate_per_year = component.economic_parameter["energy_price_change_rate_per_year"]
+    base_cost_per_year = component.economic_parameter["base_cost_per_year"]
+    base_cost_change_rate_per_year = component.economic_parameter["base_cost_change_rate_per_year"]
+    observation_period = Int(sim_params["economic_parameter"]["observation_period_in_years"])
 
-    if isnothing(component.economy_parameter["constant_energy_price"])
+    if isnothing(component.economic_parameter["constant_energy_price"])
         # get price profile from component (one of them is given)
         step = Millisecond(round(Int, sim_params["time_step_seconds"] * 1000))
         times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
-        price_profile_energy = component.economy_parameter["energy_price_profile_scale"] .*
-                               [component.economy_parameter["energy_price_profile"].data[t] for t in times]
+        price_profile_energy = component.economic_parameter["energy_price_profile_scale"] .*
+                               [component.economic_parameter["energy_price_profile"].data[t] for t in times]
     else
         # create profile from constant energy price
-        price_profile_energy = fill(component.economy_parameter["constant_energy_price"],
+        price_profile_energy = fill(component.economic_parameter["constant_energy_price"],
                                     sim_params["number_of_time_steps_output"])
     end
     price_profile_energy = extend_profile(price_profile_energy, observation_period, sim_params)
@@ -264,7 +264,7 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
 end
 
 function get_annuity(costs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
-    q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
+    q = 1.0 + sim_params["economic_parameter"]["interest_rate"]
     years = length(costs)
 
     # Timing convention: costs[1] occurs at t=0, costs[k] at t=k-1
@@ -275,7 +275,7 @@ function get_annuity(costs::Vector{Float64}, sim_params::Dict{String,Any})::Floa
     end
 
     # Annuity factor a(q,years)
-    a = if abs(sim_params["economy_parameter"]["interest_rate"]) < sim_params["epsilon"]
+    a = if abs(sim_params["economic_parameter"]["interest_rate"]) < sim_params["epsilon"]
         1.0 / years
     else
         (q^years * (q - 1.0)) / (q^years - 1.0)
@@ -329,16 +329,16 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     # this is probably a component-specific implementation with a default implementation? No, I guess its only general.
 
     # parameter of the component
-    lifetime_years = component.economy_parameter["lifetime_years"]
-    subsidy_rate_of_capex = component.economy_parameter["subsidy_rate_of_capex"]
-    subsidy_max = component.economy_parameter["subsidy_max"]
+    lifetime_years = component.economic_parameter["lifetime_years"]
+    subsidy_rate_of_capex = component.economic_parameter["subsidy_rate_of_capex"]
+    subsidy_max = component.economic_parameter["subsidy_max"]
     capex_reference = get_capex_reference(component)  # e.g. installed power, area, etc.
 
     # parameter general
-    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    observation_period = Int(sim_params["economic_parameter"]["observation_period_in_years"])
 
     # factors
-    r = 1.0 + component.economy_parameter["capex_price_change_rate_per_year"]  # price change factor of capex
+    r = 1.0 + component.economic_parameter["capex_price_change_rate_per_year"]  # price change factor of capex
 
     # results
     investments_per_year = zeros(Float64, observation_period)
@@ -346,7 +346,7 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     subsidies_per_year = zeros(Float64, observation_period)
 
     # calculate initial investment (A0)
-    investment_first_year = component.economy_parameter["capex_specific"](capex_reference)   # € at time 0
+    investment_first_year = component.economic_parameter["capex_specific"](capex_reference)   # € at time 0
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period
@@ -379,14 +379,14 @@ end
 function get_opex_from_component(component::EnergySystems.Component, investment_first_year::Float64,
                                  sim_params::Dict{String,Any})
     # opex, here only for component-specific opex, energy are calculated separately.
-    maintenance_inspection_rate_per_year = component.economy_parameter["maintenance_inspection_rate_per_year"]
-    maintenance_inspection_price_change_rate_per_year = component.economy_parameter["maintenance_inspection_price_change_rate_per_year"]
-    repair_rate_per_year = component.economy_parameter["repair_rate_per_year"]
-    repair_price_change_rate_per_year = component.economy_parameter["repair_price_change_rate_per_year"]
-    operational_labour_hours_per_year = component.economy_parameter["operational_labour_hours_per_year"]
-    labour_costs_per_hour = sim_params["economy_parameter"]["labour_costs_per_hour"]
-    labour_costs_price_change_rate_per_year = sim_params["economy_parameter"]["labour_costs_price_change_rate_per_year"]
-    observation_period = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    maintenance_inspection_rate_per_year = component.economic_parameter["maintenance_inspection_rate_per_year"]
+    maintenance_inspection_price_change_rate_per_year = component.economic_parameter["maintenance_inspection_price_change_rate_per_year"]
+    repair_rate_per_year = component.economic_parameter["repair_rate_per_year"]
+    repair_price_change_rate_per_year = component.economic_parameter["repair_price_change_rate_per_year"]
+    operational_labour_hours_per_year = component.economic_parameter["operational_labour_hours_per_year"]
+    labour_costs_per_hour = sim_params["economic_parameter"]["labour_costs_per_hour"]
+    labour_costs_price_change_rate_per_year = sim_params["economic_parameter"]["labour_costs_price_change_rate_per_year"]
+    observation_period = Int(sim_params["economic_parameter"]["observation_period_in_years"])
 
     # calculate factors
     r_maintenance = 1.0 + maintenance_inspection_price_change_rate_per_year
@@ -411,8 +411,8 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
     return maintenance_per_year, repair_per_year, labour_per_year
 end
 
-function plot_economy_results(result::EconomyResult, output_file_path::String, sim_params::Dict{String,Any},
-                              cost_type::String)
+function plot_economic_results(result::EconomicResult, output_file_path::String, sim_params::Dict{String,Any},
+                               cost_type::String)
     suffix = "_per_year"
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
@@ -437,7 +437,7 @@ function plot_economy_results(result::EconomyResult, output_file_path::String, s
     elseif cost_type == "present_values"
         # calculate net present values
         cost_name = "present values"
-        q = 1.0 + sim_params["economy_parameter"]["interest_rate"]
+        q = 1.0 + sim_params["economic_parameter"]["interest_rate"]
 
         for (key, values) in series
             present_values = similar(values)
@@ -449,7 +449,7 @@ function plot_economy_results(result::EconomyResult, output_file_path::String, s
     end
 
     # parameter 
-    observation_period_in_years = Int(sim_params["economy_parameter"]["observation_period_in_years"])
+    observation_period_in_years = Int(sim_params["economic_parameter"]["observation_period_in_years"])
     start_year = year(sim_params["start_date_output"])
 
     # x-axis label
@@ -514,7 +514,7 @@ function plot_economy_results(result::EconomyResult, output_file_path::String, s
 
     layout = Layout(;
                     title=attr(;
-                               text="Economy results ($cost_name). Costs are positive, revenues are negative." *
+                               text="Economic results ($cost_name). Costs are positive, revenues are negative." *
                                     "<br><sup>Total yearly annuity: $(Int(round(result.total_annuity))) €/a, " *
                                     "Total costs ($cost_name) over period: $(round(total_costs_over_period; digits=0)) €</sup>"),
                     xaxis_title_text="Year",

@@ -233,7 +233,7 @@ const ELECTROLYSER_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const ELECTROLYSER_ECONOMY_PARAMETERS = Base.merge(get_economy_standard_params("transformer",
+const ELECTROLYSER_ECONOMIC_PARAMETERS = Base.merge(get_economic_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "capex_specific" => nothing,
@@ -352,7 +352,7 @@ mutable struct Electrolyser <: Component
     m_h2_out::Symbol
     m_o2_out::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     power::Float64
@@ -395,8 +395,8 @@ function component_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
     return deepcopy(ELECTROLYSER_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
-    return deepcopy(ELECTROLYSER_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
+    return deepcopy(ELECTROLYSER_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{Electrolyser})::Dict{String,NamedTuple}
@@ -411,8 +411,8 @@ end
 function validate_config(x::Type{Electrolyser}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(Electrolyser)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(Electrolyser)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(Electrolyser)
         uac = uac * " - emission_parameters"
@@ -472,7 +472,7 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
             m_heat_lt_out,
             m_h2_out,
             m_o2_out,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             power,
             power_rated_el,
@@ -757,14 +757,14 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
                    unit.losses                     # losses
 
     # calculate non-energy commodities
-    if sim_params["economy_parameter"]["calculate_economy"] &&
+    if sim_params["economic_parameter"]["calculate_economy"] &&
        sim_params["current_date"] >= sim_params["start_date_output"]
         step = Int(floor(Dates.value(Dates.Millisecond(sub_ignoring_leap_days(sim_params["current_date"],
                                                                               sim_params["start_date_output"]))) /
                          (1000 * Int(sim_params["time_step_seconds"])))) + 1
 
-        unit.water_demand[step] = unit.economy_parameter["water_demand_ratio"] * sum(energies[4]; init=0.0) / 1000  # liter water
-        unit.oxygen_production[step] = unit.economy_parameter["oxygen_production_ratio"] *
+        unit.water_demand[step] = unit.economic_parameter["water_demand_ratio"] * sum(energies[4]; init=0.0) / 1000  # liter water
+        unit.oxygen_production[step] = unit.economic_parameter["oxygen_production_ratio"] *
                                        sum(energies[4]; init=0.0) / 1000  # kg Oxygen
     end
 end
@@ -795,15 +795,15 @@ end
 
 function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict{String,Any})
     # prices only on yearly basis here as simplification
-    observation_period_in_years = sim_params["economy_parameter"]["observation_period_in_years"]
+    observation_period_in_years = sim_params["economic_parameter"]["observation_period_in_years"]
     # liter water in each time step as Vector
     water_demand_profile = extend_profile(unit.water_demand, observation_period_in_years, sim_params)
     # kg oxygen in each time step as Vector
     oxygen_production_profile = extend_profile(unit.oxygen_production, observation_period_in_years, sim_params)
 
     timesteps_per_year = Int(floor(length(water_demand_profile) / observation_period_in_years))
-    r_water = 1.0 + unit.economy_parameter["water_price_change_rate_per_year"]
-    r_oxygen = 1.0 + unit.economy_parameter["oxygen_price_change_rate_per_year"]
+    r_water = 1.0 + unit.economic_parameter["water_price_change_rate_per_year"]
+    r_oxygen = 1.0 + unit.economic_parameter["oxygen_price_change_rate_per_year"]
 
     # get yearly sums
     yearly_water_costs = zeros(Float64, observation_period_in_years)
@@ -812,8 +812,8 @@ function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict
         annual_water_demand = sum(water_demand_profile[((year - 1) * timesteps_per_year + 1):(year * timesteps_per_year)])
         annual_oxygen_production = sum(oxygen_production_profile[((year - 1) * timesteps_per_year + 1):(year * timesteps_per_year)])
 
-        yearly_water_costs[year] = annual_water_demand * unit.economy_parameter["water_price"] * r_water^(year - 1)
-        yearly_oxygen_revenue[year] = annual_oxygen_production * unit.economy_parameter["oxygen_price"] *
+        yearly_water_costs[year] = annual_water_demand * unit.economic_parameter["water_price"] * r_water^(year - 1)
+        yearly_oxygen_revenue[year] = annual_oxygen_production * unit.economic_parameter["oxygen_price"] *
                                       r_oxygen^(year - 1)
     end
     return ["water_costs_per_year", "oxygen_revenue_per_year"], [.-yearly_water_costs, yearly_oxygen_revenue]

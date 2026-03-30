@@ -7,7 +7,7 @@ using Dates
 Determines output keys for:
   - lineplot
   - csv export
-  - economy output (filtered to value_key containing "OUT" or "IN")
+  - economic output (filtered to value_key containing "OUT" or "IN")
 
 For each output channel:
   - if not requested, returns `nothing`
@@ -16,7 +16,7 @@ For each output channel:
       - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
-                         economy_parameter::Union{Nothing,AbstractDict{String,Any}},
+                         economic_parameter::Union{Nothing,AbstractDict{String,Any}},
                          emissions_parameter::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
@@ -124,14 +124,14 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     end
 
     # Economy and emission filter
-    is_economy_emission_key(ok::EnergySystems.OutputKey) = occursin("OUT", ok.value_key) ||
-                                                           occursin("IN", ok.value_key) ||
-                                                           occursin("Supply", ok.value_key) ||
-                                                           occursin("Demand", ok.value_key)
+    is_economic_emission_key(ok::EnergySystems.OutputKey) = occursin("OUT", ok.value_key) ||
+                                                            occursin("IN", ok.value_key) ||
+                                                            occursin("Supply", ok.value_key) ||
+                                                            occursin("Demand", ok.value_key)
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output_keys")
-    do_economy = economy_parameter["calculate_economy"]
+    do_economy = economic_parameter["calculate_economy"]
     do_emissions = emissions_parameter["calculate_emissions"]
 
     # Decide if we need all-keys lists
@@ -174,14 +174,14 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # Economy or emissions keys
     if do_economy || do_emissions
         # Use excl_flows "all" as base
-        output_keys_economy_emissions = copy(all_output_keys_excl_flows)
-        filter!(is_economy_emission_key, output_keys_economy_emissions)
+        output_keys_economic_emissions = copy(all_output_keys_excl_flows)
+        filter!(is_economic_emission_key, output_keys_economic_emissions)
         # keep stable ordering (all_output_keys_excl_flows is already sorted)
     else
-        output_keys_economy_emissions = nothing
+        output_keys_economic_emissions = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv, output_keys_economy_emissions
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions
 end
 
 """

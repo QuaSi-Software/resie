@@ -256,7 +256,7 @@ const BUFFER_TANK_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const BUFFER_TANK_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+const BUFFER_TANK_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
@@ -314,7 +314,7 @@ mutable struct BufferTank <: Component
     output_interfaces::InterfaceMap
     medium::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     model_type::Symbol
@@ -372,8 +372,8 @@ function component_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
     return deepcopy(BUFFER_TANK_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
-    return deepcopy(BUFFER_TANK_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
+    return deepcopy(BUFFER_TANK_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
@@ -396,8 +396,8 @@ end
 function validate_config(x::Type{BufferTank}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(BufferTank)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(BufferTank)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(BufferTank)
         uac = uac * " - emission_parameters"
@@ -417,7 +417,7 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
             medium,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             Symbol(params["model_type"]),
             params["capacity"],
