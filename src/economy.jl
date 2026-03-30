@@ -183,7 +183,7 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
         nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economy_end_date,
                                                                                 sim_params["end_date"]))) /
                                 Dates.value(Dates.Second(repeat_period))))
-        start_idx = length(profile) -
+        start_idx = length(profile) + 1 -
                     Int(ceil(Dates.value(Dates.Second((repeat_period))) / sim_params["time_step_seconds"]))
         end_idx = length(profile)
         data_to_repeat = profile[start_idx:end_idx]

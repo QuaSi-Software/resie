@@ -304,7 +304,8 @@ function get_economy_parameter(project_config::AbstractDict{AbstractString,Any},
         if repeat_method == "all"
             # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
             # observation_period_in_years is reached.
-            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])
+            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                            Millisecond(Second(sim_params["time_step_seconds"]))
         elseif repeat_method == "last_year"
             repeat_period = Day(365)
         elseif repeat_method == "last_month"
@@ -316,7 +317,8 @@ function get_economy_parameter(project_config::AbstractDict{AbstractString,Any},
            Second(sim_params["time_step_seconds"]) < repeat_period
             @warn "In economic calculation, the repeat_method was set to 'all' as the given period is longer " *
                   "than the simulation period."
-            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"])
+            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                            Millisecond(Second(sim_params["time_step_seconds"]))
         end
 
         return Dict{String,Any}(
