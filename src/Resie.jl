@@ -450,16 +450,25 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         end
     end
 
+    # output economic results
     if do_calculate_economy
+        # plot figure with yearly cashflow
         filepath = default(project_config["io_settings"], "economic_plot_file_cashflows",
                            "./output/economic_results_cashflows.html")
         success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
 
+        # plot figure with yearly present values
         filepath = default(project_config["io_settings"], "economic_plot_file_present_values",
                            "./output/economic_results_present_values.html")
         success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+
+        # export economic results to CSV
+        filepath = default(project_config["io_settings"], "economic_CSV_file_path",
+                           "./output/economic_results.csv")
+        success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+        success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
     end
 end
 

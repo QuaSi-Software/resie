@@ -1,4 +1,4 @@
-using PlotlyJS
+using PlotlyJS, Printf
 
 export extend_profile
 
@@ -205,7 +205,7 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
 
     if isnothing(component.economic_parameter["constant_energy_price"])
         # get price profile from component (one of them is given)
-        step = Millisecond(round(Int, sim_params["time_step_seconds"] * 1000))
+        step = Millisecond(Second(sim_params["time_step_seconds"]))
         times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         price_profile_energy = component.economic_parameter["energy_price_profile_scale"] .*
@@ -247,10 +247,12 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     end
 
     # calculate annuity
-    annuity_energies += get_annuity(energy_costs_per_year_result .+ energy_base_costs_per_year_result, sim_params)
+    component_energies_annuity = get_annuity(energy_costs_per_year_result .+ energy_base_costs_per_year_result,
+                                             sim_params)
+    annuity_energies += component_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
-                      Dict("annuity_energies" => annuity_energies,
+                      Dict("annuity_energies" => component_energies_annuity,
                            energy_name => energy_costs_per_year_result,
                            base_name => energy_base_costs_per_year_result))
 
@@ -305,10 +307,11 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     end
 
     # calculate annuity
-    annuity_energies += get_annuity(unmet_energy_costs_per_year_result, sim_params)
+    component_unmet_energies_annuity = get_annuity(unmet_energy_costs_per_year_result, sim_params)
+    annuity_energies += component_unmet_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
-                      Dict("annuity_energies" => annuity_energies,
+                      Dict("annuity_unmet_energies" => component_unmet_energies_annuity,
                            energy_name => unmet_energy_costs_per_year_result))
 
     return annuity_energies, breakdown
@@ -343,7 +346,8 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     residuals_per_year,
     subsidies_per_year = get_capex_from_component(component, sim_params)
 
-    annuity_capex += get_annuity(investments_per_year .- residuals_per_year .- subsidies_per_year, sim_params)
+    component_capex_annuity = get_annuity(investments_per_year .- residuals_per_year .- subsidies_per_year, sim_params)
+    annuity_capex += component_capex_annuity
 
     # calculate opex (operation-related costs) including inspections, servicing and repair 
     # (no energy flows here, as they are handled differently)
@@ -351,19 +355,22 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     repair_per_year,
     labour_per_year = get_opex_from_component(component, investment_first_year, sim_params)
 
-    annuity_opex += get_annuity(maintenance_per_year .+ repair_per_year .+ labour_per_year, sim_params)
+    component_opex_annuity = get_annuity(maintenance_per_year .+ repair_per_year .+ labour_per_year, sim_params)
+    annuity_opex += component_opex_annuity
 
     # get additional component-specific opex of material flows not represented by any interfaces
     # call component-specific function to get special opex, e.g. electrolysers water demand and oxygen production
     names, additional_opex_per_year = get_additional_opex_from_component(component, sim_params)
     for (idx, name) in enumerate(names)
-        annuity_opex += get_annuity(additional_opex_per_year[idx], sim_params)
+        component_additional_opex_annuity = get_annuity(additional_opex_per_year[idx], sim_params)
+        component_opex_annuity += component_additional_opex_annuity
+        annuity_opex += component_additional_opex_annuity
         add_to_breakdown!(breakdown, component.uac, Dict(name => additional_opex_per_year[idx]))
     end
 
     add_to_breakdown!(breakdown, component.uac,
-                      Dict("annuity_capex" => annuity_capex,
-                           "annuity_opex" => annuity_opex,
+                      Dict("annuity_capex" => component_capex_annuity,
+                           "annuity_opex" => component_opex_annuity,
                            "investments_costs_per_year" => investments_per_year,
                            "residual_revenues_per_year" => .-residuals_per_year,
                            "subsidy_revenues_per_year" => .-subsidies_per_year,
@@ -580,6 +587,59 @@ function plot_economic_results(result::EconomicResult, output_file_path::String,
     p = plot(traces, layout)
     savefig(p, output_file_path)
 
+    return true
+end
+
+function write_economic_results_to_CSV(economic_result::EconomicResult, filepath::String, sim_params::Dict{String,Any})
+    observation_period_in_years = Int(sim_params["economic_parameter"]["observation_period_in_years"])
+    start_year = year(sim_params["start_date_output"])
+
+    # write data to file
+    open(filepath, "w") do file_handle
+        write(file_handle, "\ufeff")  # UTF-8 BOM for Excel
+        write(file_handle, "Economic results\n")
+        write(file_handle, "Note: Costs are positive, revenues are negative.\n")
+
+        write(file_handle, replace(@sprintf("Total Annuity:;%.2f;€\n", economic_result.total_annuity), "." => ","))
+        write(file_handle, replace(@sprintf("Annuity of Capex:;%.2f;€\n", economic_result.annuity_capex), "." => ","))
+        write(file_handle,
+              replace(@sprintf("Annuity of Opex (without energies):;%.2f;€\n", economic_result.annuity_opex),
+                      "." => ","))
+        write(file_handle,
+              replace(@sprintf("Annuity of Energies:;%.2f;€\n", economic_result.annuity_energies), "." => ","))
+
+        write(file_handle, "\n")
+        write(file_handle, "Yearly cashflows in [€/year] (without discounting):\n")
+
+        # write years
+        for year in 1:observation_period_in_years
+            current_year = Int(year - 1 + start_year)
+            write(file_handle, ";$(current_year)")
+        end
+        write(file_handle, "\n")
+
+        # write yearly component-specific cashflows
+        for (uac, component_results) in sort(collect(economic_result.breakdown); by=first)
+            for (variable_name, entry) in sort(collect(component_results); by=first)
+                if entry isa AbstractVector{<:Real}
+                    write(file_handle, "$(uac) - $(variable_name):;")
+                    write(file_handle, replace(join((@sprintf("%.2f", x) for x in entry), ";") * "\n", "." => ","))
+                end
+            end
+        end
+
+        # write annuities per category and component
+        write(file_handle, "\n")
+        write(file_handle, "Annuity breakdown per component:\n")
+        for (uac, component_results) in sort(collect(economic_result.breakdown); by=first)
+            for (variable_name, entry) in sort(collect(component_results); by=first)
+                if entry isa Float64
+                    write(file_handle, "$(uac) - $(variable_name):;")
+                    write(file_handle, replace(@sprintf("%.2f;€\n", entry), "." => ","))
+                end
+            end
+        end
+    end
     return true
 end
 
