@@ -7,6 +7,262 @@ using OrderedCollections: OrderedDict
 const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
 
+#! format: off
+const IO_SETTINGS_DEF = Dict(
+    "base_path" => (
+        default=nothing,
+        description="If given, this path will be used as the base path for all relative " *
+                    "paths used in the config file. If not given it defaults to the " *
+                    "current working directory for the Julia process running ReSiE, which " *
+                    "in almost all cases is the directory from which ReSiE is started.",
+        display_name="Base path",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "plot_weather_data" => (
+        default=false,
+        description="Toggle if weather data should be included in the line plots",
+        display_name="Plot weather data?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "csv_output_weather" => (
+        default=false,
+        description="Toggle if weather data should be included in the CSV output",
+        display_name="Weather data in CSV?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "write_csv_continuously" => (
+        default=false,
+        description="Toggle if CSV output should be written in every time step. Negatively " *
+                    "affects performance.",
+        display_name="Write CSV continously?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "csv_output_file" => (
+        default="./output/out.csv",
+        description="File path to where CSV outputs are written",
+        display_name="CSV output file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "csv_time_unit" => (
+        default="seconds",
+        description="Time unit for the CSV output",
+        display_name="CSV time unit",
+        required=false,
+        options=["seconds", "minutes", "hours", "date"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "output_plot_file" => (
+        default="./output/output_plot.html",
+        description="File path to where the line plots are written",
+        display_name="Output plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "output_plot_time_unit" => (
+        default="date",
+        description="Time unit for the output plots",
+        display_name="Output plot time unit",
+        required=false,
+        options=["seconds", "minutes", "hours", "date"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "sankey_plot_file" => (
+        default="./output/output_sankey.html",
+        description="File path to where the sankey plot is written",
+        display_name="Sankey plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "show_detailed_errors" => (
+        default=false,
+        description="Toggle if some errors show a more detailed error message",
+        display_name="Show detailed errors?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "auxiliary_info" => (
+        default=false,
+        description="Toggle if auxiliary info should be written to file",
+        display_name="Write auxiliary info?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "auxiliary_info_file" => (
+        default="./output/auxiliary_info.md",
+        description="File path to where the auxiliary info is written",
+        display_name="Auxiliary info file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "auxiliary_plots" => (
+        default=false,
+        description="Toggle if auxiliary plots should be created",
+        display_name="Create auxiliary plots?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "auxiliary_plots_path" => (
+        default="./output/",
+        description="Directory to where the auxiliary plots are written",
+        display_name="Auxiliary plots path",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "auxiliary_plots_formats" => (
+        default=["png"],
+        description="Multiple selection of which file formats are used to create the " *
+                    "auxiliary plots. Allowed formats are: html, pdf, png, ps, svg",
+        display_name="Auxiliary plots formats",
+        required=false,
+        type=Vector{String},
+        json_type="list",
+        unit="-"
+    ),
+    "economy_plot_file_cashflows" => (
+        default="./output/economy_results_cashflows.html",
+        description="File path to where the economic cashflow plots are written",
+        display_name="Economy cashflows plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "economy_plot_file_present_values" => (
+        default="./output/economy_results_present_values.html",
+        description="File path to where the economic present value plots are written",
+        display_name="Economy present value plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "step_info_interval" => (
+        default=nothing,
+        description="Defines how often a progress report on the loop over the timesteps " *
+                    "of the simulation is logged to the info channel. This is useful to " *
+                    "get an estimation of how much longer the simulation requires " *
+                    "(albeit that such estimation is always inaccurate). If no value is " *
+                    "given, automatically sets a value such that 20 reports are printed " *
+                    "over the course of the simulation. To deactivate these reports, set " *
+                    "this to 0.",
+        display_name="Step info interval",
+        required=false,
+        validations=[("self", "value_gte_num", 0.0)],
+        type=Integer,
+        json_type="int",
+        unit="-"
+    ),
+    "sankey_plot" => (
+        default="default",
+        description="Sets the mode of the sankey plot output, switching between default " *
+                    "and custom behaviour as well an option of not creating a sankey " *
+                    "plot file.",
+        display_name="Sankey plot mode",
+        options=["default", "custom", "nothing"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "sankey_plot_spec" => (
+        default=nothing,
+        description="Specification for the sankey plot in custom mode. See documentation " *
+                    "for how this needs to be structured.",
+        display_name="Sankey plot specification",
+        required=false,
+        conditionals=[("sankey_plot", "is", "custom")],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+    "output_plot" => (
+        default="all_incl_flows",
+        description="Sets the mode of the output plot, switching between several default " *
+                    "and custom behaviour modes as well an option of not creating a plot " *
+                    "file at all.",
+        display_name="Output plot mode",
+        options=["custom", "all_excl_flows", "all_incl_flows", "nothing"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "output_plot_spec" => (
+        default=nothing,
+        description="Specification for the output plot in custom mode. See documentation " *
+                    "for how this needs to be structured.",
+        display_name="Output plot specification",
+        required=false,
+        conditionals=[("output_plot", "is", "custom")],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+    "csv_output" => (
+        default="nothing",
+        description="Sets the mode of the CSV output, switching between several default " *
+                    "and custom behaviour modes as well an option of not creating a " *
+                    "CSV file at all.",
+        display_name="CSV output mode",
+        options=["custom", "all_excl_flows", "all_incl_flows", "nothing"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "csv_output_keys" => (
+        default=nothing,
+        description="Specification for the CSV output in custom mode. See documentation " *
+                    "for how this needs to be structured.",
+        display_name="CSV output specification",
+        required=false,
+        conditionals=[("csv_output", "is", "custom")],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+)
+
+OUTPUT_SPECIFICATION_SETTINGS = [
+    ("output_plot", "output_plot_spec"),
+    ("sankey_plot", "sankey_plot_spec"),
+    ("csv_output", "csv_output_keys"),
+]
+#! format: on
+
 """
     read_JSON(filepath)
 
@@ -30,60 +286,58 @@ Constructs the dictionary of IO settings from the given config, considering defa
 -`Dict{String,Any}`: The IO settings dictionary
 """
 function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    io_settings = Dict{String,Any}(
-        "plot_weather_data" => default(project_config["io_settings"], "plot_weather_data", false),
-        "csv_output_weather" => default(project_config["io_settings"], "csv_output_weather", false),
-        "write_csv_continuously" => default(project_config["io_settings"], "write_csv_continuously", false),
-        "csv_output_file" => default(project_config["io_settings"], "csv_output_file", "./output/out.csv"),
-        "csv_time_unit" => default(project_config["io_settings"], "csv_time_unit", "seconds"),
-        "output_plot_file" => default(project_config["io_settings"], "output_plot_file", "./output/output_plot.html"),
-        "output_plot_time_unit" => default(project_config["io_settings"], "output_plot_time_unit", "date"),
-        "sankey_plot_file" => default(project_config["io_settings"], "sankey_plot_file", "./output/output_sankey.html"),
-        "auxiliary_plots" => default(project_config["io_settings"], "auxiliary_plots", false),
-        "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
-        "auxiliary_info" => default(project_config["io_settings"], "auxiliary_info", false),
-        "auxiliary_info_file" => default(project_config["io_settings"], "auxiliary_info_file",
-                                         "./output/auxiliary_info.md"),
-        "auxiliary_plots_path" => default(project_config["io_settings"], "auxiliary_plots_path", "./output/"),
-        "auxiliary_plots_formats" => default(project_config["io_settings"], "auxiliary_plots_formats", ["png"]),
-        "economy_plot_file_cashflows" => default(project_config["io_settings"], "economy_plot_file_cashflows",
-                                                 "./output/economy_results_cashflows.html"),
-        "economy_plot_file_present_values" => default(project_config["io_settings"], "economy_plot_file_present_values",
-                                                      "./output/economy_results_present_values.html"),
-    )
+    # convert config to what the function expects
+    # @TODO: find a better way to avoid copying, maybe consistent argument types
+    config = Dict{String,Any}(pairs(project_config["io_settings"]))
 
-    if !(io_settings["csv_time_unit"] in ["seconds", "minutes", "hours", "date"])
-        @error "The IO setting `csv_time_unit` has to be one of: seconds, minutes, hours, date"
-        throw(InputError())
+    # extract most parameter values using the extract function on the base type component
+    # (even though we are not checking components...)
+    io_settings = Dict{String,Any}()
+    for (name, param_def) in pairs(IO_SETTINGS_DEF)
+        if name in ["sankey_plot_spec", "output_plot_spec", "csv_output_keys"]
+            continue
+        end
+        io_settings[name] = EnergySystems.extract_parameter(EnergySystems.Component, config, name, param_def,
+                                                            Dict{String,Any}(), "IO settings")
     end
 
-    if !(io_settings["output_plot_time_unit"] in ["seconds", "minutes", "hours", "date"])
-        @info "The IO setting `output_plot_time_unit` has to be one of: seconds, minutes, " *
-              "hours, date. It will be set to date as default."
-        io_settings["output_plot_time_unit"] = "date"
+    # special parameters for output specifications
+    for (mode, spec) in OUTPUT_SPECIFICATION_SETTINGS
+        if io_settings[mode] == "custom"
+            if haskey(project_config["io_settings"], spec)
+                io_settings[spec] = Dict{String,Any}(pairs(project_config["io_settings"][spec]))
+            else
+                throw(InputError("IO setting $mode was set to custom, but no custom specification was provided"))
+            end
+        elseif mode == "sankey_plot" && io_settings[mode] == "default"
+            io_settings[spec] = Dict{String,Any}(
+                "m_h_w_lt1" => "red",
+                "m_h_w_lt2" => "red",
+                "m_h_w_ht1" => "darkred",
+                "m_e_ac_230v" => "darkgoldenrod1",
+                "m_c_g_natgas" => "purple3",
+                "m_c_g_h2" => "green3",
+                "m_c_g_o2" => "firebrick1",
+                "Losses" => "grey40",
+                "Gains" => "grey40",
+            )
+        end
     end
 
-    if haskey(project_config["io_settings"], "sankey_plot")
-        io_settings["sankey_plot"] = project_config["io_settings"]["sankey_plot"]
+    # special handling for some other parameters
+    if haskey(io_settings, "step_info_interval") && isnothing(io_settings["step_info_interval"])
+        delete!(io_settings, "step_info_interval")
     end
 
-    if haskey(project_config["io_settings"], "output_plot")
-        io_settings["output_plot"] = project_config["io_settings"]["output_plot"]
-    end
-
-    if haskey(project_config["io_settings"], "csv_output_keys")
-        io_settings["csv_output_keys"] = project_config["io_settings"]["csv_output_keys"]
-    end
-
-    if haskey(project_config["io_settings"], "step_info_interval")
-        io_settings["step_info_interval"] = project_config["io_settings"]["step_info_interval"]
-    end
-
-    if haskey(project_config["io_settings"], "base_path")
-        io_settings["base_path"] = abspath(project_config["io_settings"]["base_path"])
+    if haskey(io_settings, "base_path") && !isnothing(io_settings["base_path"])
+        io_settings["base_path"] = abspath(io_settings["base_path"])
     else
         io_settings["base_path"] = abspath(joinpath(dirname(@__FILE__), ".."))
     end
+
+    # again, we use the component validation function as it avoids duplicate code
+    EnergySystems.validate_config(EnergySystems.Component, io_settings, "IO settings",
+                                  Dict{String,Any}(), IO_SETTINGS_DEF)
 
     return io_settings
 end
