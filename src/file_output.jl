@@ -130,7 +130,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                                                            occursin("Demand", ok.value_key)
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
-    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output_keys")
+    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
     do_economy = economy_parameter["calculate_economy"]
     do_emissions = emissions_parameter["calculate_emissions"]
 
@@ -149,7 +149,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             output_keys_lineplot = all_output_keys_excl_flows
         else
             output_keys_lineplot = Vector{EnergySystems.OutputKey}()
-            for plot in io_settings["output_plot"]
+            for plot in io_settings["output_plot_spec"]
                 key = plot[2]["key"]
                 append!(output_keys_lineplot, output_keys(components, key))
             end
@@ -651,7 +651,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         unit = String[]
         scale_fact = Float64[]
         if plot_data
-            for plot in io_settings["output_plot"]
+            for plot in io_settings["output_plot_spec"]
                 if occursin("->", first(plot[2]["key"])[2][1])
                     # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
                     # temperature should be plotted
@@ -668,7 +668,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
                         push!(axis, "nothing")
                         push!(unit, "nothing")
                         push!(scale_fact, NaN)
-                        @info "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
+                        @info "For the generation of the output plot, the meta information for entry $(plot[1]) " *
                               "do not contain two values. Therefore, only energy values will be output. If you want " *
                               "to output also a corresponding temperature, provide two meta information: " *
                               "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
