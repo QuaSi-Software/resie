@@ -7,7 +7,7 @@
         "sankey_plot_file": "./test/scenarios/interconnected_STES/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot": "all_incl_flows",
         "output_plot_file": "./test/scenarios/interconnected_STES/output_plot.html"
     },

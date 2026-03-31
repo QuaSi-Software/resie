@@ -31,7 +31,8 @@
         },
         "output_plot_file": "./test/scenarios/2_sector/output_plot.html",
         "output_plot_time_unit": "date",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_01_HZG_01_BFT": ["Load"]},
                 "axis": "right",

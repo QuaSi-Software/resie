@@ -7,8 +7,9 @@
         "output_plot_file": "./test/scenarios/reorder_operations/output_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "nothing",
-        "output_plot": {
+        "csv_output": "nothing",
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"Grid_IN": ["m_power:OUT"]},
                 "axis": "left",

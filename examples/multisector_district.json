@@ -4,7 +4,8 @@
         "auxiliary_info": true,
         "auxiliary_plots": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
-        "sankey_plot": {
+        "sankey_plot": "custom",
+        "sankey_plot_spec": {
             "m_h_w_lt1": "lightblue",
             "m_h_w_ht1": "red",
             "m_e_ac_230v": "darkgoldenrod1",
@@ -14,6 +15,7 @@
             "Losses": "black",
             "Gains": "black"
         },
+        "csv_output": "custom",
         "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1:IN"],
             "TST_BFT_TH_01": ["Load"],
@@ -28,7 +30,8 @@
             "TST_BUS_TH_00": ["Balance"],
             "TST_PVP_EL_01": ["m_e_ac_230v:OUT"]
         },
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_DEM_TH_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",

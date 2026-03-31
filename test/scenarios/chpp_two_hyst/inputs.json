@@ -5,6 +5,7 @@
         "sankey_plot_file": "./test/scenarios/chpp_two_hyst/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_file": "./test/scenarios/chpp_two_hyst/out.csv",
+        "csv_output": "custom",
         "csv_output_keys": {
             "m_h_w_ht1":  ["TST_CHP_01->TST_DEM_01", "TST_CHP_01->TST_BT_01", "TST_CHP_01->TST_GRO_01"]
         },

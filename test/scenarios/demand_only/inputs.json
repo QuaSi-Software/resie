@@ -5,6 +5,7 @@
         "auxiliary_info_file": "./test/scenarios/demand_only/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/demand_only/sankey_plot.html",
         "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"]
         }

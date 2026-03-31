@@ -5,7 +5,7 @@
         "auxiliary_info_file": "./test/scenarios/transformer_chain/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/transformer_chain/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": {},
+        "csv_output": "nothing",
         "output_plot_file": "./test/scenarios/transformer_chain/output_plot.html",
         "output_plot": "all_incl_flows"
     },

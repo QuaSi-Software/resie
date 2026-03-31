@@ -5,13 +5,15 @@
         "auxiliary_info_file": "./test/scenarios/simple_geothermal_probe/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/simple_geothermal_probe/sankey_plot.html",
         "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_STH_01": ["m_h_w_ht1:OUT"],
             "TST_DEM_01": ["m_h_w_ht1:IN"],
             "TST_GTP_01": ["new_fluid_temperature","fluid_reynolds_number"]
         },
         "output_plot_file": "./test/scenarios/simple_geothermal_probe/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_DEM_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",

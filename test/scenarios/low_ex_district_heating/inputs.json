@@ -6,7 +6,7 @@
         "output_plot_file": "./test/scenarios/low_ex_district_heating/output_plot.html",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/low_ex_district_heating/auxiliary_info.md",
-        "csv_output_keys": "nothing"
+        "csv_output": "nothing"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",

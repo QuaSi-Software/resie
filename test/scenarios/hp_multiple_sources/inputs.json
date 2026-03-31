@@ -3,7 +3,8 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/hp_multiple_sources/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/hp_multiple_sources/sankey_plot.html",
-        "sankey_plot": {
+        "sankey_plot": "custom",
+        "sankey_plot_spec": {
             "m_h_w_lt1": "red",
             "m_h_w_ht1": "darkred",
             "m_e_ac_230v": "darkgoldenrod1",
@@ -11,9 +12,10 @@
             "Gains": "black"
         },
         "csv_output_file": "./test/scenarios/hp_multiple_sources/out.csv",
-        "csv_output_keys": "all_excl_flows",
+        "csv_output": "all_excl_flows",
         "output_plot_file": "./test/scenarios/hp_multiple_sources/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_SRC_01": ["m_h_w_lt1:OUT"]},
                 "axis": "left",

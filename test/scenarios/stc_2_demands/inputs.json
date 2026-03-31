@@ -5,9 +5,10 @@
         "auxiliary_info_file": "./test/scenarios/stc_2_demands/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/stc_2_demands/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "all_excl_flows",
+        "csv_output": "all_excl_flows",
         "output_plot_file": "./test/scenarios/stc_2_demands/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_DEM_01": ["Temperature"]},
                 "axis": "right",

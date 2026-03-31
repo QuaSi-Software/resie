@@ -5,7 +5,7 @@
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot_file": "./output/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot_file": "./output/output_plot.html",
         "output_plot": "all_incl_flows"
     },

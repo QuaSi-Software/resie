@@ -13,6 +13,7 @@
             "TST_01_HZG_01_GBO": ["m_h_w_ht1:OUT"],
             "TST_01_HZG_01_STS": ["m_h_w_ht1:IN", "Load"]
         },
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1:OUT"],
@@ -22,7 +23,8 @@
             "TST_01_HZG_01_STS": ["m_h_w_ht1:IN", "Load"]
         },
         "output_plot_file": "./test/scenarios/electrolyser_single_bus/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"]},
                 "axis": "left",

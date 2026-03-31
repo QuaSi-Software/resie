@@ -11,6 +11,7 @@
             "TST_01_HZG_02_HTP": ["m_h_w_ht1:OUT"],
 			"TST_01_ELT_01_ELY": ["m_e_ac_230v:IN"]
         },
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1:OUT"],
