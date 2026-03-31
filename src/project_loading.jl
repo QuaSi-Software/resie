@@ -256,6 +256,156 @@ const IO_SETTINGS_DEF = Dict(
     ),
 )
 
+const SIMULATION_PARAMETERS_DEF = Dict(
+    "start" => (
+        description="Date and time of the beginning of the simulation (inclusive)",
+        display_name="Start date",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "end" => (
+        description="Date and time of the end of the simulation (inclusive). Will be " *
+                    "rounded down to the nearest multiple of the time step.",
+        display_name="End date",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "start_end_unit" => (
+        description="Datetime format specifier for parameters `start`, `start_output` and `end`",
+        display_name="Start/end format",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "time_step" => (
+        default=900,
+        description="Time step for the simulation. The parameter `time_step_unit` " *
+                    "determines what the value in `time_step` means.",
+        display_name="Time step",
+        required=false,
+        validations=[("self", "value_gte_num", 1)],
+        type=Integer,
+        json_type="number",
+        unit="-"
+    ),
+    "time_step_unit" => (
+        default="seconds",
+        description="Unit for the value given in parameter `time_step`.",
+        display_name="Time step unit",
+        options=["seconds", "minutes", "hours"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "weather_file_path" => (
+        default=nothing,
+        description="File path to the project-wide weather file. Can either be an " *
+                    "EnergyPlus Weather File (EPW, time step has to be one hour, without " *
+                    "leap day or DST) or a .dat file from the DWD (see " *
+                    "https://kunden.dwd.de/obt/, free registration is required). See the " *
+                    "component parameters on how to link weather file data to a component.",
+        display_name="Weather file path",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "weather_interpolation_type_general" => (
+        default="linear_classic",
+        description="Interpolation type for weather data from weather file, except for " *
+                    "solar radiation data",
+        display_name="Weather interpol. general",
+        options=["stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"],
+        required=false,
+        conditionals=[("weather_file_path", "is_not_nothing")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "weather_interpolation_type_solar" => (
+        default="linear_solar_radiation",
+        description="Interpolation method for solar radiation data from weather file",
+        display_name="Weather interpol. solar",
+        options=["stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"],
+        required=false,
+        conditionals=[("weather_file_path", "is_not_nothing")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "latitude" => (
+        default=nothing,
+        description="The latitude of the location in WGS84. If given, it overwrites the " *
+                    "coordinates read out of the weather file!",
+        display_name="Latitude",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", -90.0),
+            ("self", "value_lte_num", 90.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°"
+    ),
+    "longitude" => (
+        default=nothing,
+        description="The longitude of the location in WGS84. If given, it overwrites the " *
+                    "coordinates read out of the weather file!",
+        display_name="Latitude",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", -180.0),
+            ("self", "value_lte_num", 180.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°"
+    ),
+    "time_zone" => (
+        default=nothing,
+        description="The time zone offset used in the current simulation in relation to " *
+                    "UTC. If given, it overwrites the coordinates read out of the " *
+                    "weather file! DWD-dat files are assumed to be in GMT+1.",
+        display_name="Time zone offset",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="h"
+    ),
+    "epsilon" => (
+        default=1e-9,
+        description="The absolute tolerance for many floating-point comparisons in the " *
+                    "simulation. Two values whose difference falls below this threshold " *
+                    "are treated as equal.",
+        display_name="Epsilon",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 1e-4)
+        ],
+        type=Float64,
+        json_type="number",
+        unit=""
+    ),
+    "force_profiles_to_repeat" => (
+        default=false,
+        description="If set to true, all utilized profiles are allowed to be repeated, " *
+                    "even if denied or not specified in the profile header! Attention: " *
+                    "This parameter disables the profile parameter in the profile header!",
+        display_name="Force profiles to repeat?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+)
+
 OUTPUT_SPECIFICATION_SETTINGS = [
     ("output_plot", "output_plot_spec"),
     ("sankey_plot", "sankey_plot_spec"),
