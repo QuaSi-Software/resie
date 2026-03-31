@@ -311,8 +311,8 @@ function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict
             end
         elseif mode == "sankey_plot" && io_settings[mode] == "default"
             io_settings[spec] = Dict{String,Any}(
-                "m_h_w_lt1" => "red",
-                "m_h_w_lt2" => "red",
+                "m_h_w_lt1" => "steelblue1",
+                "m_h_w_lt2" => "steelblue1",
                 "m_h_w_ht1" => "darkred",
                 "m_e_ac_230v" => "darkgoldenrod1",
                 "m_c_g_natgas" => "purple3",

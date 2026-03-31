@@ -900,21 +900,24 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         # assign colors to the missing media
         color_map = Dict{String,Any}()
         for label in unique_medium_labels
-            color_entry = [0, 0, 0]
+            color = RGB(0, 0, 0)
             try
                 if haskey(io_settings["sankey_plot_spec"], label)
                     color_entry = Colors.color_names[io_settings["sankey_plot_spec"][label]]
+                    color = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
                 else
-                    # use deterministic random color based on label hash
+                    # use deterministic random color based on label hash. colors are drawn
+                    # from the roma color scheme
                     rng = Random.MersenneTwister(hash(label))
-                    color_entry = rand(rng, values(Colors.color_names))
+                    color = get(ColorSchemes.roma, rand(rng))
                 end
             catch
-                @error "The given color '$color_entry' of medium '$label' for the sankey " *
-                       "plot is not one of the available colors in `Colors.color_names`"
+                @error "The given color '$(io_settings["sankey_plot_spec"][label])' of " *
+                       "medium '$label' for the sankey plot is not one of the available " *
+                       "colors in `Colors.color_names`"
                 throw(InputError())
             end
-            color_map[label] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
+            color_map[label] = color
         end
 
         for medium in unique_medium_labels
