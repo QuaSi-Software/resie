@@ -28,14 +28,18 @@ const PV_PLANT_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection", 
+const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fixed", 
     Dict{String,Any}(
         "energy_price_profile_file_path" => nothing,
         "energy_price_profile_scale" => 1.0,
         "constant_energy_price" => nothing,
         "energy_price_change_rate_per_year" =>  0.0,
         "base_cost_per_year" => 0.0,
-        "base_cost_change_rate_per_year" => 0.0
+        "base_cost_change_rate_per_year" => 0.0,
+        "unmet_energy_price_profile_file_path" => nothing,
+        "unmet_energy_price_profile_scale" => 1.0,
+        "constant_unmet_energy_price" => 0.0,
+        "unmet_energy_price_change_rate_per_year" =>  0.00,
     ),
     Dict{String,Any}(),
 )
@@ -94,12 +98,6 @@ end
 
 function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
                            sim_params::Dict{String,Any}, uac::String)
-    if param_name == "energy_price_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    elseif param_name == "energy_emissions_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    end
-
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 

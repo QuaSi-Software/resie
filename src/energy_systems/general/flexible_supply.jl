@@ -165,12 +165,6 @@ function extract_parameter(x::Type{FlexibleSupply}, config::Dict{String,Any}, pa
         return convert(Temperature, default(config, param_name, nothing))
     end
 
-    if param_name == "energy_price_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    elseif param_name == "energy_emissions_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    end
-
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 

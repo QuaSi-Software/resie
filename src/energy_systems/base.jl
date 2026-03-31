@@ -1644,6 +1644,12 @@ Handles special processing like function parsing where needed.
 """
 function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name in ["energy_price_profile_file_path",
+                      "unmet_energy_price_profile_file_path",
+                      "energy_emissions_profile_file_path"]
+        return load_optional_profile(config, param_name, sim_params)
+    end
+
     if isdefined(param_def, :default)
         value = default(config, param_name, param_def.default)
     elseif param_name in keys(config)
@@ -2313,8 +2319,8 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="€"
             )
         )
-    elseif type in ["connection"]
-        return Dict{String,NamedTuple}(
+    elseif type in ["connection", "connection_fixed"]
+        connection_general_parameter = Dict{String,NamedTuple}(
             "energy_price_profile_file_path" => (
                 default=defaults["energy_price_profile_file_path"],
                 description="Path to an energy price profile file",
@@ -2373,8 +2379,57 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 json_type="number",
                 unit="1/year"
             ),
-
         )
+
+        if type == "connection"
+            return connection_general_parameter
+        elseif type ==  "connection_fixed"
+            # additional economic parameter for pricing of unmet energies
+            fixed_connection_parameter = Dict{String,NamedTuple}(
+                "unmet_energy_price_profile_file_path" => (
+                    default=defaults["unmet_energy_price_profile_file_path"],
+                    description="Path to an price profile file for unmet energies",
+                    display_name="Unmet energy price profile file",
+                    required=false,
+                    conditionals=[("constant_unmet_energy_price", "mutex")],
+                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                    type=String,
+                    json_type="string",
+                    unit="€/Wh"
+                ),
+                "unmet_energy_price_profile_scale" => (
+                    default=defaults["unmet_energy_price_profile_scale"],
+                    description="Scale factor for unmet energy price profile",
+                    display_name="Scale factor unmet energy price profile",
+                    required=false,
+                    type=Float64,
+                    json_type="number",
+                    unit="-"
+                ),
+                "constant_unmet_energy_price" => (
+                    default=defaults["constant_unmet_energy_price"],
+                    description="Constant unmet energy price",
+                    display_name="Constant unmet energy price",
+                    required=false,
+                    conditionals=[("unmet_energy_price_profile_file_path", "mutex")],
+                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                    type=Float64,
+                    json_type="number",
+                    unit="€/Wh"
+                ),
+                "unmet_energy_price_change_rate_per_year" => (
+                    default=defaults["unmet_energy_price_change_rate_per_year"],
+                    description="Yearly change rate of the unmet energy price",
+                    display_name="unmet energy price change rate per year",
+                    required=false,
+                    type=Float64,
+                    json_type="number",
+                    unit="1/year"
+                ),
+            )
+
+            return Base.merge(connection_general_parameter, fixed_connection_parameter)
+        end
     else
         @error "Unknown type in function get_economic_defaults."
     end

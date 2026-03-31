@@ -36,7 +36,7 @@ function prepare_economic_emissions_data(components::Grouping,
                       value_key::String)
         for (idx, key) in pairs(output_keys)
             if component == key.unit && value_key == key.value_key
-                return idx
+                return idx + 1
             end
         end
         @error "The output key `$value_key` could not be retrieved from component `$(component.uac)` but is " *
@@ -123,9 +123,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                 energy_unmet = energy_demand .- energy # unmet demand of sink
                 type = :sink
             end
-
-            # Note: (unmet) energies from sources are negative, (unmet) energies into sinks are positive at this point
-            # TODO Unmet energies not considered yet!
+            # Note: Both (unmet) energies from sources AND (unmet) energies into sinks are positive at this point
 
             # calculate annuity for energies (demand-related costs)
             result.annuity_energies, result.breakdown = calculate_annuity_of_energies(energy,
@@ -134,6 +132,14 @@ function calculate_economy(shared_data::Vector{EconomyEmissionData}, sim_params:
                                                                                       result.annuity_energies,
                                                                                       result.breakdown,
                                                                                       type)
+
+            # calculate annuity for unmet energies
+            result.annuity_energies, result.breakdown = calculate_annuity_of_unmet_energies(energy_unmet,
+                                                                                            component,
+                                                                                            sim_params,
+                                                                                            result.annuity_energies,
+                                                                                            result.breakdown,
+                                                                                            type)
 
         else
             # start and end energy of storage?! TODO
@@ -223,7 +229,7 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     for y in 1:observation_period
         energy_base_costs_per_year[y] = base_cost_per_year * r_base_costs^(y - 1)
         energy_costs_per_year[y] = sum(energy_costs_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
-                                       init=1.0) * r_energy_costs^(y - 1)
+                                       init=0.0) * r_energy_costs^(y - 1)
     end
 
     if type == :source
@@ -247,6 +253,63 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
                       Dict("annuity_energies" => annuity_energies,
                            energy_name => energy_costs_per_year_result,
                            base_name => energy_base_costs_per_year_result))
+
+    return annuity_energies, breakdown
+end
+
+function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing,Vector{Float64}},
+                                             component::EnergySystems.Component,
+                                             sim_params::Dict{String,Any}, annuity_energies::Float64,
+                                             breakdown::Dict{String,Any}, type::Symbol)
+    if unmet_energy_profile === nothing
+        return annuity_energies, breakdown
+    end
+
+    unmet_energy_price_change_rate_per_year = component.economic_parameter["unmet_energy_price_change_rate_per_year"]
+    observation_period = Int(sim_params["economic_parameter"]["observation_period_in_years"])
+
+    if isnothing(component.economic_parameter["constant_unmet_energy_price"])
+        # get price profile from component (one of them is given)
+        step = Millisecond(round(Int, sim_params["time_step_seconds"] * 1000))
+        times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
+        times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
+        price_profile_unmet_energy = component.economic_parameter["unmet_energy_price_profile_scale"] .*
+                                     [component.economic_parameter["unmet_energy_price_profile"].data[t] for t in times]
+    else
+        # create profile from constant energy price
+        price_profile_unmet_energy = fill(component.economic_parameter["constant_unmet_energy_price"],
+                                          sim_params["number_of_time_steps_output"])
+    end
+    price_profile_unmet_energy = extend_profile(price_profile_unmet_energy, observation_period, sim_params)
+
+    # factors
+    r_unmet_energy_costs = 1.0 + unmet_energy_price_change_rate_per_year  # price change factor of unmet energy costs/revenues
+
+    # calculate yearly costs / revenues of unmet energies
+    unmet_energy_costs_per_year = zeros(Float64, observation_period)
+    unmet_energy_costs_per_timestep = unmet_energy_profile .* price_profile_unmet_energy
+    timesteps_per_year = Int(floor(length(unmet_energy_costs_per_timestep) / observation_period))
+    for y in 1:observation_period
+        unmet_energy_costs_per_year[y] = sum(unmet_energy_costs_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
+                                             init=0.0) * r_unmet_energy_costs^(y - 1)
+    end
+
+    if type == :source
+        # fixed source: costs for unmet energies from sink will be negative (= revenues)
+        unmet_energy_costs_per_year_result = .-unmet_energy_costs_per_year
+        energy_name = "unmet_energy_revenues_per_year"
+    elseif type == :sink
+        # fixed sink: unmet energies from demands will be also positive (= costs)
+        unmet_energy_costs_per_year_result = unmet_energy_costs_per_year
+        energy_name = "unmet_energy_costs_per_year"
+    end
+
+    # calculate annuity
+    annuity_energies += get_annuity(unmet_energy_costs_per_year_result, sim_params)
+
+    add_to_breakdown!(breakdown, component.uac,
+                      Dict("annuity_energies" => annuity_energies,
+                           energy_name => unmet_energy_costs_per_year_result))
 
     return annuity_energies, breakdown
 end
@@ -301,12 +364,12 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_capex" => annuity_capex,
                            "annuity_opex" => annuity_opex,
-                           "investments_cost_per_year" => investments_per_year,
+                           "investments_costs_per_year" => investments_per_year,
                            "residual_revenues_per_year" => .-residuals_per_year,
                            "subsidy_revenues_per_year" => .-subsidies_per_year,
-                           "maintenance_cost_per_year" => maintenance_per_year,
-                           "repairs_cost_per_year" => repair_per_year,
-                           "labour_cost_per_year" => labour_per_year
+                           "maintenance_costs_per_year" => maintenance_per_year,
+                           "repairs_costs_per_year" => repair_per_year,
+                           "labour_costs_per_year" => labour_per_year
                            ))
 
     return annuity_capex, annuity_opex, breakdown
