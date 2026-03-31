@@ -1,5 +1,6 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
+using Random
 
 """
     get_output_keys(io_settings, components)
@@ -893,34 +894,38 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
 
-    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], AbstractDict{})
-        if length(unique_medium_labels) > 1
-            colors = get(ColorSchemes.roma,
-                         (0:(length(unique_medium_labels) - 1)) ./ (length(unique_medium_labels) - 1))
-            color_map = Dict(zip(unique_medium_labels, colors))
-        else
-            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
-        end
-    else
-        color_map = Dict{String,Any}(io_settings["sankey_plot"])
-        for (medium, color) in color_map
+    if io_settings["sankey_plot"] == "default" || io_settings["sankey_plot"] == "custom"
+        # in both cases of "default" or "custom", the setting sankey_plot_spec already
+        # contains a color map definition, but it may not cover all media, thus we randomly
+        # assign colors to the missing media
+        color_map = Dict{String,Any}()
+        for label in unique_medium_labels
+            color_entry = [0, 0, 0]
             try
-                color_entry = Colors.color_names[color]
-                color_map[medium] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
-            catch e
-                @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
-                       "The following error occurred: $e\n" *
-                       "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                if haskey(io_settings["sankey_plot_spec"], label)
+                    color_entry = Colors.color_names[io_settings["sankey_plot_spec"][label]]
+                else
+                    # use deterministic random color based on label hash
+                    rng = Random.MersenneTwister(hash(label))
+                    color_entry = rand(rng, values(Colors.color_names))
+                end
+            catch
+                @error "The given color '$color_entry' of medium '$label' for the sankey " *
+                       "plot is not one of the available colors in `Colors.color_names`"
                 throw(InputError())
             end
+            color_map[label] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
         end
+
         for medium in unique_medium_labels
             if medium in keys(color_map)
                 continue
             elseif medium == "hide_medium"
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
-                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                @error "The color for the medium '$medium' for the sankey could not be " *
+                       "found in the input file. Please add the medium and its color in " *
+                       "IO setting 'sankey_plot_spec'."
                 throw(InputError())
             end
         end
