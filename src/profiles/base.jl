@@ -882,7 +882,7 @@ function convert_profile(values::Vector{Float64},
                         sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
                                                                       sim_params["latitude"],
                                                                       sim_params["longitude"],
-                                                                      sim_params["timezone"])
+                                                                      sim_params["time_zone"])
                     end
                 end
                 sunrise = Profile("sunrise_times",
@@ -1144,7 +1144,7 @@ function segment_profile(begin_dt::DateTime,
             sunrise, sunset = get_sunrise_sunset(current_hour_dt,
                                                  sim_params["latitude"],
                                                  sim_params["longitude"],
-                                                 sim_params["timezone"])
+                                                 sim_params["time_zone"])
         end
 
         # Retrieve current and next hourly integrated irradiation.
