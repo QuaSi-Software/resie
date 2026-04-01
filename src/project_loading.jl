@@ -346,8 +346,8 @@ const SIMULATION_PARAMETERS_DEF = Dict(
         display_name="Latitude",
         required=false,
         validations=[
-            ("self", "value_gte_num", -90.0),
-            ("self", "value_lte_num", 90.0)
+            ("self", "value_gte_num_or_nothing", -90.0),
+            ("self", "value_lte_num_or_nothing", 90.0)
         ],
         type=Float64,
         json_type="number",
@@ -360,8 +360,8 @@ const SIMULATION_PARAMETERS_DEF = Dict(
         display_name="Latitude",
         required=false,
         validations=[
-            ("self", "value_gte_num", -180.0),
-            ("self", "value_lte_num", 180.0)
+            ("self", "value_gte_num_or_nothing", -180.0),
+            ("self", "value_lte_num_or_nothing", 180.0)
         ],
         type=Float64,
         json_type="number",
