@@ -297,11 +297,11 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     end
 
     if type == :source
-        # fixed source: costs for unmet energies from sink will be negative (= revenues)
-        unmet_energy_costs_per_year_result = .-unmet_energy_costs_per_year
+        # fixed source: unmet energies from sink are defined as costs, so they are positive
+        unmet_energy_costs_per_year_result = unmet_energy_costs_per_year
         energy_name = "unmet_energy_revenues_per_year"
     elseif type == :sink
-        # fixed sink: unmet energies from demands will be also positive (= costs)
+        # fixed sink: unmet energies from demands are also costs and therefore positive
         unmet_energy_costs_per_year_result = unmet_energy_costs_per_year
         energy_name = "unmet_energy_costs_per_year"
     end
