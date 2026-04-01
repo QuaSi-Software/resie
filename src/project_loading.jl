@@ -505,6 +505,7 @@ Constructs the dictionary of simulation parameters.
 """
 function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
                                io_settings::Dict{String,Any})::Dict{String,Any}
+    # load time and step info directly, bypassing extraction and validation
     time_step,
     start_date,
     start_date_output,
@@ -512,25 +513,41 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
     nr_of_steps,
     nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
 
-    sim_params = Dict{String,Any}(
-        "time" => 0,
-        "time_since_output" => 0,
-        "current_date" => start_date,
-        "time_step_seconds" => time_step,
-        "number_of_time_steps" => nr_of_steps,
-        "number_of_time_steps_output" => nr_of_steps_output,
-        "start_date" => start_date,
-        "start_date_output" => start_date_output,
-        "end_date" => end_date,
-        "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
-        "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
-        "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
-        "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
-        "step_info_interval" => default(io_settings, "step_info_interval", Integer(floor(nr_of_steps / 20))),
-        "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
-                                              false),
-        "show_detailed_errors" => io_settings["show_detailed_errors"],
-    )
+    # convert config to what the function extract_parameter expects
+    # @TODO: find a better way to avoid copying, maybe consistent argument types
+    config = Dict{String,Any}(pairs(project_config["simulation_parameters"]))
+
+    # extract most parameter values using the extract function on the base type component
+    # (even though we are not checking components...)
+    sim_params = Dict{String,Any}()
+    for (name, param_def) in pairs(SIMULATION_PARAMETERS_DEF)
+        if name in ["start", "start_output", "end", "start_end_unit", "time_step", "time_step_unit"]
+            continue
+        end
+        sim_params[name] = EnergySystems.extract_parameter(EnergySystems.Component, config, name, param_def,
+                                                           Dict{String,Any}(), "Sim params")
+    end
+
+    # again, we use the component validation function as it avoids duplicate code
+    EnergySystems.validate_config(EnergySystems.Component, sim_params, "Sim params",
+                                  Dict{String,Any}(), SIMULATION_PARAMETERS_DEF)
+
+    sim_params = merge(sim_params,
+                       Dict{String,Any}(
+                           "time" => 0,
+                           "time_since_output" => 0,
+                           "current_date" => start_date,
+                           "time_step_seconds" => time_step,
+                           "number_of_time_steps" => nr_of_steps,
+                           "number_of_time_steps_output" => nr_of_steps_output,
+                           "start_date" => start_date,
+                           "start_date_output" => start_date_output,
+                           "end_date" => end_date,
+                           "step_info_interval" => default(io_settings, "step_info_interval",
+                                                           Integer(floor(nr_of_steps / 20))),
+                           "show_detailed_errors" => io_settings["show_detailed_errors"],
+                       ))
+
     sim_params["economy_parameter"] = get_economy_parameter(project_config)
     sim_params["emissions_parameter"] = get_emission_parameter(project_config)
 
@@ -548,22 +565,16 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
         return isabspath(path) ? path : abspath(joinpath(io_settings["base_path"], path))
     end
 
-    # load weather profiles accesible for all components
-    weather_file_path = default(project_config["simulation_parameters"],
-                                "weather_file_path",
-                                nothing)
-
+    # load weather profiles accessible for all components
+    weather_file_path = sim_params["weather_file_path"]
     if weather_file_path !== nothing
-        weather_interpolation_type_solar = default(project_config["simulation_parameters"],
-                                                   "weather_interpolation_type_solar", "linear_solar_radiation")
-        weather_interpolation_type_general = default(project_config["simulation_parameters"],
-                                                     "weather_interpolation_type_general", "linear_classic")
-        # WeatherData() writes the lat and long to sim_params if they are not given in the input file
+        # WeatherData() writes the latitude and longitude to sim_params if either of them is
+        # nothing at this point
         sim_params["weather_data"] = WeatherData(sim_params["run_path"](weather_file_path),
                                                  sim_params,
                                                  guess_file_format(sim_params["run_path"](weather_file_path)),
-                                                 weather_interpolation_type_solar,
-                                                 weather_interpolation_type_general)
+                                                 sim_params["weather_interpolation_type_solar"],
+                                                 sim_params["weather_interpolation_type_general"])
     end
 
     return sim_params
@@ -795,8 +806,10 @@ function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
                                     for i in 1:length(bus.output_interfaces)])
 
     # Input side: include is_secondary_interface in the key
-    component_key(uac::AbstractString, is_secondary_interface::Bool) = is_secondary_interface ?
-                                                                       string(uac, "#secondary") : uac
+    function component_key(uac::AbstractString, is_secondary_interface::Bool)
+        is_secondary_interface ?
+        string(uac, "#secondary") : uac
+    end
     input_perm_indices = sortperm([input_order_dict[component_key(bus.input_interfaces[i].source.uac,
                                                                   bus.input_interfaces[i].is_secondary_interface)]
                                    for i in eachindex(bus.input_interfaces)])
