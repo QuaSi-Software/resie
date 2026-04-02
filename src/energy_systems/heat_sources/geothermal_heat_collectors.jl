@@ -664,6 +664,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_par
     Dict{String,Any}(
         "lifetime_years" => 30,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/m"
@@ -1824,7 +1825,7 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     handle_component_update!(unit, "load", sim_params)
 end
 
-function get_capex_reference(unit::GeothermalHeatCollector)
+function get_reference_for_capex_and_embodied_emissions(unit::GeothermalHeatCollector)
     return unit.pipe_length * unit.number_of_pipes # [m]
 end
 

@@ -24,7 +24,8 @@ export check_balances_of_components, check_balances_of_interfaces, Component, ea
        link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
        calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
-       create_secondary_name, get_capex_reference, get_additional_opex_from_component, handle_profiles
+       create_secondary_name, get_reference_for_capex_and_embodied_emissions, get_additional_opex_from_component,
+       handle_profiles
 
 using ..Profiles
 using UUIDs
@@ -1598,13 +1599,15 @@ function emission_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
 end
 
 """
-    get_capex_reference(unit)
+    get_reference_for_capex_and_embodied_emissions(unit)
 
-Returns the reference value to calculate the capes from the specific capex for each component. 
-E.g. a heat pump returns its thermal design power that is reference for the specific capex.
+Returns the reference value to calculate the capex from the specific capex and
+to calculate the embodied emissions from the specific embodied emissions for each component.
+E.g. a heat pump returns its thermal design power that is reference for the specific capex and 
+embodied emissions.
 """
-function get_capex_reference(unit::Component)
-    @error "No function `get_capex_reference` specified for component $(typeof(unit))."
+function get_reference_for_capex_and_embodied_emissions(unit::Component)
+    @error "No function `get_reference_for_capex_and_embodied_emissions` specified for component $(typeof(unit))."
     throw(MethodError)
     # base implementation should not be called as the function has to be specified in every component.
 end
@@ -2472,6 +2475,15 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 type=Float64,
                 json_type="number",
                 unit=units["embodied_emissions_specific"]
+            ),
+            "embodied_emissions_change_rate_per_year" => (
+                default=defaults["embodied_emissions_change_rate_per_year"],
+                description="Yearly change rate of embodied emissions)",
+                display_name="Embodied emissions change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
             ),
         )
     elseif type in ["connection"]

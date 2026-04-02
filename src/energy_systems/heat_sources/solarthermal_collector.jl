@@ -466,6 +466,7 @@ const SOLARTHERMAL_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_params
     Dict{String,Any}(
         "lifetime_years" => 18,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/m^2"
@@ -1317,7 +1318,7 @@ function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::Solarther
     spec_flow_rate * 2 * unit.vol_heat_cap * independent_target_temp
 end
 
-function get_capex_reference(unit::SolarthermalCollector)
+function get_reference_for_capex_and_embodied_emissions(unit::SolarthermalCollector)
     return unit.collector_gross_area # [m^2]
 end
 

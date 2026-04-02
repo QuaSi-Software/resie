@@ -108,6 +108,7 @@ const UTIR_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 10,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/W"
@@ -284,7 +285,7 @@ function component_has_minimum_part_load(unit::UTIR)
     return unit.min_power_fraction > 0.0
 end
 
-function get_capex_reference(unit::UTIR)
+function get_reference_for_capex_and_embodied_emissions(unit::UTIR)
     return unit.power # [W]
 end
 

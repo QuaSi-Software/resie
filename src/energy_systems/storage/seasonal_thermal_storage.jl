@@ -565,7 +565,8 @@ const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_param
 const SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 20,
-        "embodied_emissions_specific" => 0.0
+        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/m^3"
@@ -2466,7 +2467,7 @@ function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real
     return (1 - β) * Tr1 + β * Tr2
 end
 
-function get_capex_reference(unit::SeasonalThermalStorage)
+function get_reference_for_capex_and_embodied_emissions(unit::SeasonalThermalStorage)
     return unit.volume # [m^3]
 end
 

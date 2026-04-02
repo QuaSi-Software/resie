@@ -298,29 +298,6 @@ Return:
 function get_economic_parameter(project_config::AbstractDict{AbstractString,Any},
                                 sim_params::Dict{String,Any})::Dict{String,Any}
     if haskey(project_config, "economic_parameter")
-
-        # detect repeat_method to extend the simulation results to the observation_period_in_years
-        repeat_method = default(project_config["economic_parameter"], "repeat_method", "last_year")
-        if repeat_method == "all"
-            # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
-            # observation_period_in_years is reached.
-            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
-                            Millisecond(Second(sim_params["time_step_seconds"]))
-        elseif repeat_method == "last_year"
-            repeat_period = Day(365)
-        elseif repeat_method == "last_month"
-            repeat_period = Day(30)
-        elseif repeat_method == "last_week"
-            repeat_period = Day(7)
-        end
-        if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
-           Second(sim_params["time_step_seconds"]) < repeat_period
-            @warn "In economic calculation, the repeat_method was set to 'all' as the given period is longer " *
-                  "than the simulation period."
-            repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
-                            Millisecond(Second(sim_params["time_step_seconds"]))
-        end
-
         return Dict{String,Any}(
             "calculate_economy" => default(project_config["economic_parameter"], "calculate_economy", false),
             "observation_period_in_years" => default(project_config["economic_parameter"],
@@ -330,13 +307,37 @@ function get_economic_parameter(project_config::AbstractDict{AbstractString,Any}
             "labour_costs_per_hour" => default(project_config["economic_parameter"], "labour_costs_per_hour", 100.0),
             "labour_costs_price_change_rate_per_year" => default(project_config["economic_parameter"],
                                                                  "labour_costs_price_change_rate_per_year", 0.035),
-            "repeat_period" => repeat_period,
+            "repeat_period" => get_repeat_period(default(project_config["economic_parameter"], "repeat_method",
+                                                         "last_year"), sim_params, "economic"),
         )
     else
         return Dict{String,Any}(
             "calculate_economy" => false,
         )
     end
+end
+
+function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
+    if repeat_method == "all"
+        # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
+        # observation_period_in_years is reached.
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+    elseif repeat_method == "last_year"
+        repeat_period = Day(365)
+    elseif repeat_method == "last_month"
+        repeat_period = Day(30)
+    elseif repeat_method == "last_week"
+        repeat_period = Day(7)
+    end
+    if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+       Second(sim_params["time_step_seconds"]) < repeat_period
+        @warn "In $type calculation, the repeat_method was set to 'all' as the given period is longer " *
+              "than the simulation period."
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+    end
+    return repeat_period
 end
 
 """
@@ -349,7 +350,8 @@ Args:
 Return:
 -`Dict{String,Any}`: The emission parameters from the input file. If non are given, calculate_emissions will be set to false.
 """
-function get_emission_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+function get_emission_parameter(project_config::AbstractDict{AbstractString,Any},
+                                sim_params::Dict{String,Any})::Dict{String,Any}
     if haskey(project_config, "emissions_parameter")
         return Dict{String,Any}(
             "calculate_emissions" => default(project_config["emissions_parameter"], "calculate_emissions", false),
@@ -357,7 +359,8 @@ function get_emission_parameter(project_config::AbstractDict{AbstractString,Any}
                                                      "observation_period_in_years", 20.0),
             "include_embodied_emissions" => default(project_config["emissions_parameter"], "include_embodied_emissions",
                                                     true),
-        )
+            "repeat_period" => get_repeat_period(default(project_config["emissions_parameter"], "repeat_method",
+                                                         "last_year"), sim_params, "emissions"))
     else
         return Dict{String,Any}(
             "calculate_emissions" => false,

@@ -131,7 +131,7 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
     )
     sim_params["economic_parameter"] = get_economic_parameter(project_config, sim_params)
-    sim_params["emissions_parameter"] = get_emission_parameter(project_config)
+    sim_params["emissions_parameter"] = get_emission_parameter(project_config, sim_params)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.
@@ -453,13 +453,13 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     # output economic results
     if do_calculate_economy
         # plot figure with yearly cashflow
-        filepath = default(project_config["io_settings"], "economic_plot_file_cashflows",
+        filepath = default(project_config["io_settings"], "economic_plot_file_path_cashflows",
                            "./output/economic_results_cashflows.html")
         success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
 
         # plot figure with yearly present values
-        filepath = default(project_config["io_settings"], "economic_plot_file_present_values",
+        filepath = default(project_config["io_settings"], "economic_plot_file_path_present_values",
                            "./output/economic_results_present_values.html")
         success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
@@ -469,6 +469,21 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                            "./output/economic_results.csv")
         success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
         success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
+    end
+
+    # output emission results
+    if do_calculate_emissions
+        # plot figure with yearly emissions
+        filepath = default(project_config["io_settings"], "emissions_plot_file_path",
+                           "./output/emissions_result.html")
+        success = plot_emissions_results(emissions_result, filepath, sim_params)
+        success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
+
+        # export emission results to CSV
+        filepath = default(project_config["io_settings"], "emissions_CSV_file_path",
+                           "./output/emission_results.csv")
+        success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+        success && @info "Emission results exported to $(sim_params["run_path"](filepath))"
     end
 end
 

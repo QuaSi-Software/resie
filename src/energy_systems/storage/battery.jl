@@ -374,6 +374,7 @@ const BATTERY_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 12,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/Wh"
@@ -1334,7 +1335,7 @@ function f_V_cell(extracted_charge::Number, current::Number, unit::Battery, n::N
     return V_cell
 end
 
-function get_capex_reference(unit::Battery)
+function get_reference_for_capex_and_embodied_emissions(unit::Battery)
     return unit.capacity # [Wh]
 end
 

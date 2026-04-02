@@ -314,6 +314,7 @@ const ELECTROLYSER_EMISSION_PARAMETERS = get_emissions_standard_params("transfor
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/W"
@@ -819,7 +820,7 @@ function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict
     return ["water_costs_per_year", "oxygen_revenue_per_year"], [.-yearly_water_costs, yearly_oxygen_revenue]
 end
 
-function get_capex_reference(unit::Electrolyser)
+function get_reference_for_capex_and_embodied_emissions(unit::Electrolyser)
     return unit.power_rated_el # [W]
 end
 
