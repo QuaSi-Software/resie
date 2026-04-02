@@ -97,6 +97,46 @@ function compare_files(file_1, file_2)
 end
 
 """
+    rename_paths_and_dates(subdir)
+
+Renames absolute paths and creation dates in the simulation output files of a scenario run.
+
+Also replaces the randomly created IDs of plot files with a fixed value. All these
+replacements serve the purpose of making the output deterministic and consistent, to allow
+for automatic checking between output and references.
+
+# Arguments
+- `subdir::String`: The subdir of the scenario in which to change the output files
+"""
+function rename_paths_and_dates(subdir::String)
+    files_to_adjust = ["output_plot.html",
+                       "sankey_plot.html",
+                       "balanceWarn.log",
+                       "general.log"]
+
+    path_prefix = abspath(joinpath(dirname(@__FILE__), "..", ".."))
+
+    for filename in files_to_adjust
+        content = read(joinpath(subdir, filename), String)
+
+        # replace the absolute paths with relative
+        content = replace(content, path_prefix => ".\\")
+
+        # replace dates of log files
+        content = replace(content, r"started at: .+\n" => "started at: 2000-01-01 00:00:00\n")
+
+        # replace IDs of plots
+        id_match = match(r"id=([0-9a-f-]+)\s", content)
+        if !isnothing(id_match)
+            old_id = id_match.captures[1]
+            content = replace(content, old_id => "12345678-1234-1234-1234-123456789123")
+        end
+
+        write(joinpath(subdir, filename), content)
+    end
+end
+
+"""
     generate_output(name, subdir)
 
 Generate the output for the given scenario.
@@ -107,7 +147,7 @@ Generate the output for the given scenario.
 """
 function generate_output(name::String, subdir::String)
     println("Generating scenario $name in dir $subdir")
-    println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|")
+    println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|Renme|")
 
     logger = setup_logger(subdir)
     print("|  ✓  ")
@@ -185,6 +225,9 @@ function generate_output(name::String, subdir::String)
     end
 
     Resie_Logger.close_logger(logger)
+    print("|  ✓  ")
+
+    rename_paths_and_dates(subdir)
     print("|  ✓  ")
 
     println("|")
