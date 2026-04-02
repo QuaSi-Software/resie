@@ -210,12 +210,14 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                   output_keys_to_CSV,
                                   weather_CSV_keys,
                                   sim_params,
+                                  io_settings,
                                   csv_time_unit)
             elseif do_write_CSV
                 output_csv[output_steps, :] = write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
                                                                 output_keys_to_CSV,
                                                                 weather_CSV_keys,
                                                                 sim_params,
+                                                                io_settings,
                                                                 csv_time_unit;
                                                                 do_return=true)
             end
@@ -280,6 +282,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                           output_keys_to_CSV,
                           weather_CSV_keys,
                           sim_params,
+                          io_settings,
                           csv_time_unit;
                           do_return=false,
                           output_rows=output_csv)

@@ -125,10 +125,12 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     end
 
     # Economy and emission filter
-    is_economy_emission_key(ok::EnergySystems.OutputKey) = occursin("OUT", ok.value_key) ||
-                                                           occursin("IN", ok.value_key) ||
-                                                           occursin("Supply", ok.value_key) ||
-                                                           occursin("Demand", ok.value_key)
+    function is_economy_emission_key(ok::EnergySystems.OutputKey)
+        occursin("OUT", ok.value_key) ||
+            occursin("IN", ok.value_key) ||
+            occursin("Supply", ok.value_key) ||
+            occursin("Demand", ok.value_key)
+    end
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
@@ -465,6 +467,7 @@ function write_to_CSV_file(filepath::String,
                            output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                            weather_data_keys::Union{Nothing,Vector{String}},
                            sim_params::Dict{String,Any},
+                           io_settings::Dict{String,Any},
                            csv_time_unit::String;
                            do_return::Bool=false,
                            output_rows::Union{Nothing,Matrix}=nothing)
@@ -491,17 +494,22 @@ function write_to_CSV_file(filepath::String,
 
     push!(line, "$time")
 
+    interpolator = v -> "$v"
+    if io_settings["fixed_output_precision"] > 0
+        interpolator = v -> round(v; digits=io_settings["fixed_output_precision"])
+    end
+
     if output_keys !== nothing
         for outkey in output_keys
             value = output_value(outkey.unit, outkey)
-            value = replace("$value", "." => ",")
+            value = replace(interpolator(value), "." => ",")
             push!(line, value)
         end
     end
     if weather_data_keys !== nothing
         for key in weather_data_keys
             value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-            value = replace("$value", "." => ",")
+            value = replace(interpolator(value), "." => ",")
             push!(line, value)
         end
     end
@@ -771,6 +779,11 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     y = hcat(plot_data ? outputs_plot_data[:, 2:end] : zeros(Float64, size(outputs_plot_weather, 1), 0),
              plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
+
+    if io_settings["fixed_output_precision"] > 0
+        y = round.(y; digits=io_settings["fixed_output_precision"])
+    end
+
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
@@ -879,6 +892,11 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         interface_new += 1
     end
     interface_new -= 1
+
+    # apply fixed precision before adding for non-zero as it may otherwise be rounded to zero again
+    if io_settings["fixed_output_precision"] > 0
+        output_all_value_sum = round.(output_all_value_sum; digits=io_settings["fixed_output_precision"])
+    end
 
     # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
     output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
