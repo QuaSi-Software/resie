@@ -2,6 +2,7 @@
     "io_settings": {
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/hp_multiple_sources/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/hp_multiple_sources/sankey_plot.html",
         "sankey_plot": "custom",
         "sankey_plot_spec": {

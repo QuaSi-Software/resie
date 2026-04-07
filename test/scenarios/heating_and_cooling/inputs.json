@@ -3,6 +3,7 @@
         "csv_output_file": "./test/scenarios/heating_and_cooling/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/heating_and_cooling/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/heating_and_cooling/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_keys": "nothing",

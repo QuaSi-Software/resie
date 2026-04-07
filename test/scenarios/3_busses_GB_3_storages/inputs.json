@@ -3,6 +3,7 @@
         "csv_output_file": "./test/scenarios/3_busses_GB_3_storages/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/3_busses_GB_3_storages/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/3_busses_GB_3_storages/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "custom",

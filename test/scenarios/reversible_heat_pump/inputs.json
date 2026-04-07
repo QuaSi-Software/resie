@@ -3,6 +3,7 @@
         "csv_output_file": "./test/scenarios/reversible_heat_pump/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/reversible_heat_pump/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/reversible_heat_pump/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "nothing",

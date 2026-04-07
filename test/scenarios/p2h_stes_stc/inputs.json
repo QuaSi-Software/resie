@@ -3,6 +3,7 @@
         "csv_output_file": "./test/scenarios/p2h_stes_stc/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/p2h_stes_stc/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/p2h_stes_stc/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",

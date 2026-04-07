@@ -2,6 +2,7 @@
     "io_settings": {
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/simple_geothermal_collector/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot": "default",
         "sankey_plot_file": "./test/scenarios/simple_geothermal_collector/sankey_plot.html",
         "csv_output": "all_excl_flows",

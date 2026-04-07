@@ -5,6 +5,7 @@
         "csv_output_keys": {},
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/electric_transformer/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/electric_transformer/sankey_plot.html",
         "sankey_plot": "default",
         "output_plot_file": "./test/scenarios/electric_transformer/output_plot.html",

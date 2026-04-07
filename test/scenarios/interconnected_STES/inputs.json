@@ -4,6 +4,7 @@
         "auxiliary_info": true,
         "auxiliary_plots": false,
         "auxiliary_info_file": "./test/scenarios/interconnected_STES/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/interconnected_STES/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",

@@ -2,6 +2,7 @@
         "csv_output_file": "./test/scenarios/secondary_interfaces/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/secondary_interfaces/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/secondary_interfaces/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "nothing",
