@@ -496,7 +496,7 @@ function write_to_CSV_file(filepath::String,
 
     interpolator = v -> "$v"
     if io_settings["fixed_output_precision"] > 0
-        interpolator = v -> round(v; digits=io_settings["fixed_output_precision"])
+        interpolator = v -> "$(round(v; digits=io_settings["fixed_output_precision"]))"
     end
 
     if output_keys !== nothing
