@@ -152,9 +152,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             output_keys_lineplot = all_output_keys_excl_flows
         else
             output_keys_lineplot = Vector{EnergySystems.OutputKey}()
-            for plot in io_settings["output_plot_spec"]
-                key = plot[2]["key"]
-                append!(output_keys_lineplot, output_keys(components, key))
+            for (_, plot) in sort(collect(io_settings["output_plot_spec"]); by=p->parse(Int, p[1]))
+                append!(output_keys_lineplot, output_keys(components, plot["key"]))
             end
         end
     else
@@ -338,12 +337,12 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
     end
     all_current_media = unique(all_current_media)
 
-    for key in keys(from_config)
+    for (key, _) in sort(collect(from_config); by=k->k[1])
         if key in keys(components)
             unit_key = key
             unit = components[unit_key]
 
-            for entry in from_config[unit_key]
+            for entry in sort(from_config[unit_key])
                 splitted = split(String(entry), ":")
                 if length(splitted) > 1
                     medium_key = splitted[1]
@@ -371,7 +370,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
         elseif key in all_current_media
             media_key = key
             medium = Symbol(String(media_key))
-            for value_key in from_config[media_key]
+            for value_key in sort(from_config[media_key])
                 success = false
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
@@ -660,40 +659,40 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         unit = String[]
         scale_fact = Float64[]
         if plot_data
-            for plot in io_settings["output_plot_spec"]
-                if occursin("->", first(plot[2]["key"])[2][1])
+            for (nr, plot) in sort(collect(io_settings["output_plot_spec"]); by=p->parse(Int, p[1]))
+                if occursin("->", first(plot["key"])[2][1])
                     # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
                     # temperature should be plotted
-                    if !isa(plot[2]["axis"], AbstractVector) || length(plot[2]["axis"]) !== 2 ||
-                       !isa(plot[2]["unit"], AbstractVector) || length(plot[2]["unit"]) !== 2 ||
-                       !isa(plot[2]["scale_factor"], AbstractVector) || length(plot[2]["scale_factor"]) !== 2
+                    if !isa(plot["axis"], AbstractVector) || length(plot["axis"]) !== 2 ||
+                       !isa(plot["unit"], AbstractVector) || length(plot["unit"]) !== 2 ||
+                       !isa(plot["scale_factor"], AbstractVector) || length(plot["scale_factor"]) !== 2
                         # only one set of meta information given. Use the given one both for energy and temperature flow
-                        push!(axis, isa(plot[2]["axis"], AbstractVector) ? plot[2]["axis"][1] : plot[2]["axis"])
-                        push!(unit, isa(plot[2]["unit"], AbstractVector) ? plot[2]["unit"][1] : plot[2]["unit"])
+                        push!(axis, isa(plot["axis"], AbstractVector) ? plot["axis"][1] : plot["axis"])
+                        push!(unit, isa(plot["unit"], AbstractVector) ? plot["unit"][1] : plot["unit"])
                         push!(scale_fact,
-                              isa(plot[2]["scale_factor"], AbstractVector) ? plot[2]["scale_factor"][1] :
-                              plot[2]["scale_factor"])
+                              isa(plot["scale_factor"], AbstractVector) ? plot["scale_factor"][1] :
+                              plot["scale_factor"])
 
                         push!(axis, "nothing")
                         push!(unit, "nothing")
                         push!(scale_fact, NaN)
-                        @info "For the generation of the output plot, the meta information for entry $(plot[1]) " *
+                        @info "For the generation of the output plot, the meta information for entry $nr " *
                               "do not contain two values. Therefore, only energy values will be output. If you want " *
                               "to output also a corresponding temperature, provide two meta information: " *
                               "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
                     else
-                        push!(axis, string(plot[2]["axis"][1]))
-                        push!(unit, string(plot[2]["unit"][1]))
-                        push!(scale_fact, plot[2]["scale_factor"][1])
+                        push!(axis, string(plot["axis"][1]))
+                        push!(unit, string(plot["unit"][1]))
+                        push!(scale_fact, plot["scale_factor"][1])
 
-                        push!(axis, string(plot[2]["axis"][2]))
-                        push!(unit, string(plot[2]["unit"][2]))
-                        push!(scale_fact, plot[2]["scale_factor"][2])
+                        push!(axis, string(plot["axis"][2]))
+                        push!(unit, string(plot["unit"][2]))
+                        push!(scale_fact, plot["scale_factor"][2])
                     end
                 else
-                    push!(axis, string(plot[2]["axis"]))
-                    push!(unit, string(plot[2]["unit"]))
-                    push!(scale_fact, plot[2]["scale_factor"])
+                    push!(axis, string(plot["axis"]))
+                    push!(unit, string(plot["unit"]))
+                    push!(scale_fact, plot["scale_factor"])
                 end
             end
         end
