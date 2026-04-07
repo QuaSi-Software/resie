@@ -117,7 +117,12 @@ function rename_paths_and_dates(subdir::String)
     path_prefix = abspath(joinpath(dirname(@__FILE__), "..", ".."))
 
     for filename in files_to_adjust
-        content = read(joinpath(subdir, filename), String)
+        filepath = joinpath(subdir, filename)
+        if !isfile(filepath)
+            continue
+        end
+
+        content = read(filepath, String)
 
         # replace the absolute paths with relative
         content = replace(content, path_prefix => ".\\")
@@ -132,7 +137,7 @@ function rename_paths_and_dates(subdir::String)
             content = replace(content, old_id => "12345678-1234-1234-1234-123456789123")
         end
 
-        write(joinpath(subdir, filename), content)
+        write(filepath, content)
     end
 end
 
