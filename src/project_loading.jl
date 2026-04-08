@@ -169,6 +169,33 @@ const IO_SETTINGS_DEF = Dict(
         json_type="string",
         unit="-"
     ),
+    "economic_CSV_file_path" => (
+        default="./output/economic_results.csv",
+        description="File path to where the economic results are written to CSV",
+        display_name="Economic results CSV file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "emissions_plot_file_path" => (
+        default="./output/emissions_result.html",
+        description="File path to where the emissions plot file is written",
+        display_name="Emissions plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "emissions_CSV_file_path" => (
+        default="./output/emission_results.csv",
+        description="File path to where the emissions are written to CSV",
+        display_name="Emissions CSV file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
     "step_info_interval" => (
         default=nothing,
         description="Defines how often a progress report on the loop over the timesteps " *

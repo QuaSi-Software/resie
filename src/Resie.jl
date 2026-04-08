@@ -348,8 +348,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
 
         # export economic results to CSV
-        filepath = default(project_config["io_settings"], "economic_CSV_file_path",
-                           "./output/economic_results.csv")
+        filepath = io_settings["economic_CSV_file_path"]
         success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
         success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
     end
@@ -357,14 +356,12 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     # output emission results
     if do_calculate_emissions
         # plot figure with yearly emissions
-        filepath = default(project_config["io_settings"], "emissions_plot_file_path",
-                           "./output/emissions_result.html")
+        filepath = io_settings["emissions_plot_file_path"]
         success = plot_emissions_results(emissions_result, filepath, sim_params)
         success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
 
         # export emission results to CSV
-        filepath = default(project_config["io_settings"], "emissions_CSV_file_path",
-                           "./output/emission_results.csv")
+        filepath = io_settings["emissions_CSV_file_path"]
         success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
         success && @info "Emission results exported to $(sim_params["run_path"](filepath))"
     end
