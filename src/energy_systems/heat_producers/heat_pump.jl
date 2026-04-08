@@ -325,7 +325,7 @@ const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const HEAT_PUMP_ECONOMY_PARAMETERS = get_economy_standard_params("transformer",
+const HEAT_PUMP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
@@ -347,6 +347,7 @@ const HEAT_PUMP_EMISSION_PARAMETERS = get_emissions_standard_params("transformer
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/W"
@@ -383,7 +384,7 @@ mutable struct HeatPump <: Component
     m_heat_out_secondary::Symbol
     m_heat_in::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     has_secondary_interface::Bool
@@ -439,8 +440,8 @@ function component_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
     return deepcopy(HEAT_PUMP_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
-    return deepcopy(HEAT_PUMP_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
+    return deepcopy(HEAT_PUMP_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
@@ -465,8 +466,8 @@ end
 function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(HeatPump)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(HeatPump)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(HeatPump)
         uac = uac * " - emission_parameters"
@@ -527,7 +528,7 @@ function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,An
             m_heat_out,
             m_heat_out_secondary,
             m_heat_in,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             params["has_secondary_interface"],
             params["primary_el_sources"],
@@ -1800,7 +1801,7 @@ function component_has_minimum_part_load(unit::HeatPump)
     return unit.min_usage_fraction > 0.0
 end
 
-function get_capex_reference(unit::HeatPump)
+function get_reference_for_capex_and_embodied_emissions(unit::HeatPump)
     return unit.design_power_th # [W]
 end
 

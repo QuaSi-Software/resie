@@ -151,19 +151,19 @@ const IO_SETTINGS_DEF = Dict(
         json_type="list",
         unit="-"
     ),
-    "economy_plot_file_cashflows" => (
-        default="./output/economy_results_cashflows.html",
+    "economic_plot_file_cashflows" => (
+        default="./output/economic_results_cashflows.html",
         description="File path to where the economic cashflow plots are written",
-        display_name="Economy cashflows plot file",
+        display_name="Economic cashflows plot file",
         required=false,
         type=String,
         json_type="string",
         unit="-"
     ),
-    "economy_plot_file_present_values" => (
-        default="./output/economy_results_present_values.html",
+    "economic_plot_file_present_values" => (
+        default="./output/economic_results_present_values.html",
         description="File path to where the economic present value plots are written",
-        display_name="Economy present value plot file",
+        display_name="Economic present value plot file",
         required=false,
         type=String,
         json_type="string",
@@ -561,8 +561,8 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
                            "show_detailed_errors" => io_settings["show_detailed_errors"],
                        ))
 
-    sim_params["economy_parameter"] = get_economy_parameter(project_config)
-    sim_params["emissions_parameter"] = get_emission_parameter(project_config)
+    sim_params["economic_parameter"] = get_economic_parameter(project_config, sim_params)
+    sim_params["emissions_parameter"] = get_emission_parameter(project_config, sim_params)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.
@@ -895,31 +895,58 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
 end
 
 """
-    get_economy_parameter(project_config)
+    get_economic_parameter(project_config)
 
-Extract economy parameters form input file.
+Extract economic parameters form input file.
 
 Args:
 -`project_config::AbstractDict{}`: The project config data
 Return:
--`Dict{String,Any}`: The economy parameters from the input file. If non are given, calculate_economy will be set to false.
+-`Dict{String,Any}`: The economic parameters from the input file. If non are given, calculate_economy will be set to false.
 """
-function get_economy_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    if haskey(project_config, "economy_parameter")
+function get_economic_parameter(project_config::AbstractDict{AbstractString,Any},
+                                sim_params::Dict{String,Any})::Dict{String,Any}
+    if haskey(project_config, "economic_parameter")
         return Dict{String,Any}(
-            "calculate_economy" => default(project_config["economy_parameter"], "calculate_economy", false),
-            "observation_period_in_years" => default(project_config["economy_parameter"], "observation_period_in_years",
-                                                     20.0),
-            "interest_rate" => default(project_config["economy_parameter"], "interest_rate", 0.02),
-            "labour_costs_per_hour" => default(project_config["economy_parameter"], "labour_costs_per_hour", 100.0),
-            "labour_costs_price_change_rate_per_year" => default(project_config["economy_parameter"],
+            "calculate_economy" => default(project_config["economic_parameter"], "calculate_economy", false),
+            "observation_period_in_years" => default(project_config["economic_parameter"],
+                                                     "observation_period_in_years",
+                                                     20),
+            "interest_rate" => default(project_config["economic_parameter"], "interest_rate", 0.02),
+            "labour_costs_per_hour" => default(project_config["economic_parameter"], "labour_costs_per_hour", 100.0),
+            "labour_costs_price_change_rate_per_year" => default(project_config["economic_parameter"],
                                                                  "labour_costs_price_change_rate_per_year", 0.035),
+            "repeat_period" => get_repeat_period(default(project_config["economic_parameter"], "repeat_method",
+                                                         "last_year"), sim_params, "economic"),
         )
     else
         return Dict{String,Any}(
             "calculate_economy" => false,
         )
     end
+end
+
+function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
+    if repeat_method == "all"
+        # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
+        # observation_period_in_years is reached.
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+    elseif repeat_method == "last_year"
+        repeat_period = Day(365)
+    elseif repeat_method == "last_month"
+        repeat_period = Day(30)
+    elseif repeat_method == "last_week"
+        repeat_period = Day(7)
+    end
+    if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+       Second(sim_params["time_step_seconds"]) < repeat_period
+        @warn "In $type calculation, the repeat_method was set to 'all' as the given period is longer " *
+              "than the simulation period."
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+    end
+    return repeat_period
 end
 
 """
@@ -932,7 +959,8 @@ Args:
 Return:
 -`Dict{String,Any}`: The emission parameters from the input file. If non are given, calculate_emissions will be set to false.
 """
-function get_emission_parameter(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
+function get_emission_parameter(project_config::AbstractDict{AbstractString,Any},
+                                sim_params::Dict{String,Any})::Dict{String,Any}
     if haskey(project_config, "emissions_parameter")
         return Dict{String,Any}(
             "calculate_emissions" => default(project_config["emissions_parameter"], "calculate_emissions", false),
@@ -940,7 +968,8 @@ function get_emission_parameter(project_config::AbstractDict{AbstractString,Any}
                                                      "observation_period_in_years", 20.0),
             "include_embodied_emissions" => default(project_config["emissions_parameter"], "include_embodied_emissions",
                                                     true),
-        )
+            "repeat_period" => get_repeat_period(default(project_config["emissions_parameter"], "repeat_method",
+                                                         "last_year"), sim_params, "emissions"))
     else
         return Dict{String,Any}(
             "calculate_emissions" => false,

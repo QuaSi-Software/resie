@@ -24,7 +24,8 @@ export check_balances_of_components, check_balances_of_interfaces, Component, ea
        link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
        calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
-       create_secondary_name, get_capex_reference, get_additional_opex_from_component, handle_profiles
+       create_secondary_name, get_reference_for_capex_and_embodied_emissions, get_additional_opex_from_component,
+       handle_profiles
 
 using ..Profiles
 using UUIDs
@@ -1560,19 +1561,19 @@ function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
 end
 
 """
-    economy_parameters(x::Type{Component})::Dict{String,Any}
+    economic_parameters(x::Type{Component})::Dict{String,Any}
 
-Lists all economy parameters accepted by the constructor of the component with the
+Lists all economic parameters accepted by the constructor of the component with the
 given type.
 
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the economy parameters where keys are parameter names and
+-`Dict{String,NamedTuple}`: Definition of the economic parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function economy_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+function economic_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
     return Dict{String,NamedTuple}()
@@ -1598,13 +1599,15 @@ function emission_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
 end
 
 """
-    get_capex_reference(unit)
+    get_reference_for_capex_and_embodied_emissions(unit)
 
-Returns the reference value to calculate the capes from the specific capex for each component. 
-E.g. a heat pump returns its thermal design power that is reference for the specific capex.
+Returns the reference value to calculate the capex from the specific capex and
+to calculate the embodied emissions from the specific embodied emissions for each component.
+E.g. a heat pump returns its thermal design power that is reference for the specific capex and 
+embodied emissions.
 """
-function get_capex_reference(unit::Component)
-    @error "No function `get_capex_reference` specified for component $(typeof(unit))."
+function get_reference_for_capex_and_embodied_emissions(unit::Component)
+    @error "No function `get_reference_for_capex_and_embodied_emissions` specified for component $(typeof(unit))."
     throw(MethodError)
     # base implementation should not be called as the function has to be specified in every component.
 end
@@ -1644,6 +1647,12 @@ Handles special processing like function parsing where needed.
 """
 function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name in ["energy_price_profile_file_path",
+                      "unmet_energy_price_profile_file_path",
+                      "energy_emissions_profile_file_path"]
+        return load_optional_profile(config, param_name, sim_params)
+    end
+
     if isdefined(param_def, :default)
         value = default(config, param_name, param_def.default)
     elseif param_name in keys(config)
@@ -2001,7 +2010,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
     for (name, value) in pairs(extracted)
         # skip control_parameters, as they have their own validation. also skip is_source
         # from GridConnection as it is an internal parameter
-        if name in ["control_parameters", "is_source", "economy_parameters", "emission_parameters"]
+        if name in ["control_parameters", "is_source", "economic_parameters", "emission_parameters"]
             continue
         end
 
@@ -2088,16 +2097,16 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         end
     end
 
-    # extract economy parameters using the economy parameter dictionary as the source of truth
-    extracted_economy_params = Dict{String,Any}()
-    economy_parameters_config = get(config, "economy_parameters", Dict{String,Any}())
-    if sim_params["economy_parameter"]["calculate_economy"]
-        type_def_economy = economy_parameters(T)
+    # extract economic parameters using the economic parameter dictionary as the source of truth
+    extracted_economic_params = Dict{String,Any}()
+    economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
+    if sim_params["economic_parameter"]["calculate_economy"]
+        type_def_economy = economic_parameters(T)
         for (param_name, param_def) in type_def_economy
             try
-                extracted_economy_params[param_name] = extract_parameter(T, economy_parameters_config, param_name,
-                                                                         param_def, sim_params,
-                                                                         (uac * " - economy_parameters"))
+                extracted_economic_params[param_name] = extract_parameter(T, economic_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - economic_parameters"))
             catch e
                 constructor_errored = handle_extraction_error(e, sim_params)
             end
@@ -2132,9 +2141,9 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         validate_config(T, config, extracted_params, uac, sim_params, "component")
 
         # do the same for economy
-        if sim_params["economy_parameter"]["calculate_economy"]
-            validate_mutex_params(economy_parameters_config, uac, type_def_economy)
-            validate_config(T, economy_parameters_config, extracted_economy_params, uac, sim_params, "economy")
+        if sim_params["economic_parameter"]["calculate_economy"]
+            validate_mutex_params(economic_parameters_config, uac, type_def_economy)
+            validate_config(T, economic_parameters_config, extracted_economic_params, uac, sim_params, "economy")
         end
 
         # do the same for emissions
@@ -2155,7 +2164,7 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     end
 
     # initialize the parameters ready for feeding into new()
-    extracted_params["economy_parameters"] = handle_profiles(extracted_economy_params)
+    extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
     extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
     return init_from_params(T, uac, extracted_params, config, sim_params)
 end
@@ -2196,21 +2205,21 @@ function handle_extraction_error(e, sim_params)
 end
 
 """
-    get_economy_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+    get_economic_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
 
-Returns the standard parameter definition of the SSOT for economy parameters, differently for
+Returns the standard parameter definition of the SSOT for economic parameters, differently for
 Storages/Transformer and Connection components.
 Defaults have to be passed using the "defaults" dict.
 
 Args:
 -`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
--`defaults::Dict{String,Any}`: Defaults for the standard economy parameter
--`units::Dict{String,Any}`: Units for some of the standard economy parameter
+-`defaults::Dict{String,Any}`: Defaults for the standard economic parameter
+-`units::Dict{String,Any}`: Units for some of the standard economic parameter
 Returns:
-- `Dict{String,NamedTuple}`: A Dict with the economy standard parameter settings for the SSOT
+- `Dict{String,NamedTuple}`: A Dict with the economic standard parameter settings for the SSOT
 """
-function get_economy_standard_params(type::String, defaults::Dict{String,Any},
-                                     units::Dict{String,Any})::Dict{String,NamedTuple}
+function get_economic_standard_params(type::String, defaults::Dict{String,Any},
+                                      units::Dict{String,Any})::Dict{String,NamedTuple}
     #! format: off
     if type in ["transformer", "storage"]
         return Dict{String,NamedTuple}(
@@ -2313,8 +2322,8 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 unit="€"
             )
         )
-    elseif type in ["connection"]
-        return Dict{String,NamedTuple}(
+    elseif type in ["connection", "connection_fixed"]
+        connection_general_parameter = Dict{String,NamedTuple}(
             "energy_price_profile_file_path" => (
                 default=defaults["energy_price_profile_file_path"],
                 description="Path to an energy price profile file",
@@ -2373,10 +2382,59 @@ function get_economy_standard_params(type::String, defaults::Dict{String,Any},
                 json_type="number",
                 unit="1/year"
             ),
-
         )
+
+        if type == "connection"
+            return connection_general_parameter
+        elseif type ==  "connection_fixed"
+            # additional economic parameter for pricing of unmet energies
+            fixed_connection_parameter = Dict{String,NamedTuple}(
+                "unmet_energy_price_profile_file_path" => (
+                    default=defaults["unmet_energy_price_profile_file_path"],
+                    description="Path to an price profile file for unmet energies",
+                    display_name="Unmet energy price profile file",
+                    required=false,
+                    conditionals=[("constant_unmet_energy_price", "mutex")],
+                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                    type=String,
+                    json_type="string",
+                    unit="€/Wh"
+                ),
+                "unmet_energy_price_profile_scale" => (
+                    default=defaults["unmet_energy_price_profile_scale"],
+                    description="Scale factor for unmet energy price profile",
+                    display_name="Scale factor unmet energy price profile",
+                    required=false,
+                    type=Float64,
+                    json_type="number",
+                    unit="-"
+                ),
+                "constant_unmet_energy_price" => (
+                    default=defaults["constant_unmet_energy_price"],
+                    description="Constant unmet energy price",
+                    display_name="Constant unmet energy price",
+                    required=false,
+                    conditionals=[("unmet_energy_price_profile_file_path", "mutex")],
+                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                    type=Float64,
+                    json_type="number",
+                    unit="€/Wh"
+                ),
+                "unmet_energy_price_change_rate_per_year" => (
+                    default=defaults["unmet_energy_price_change_rate_per_year"],
+                    description="Yearly change rate of the unmet energy price",
+                    display_name="unmet energy price change rate per year",
+                    required=false,
+                    type=Float64,
+                    json_type="number",
+                    unit="1/year"
+                ),
+            )
+
+            return Base.merge(connection_general_parameter, fixed_connection_parameter)
+        end
     else
-        @error "Unknown type in function get_economy_defaults."
+        @error "Unknown type in function get_economic_defaults."
     end
     #! format: on
 end
@@ -2417,6 +2475,15 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 type=Float64,
                 json_type="number",
                 unit=units["embodied_emissions_specific"]
+            ),
+            "embodied_emissions_change_rate_per_year" => (
+                default=defaults["embodied_emissions_change_rate_per_year"],
+                description="Yearly change rate of embodied emissions)",
+                display_name="Embodied emissions change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
             ),
         )
     elseif type in ["connection"]
@@ -2463,7 +2530,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             )
         )
     else
-        @error "Unknown type in function get_economy_defaults."
+        @error "Unknown type in function get_economic_defaults."
     end
     #! format: on
 end

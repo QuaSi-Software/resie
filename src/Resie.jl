@@ -110,13 +110,15 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV, output_keys_economy_emission = get_output_keys(io_settings,
-                                                                                             sim_params["economy_parameter"],
-                                                                                             sim_params["emissions_parameter"],
-                                                                                             components)
+    output_keys_lineplot,
+    output_keys_to_CSV,
+    output_keys_economic_emission = get_output_keys(io_settings,
+                                                    sim_params["economic_parameter"],
+                                                    sim_params["emissions_parameter"],
+                                                    components)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
-                                                                                  something(output_keys_economy_emission,
+                                                                                  something(output_keys_economic_emission,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -127,7 +129,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
     csv_output_file_path = io_settings["csv_output_file"]
     csv_time_unit = io_settings["csv_time_unit"]
-    do_calculate_economy = sim_params["economy_parameter"]["calculate_economy"]
+    do_calculate_economy = sim_params["economic_parameter"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameter"]["calculate_emissions"]
 
     # Initialize the arrays for output
@@ -268,12 +270,12 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
 
     if do_calculate_economy || do_calculate_emissions
-        output_data_economy_emissions = Matrix(view(output_data_all_requested, :,
-                                                    time_and_subset_cols(key_indexes, output_keys_economy_emission)))
-        economy_emissions_data = prepare_economy_emissions_data(components, output_keys_economy_emission,
-                                                                output_data_economy_emissions)
-        economy_result = do_calculate_economy ? calculate_economy(economy_emissions_data, sim_params) : nothing
-        emissions_result = do_calculate_emissions ? calculate_emissions(economy_emissions_data, sim_params) : nothing
+        output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
+                                                     time_and_subset_cols(key_indexes, output_keys_economic_emission)))
+        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emission,
+                                                                  output_data_economic_emissions)
+        economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
+        emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
     end
 
     # write output to CSV if not done continuously
@@ -335,14 +337,36 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         end
     end
 
+    # output economic results
     if do_calculate_economy
-        filepath = io_settings["economy_plot_file_cashflows"]
-        success = plot_economy_results(economy_result, filepath, sim_params, "cashflows")
+        filepath = io_settings["economic_plot_file_cashflows"]
+        success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
 
-        filepath = io_settings["economy_plot_file_present_values"]
-        success = plot_economy_results(economy_result, filepath, sim_params, "present_values")
+        filepath = io_settings["economic_plot_file_present_values"]
+        success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
         success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+
+        # export economic results to CSV
+        filepath = default(project_config["io_settings"], "economic_CSV_file_path",
+                           "./output/economic_results.csv")
+        success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+        success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
+    end
+
+    # output emission results
+    if do_calculate_emissions
+        # plot figure with yearly emissions
+        filepath = default(project_config["io_settings"], "emissions_plot_file_path",
+                           "./output/emissions_result.html")
+        success = plot_emissions_results(emissions_result, filepath, sim_params)
+        success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
+
+        # export emission results to CSV
+        filepath = default(project_config["io_settings"], "emissions_CSV_file_path",
+                           "./output/emission_results.csv")
+        success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+        success && @info "Emission results exported to $(sim_params["run_path"](filepath))"
     end
 end
 

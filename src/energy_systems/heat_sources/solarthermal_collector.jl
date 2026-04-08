@@ -444,7 +444,7 @@ const SOLARTHERMAL_COLLECTOR_COMPONENT_PARAMETERS = Dict(
     )
 )
 
-const SOLARTHERMAL_COLLECTOR_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 18,
             "capex_specific" => nothing,
@@ -466,6 +466,7 @@ const SOLARTHERMAL_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_params
     Dict{String,Any}(
         "lifetime_years" => 18,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/m^2"
@@ -482,7 +483,7 @@ mutable struct SolarthermalCollector <: Component
     output_interfaces::InterfaceMap
     m_heat_out::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     ## collector installation
@@ -573,8 +574,8 @@ function component_parameters(x::Type{SolarthermalCollector})::Dict{String,Named
     return deepcopy(SOLARTHERMAL_COLLECTOR_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{SolarthermalCollector})::Dict{String,NamedTuple}
-    return deepcopy(SOLARTHERMAL_COLLECTOR_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{SolarthermalCollector})::Dict{String,NamedTuple}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{SolarthermalCollector})::Dict{String,NamedTuple}
@@ -606,8 +607,8 @@ end
 function validate_config(x::Type{SolarthermalCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(SolarthermalCollector)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(SolarthermalCollector)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(SolarthermalCollector)
         uac = uac * " - emission_parameters"
@@ -634,7 +635,7 @@ function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::D
             InterfaceMap(),
             InterfaceMap(m_heat_out => nothing),
             m_heat_out,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             params["collector_gross_area"],
             params["tilt_angle"],
@@ -1317,7 +1318,7 @@ function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::Solarther
     spec_flow_rate * 2 * unit.vol_heat_cap * independent_target_temp
 end
 
-function get_capex_reference(unit::SolarthermalCollector)
+function get_reference_for_capex_and_embodied_emissions(unit::SolarthermalCollector)
     return unit.collector_gross_area # [m^2]
 end
 

@@ -61,7 +61,7 @@ const GRID_CONNECTION_PARAMETERS = Dict(
     ),
 )
 
-const GRID_ECONOMY_PARAMETERS = get_economy_standard_params("connection", 
+const GRID_ECONOMIC_PARAMETERS = get_economic_standard_params("connection", 
     Dict{String,Any}(
         "energy_price_profile_file_path" => nothing,
         "energy_price_profile_scale" => 1.0,
@@ -98,7 +98,7 @@ provide a given temperature.
 mutable struct GridConnection{IsSource} <: Component
     uac::String
     controller::Controller
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
     sys_function::SystemFunction
     medium::Symbol
@@ -131,16 +131,16 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         end
     end
 
-    # extract economy parameters using the economy parameter dictionary as the source of truth
-    extracted_economy_params = Dict{String,Any}()
-    economy_parameters_config = get(config, "economy_parameters", Dict{String,Any}())
-    if sim_params["economy_parameter"]["calculate_economy"]
-        for (param_name, param_def) in GRID_ECONOMY_PARAMETERS
+    # extract economic parameters using the economic parameter dictionary as the source of truth
+    extracted_economic_params = Dict{String,Any}()
+    economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
+    if sim_params["economic_parameter"]["calculate_economy"]
+        for (param_name, param_def) in GRID_ECONOMIC_PARAMETERS
             try
-                extracted_economy_params[param_name] = extract_parameter(GridConnection{IsSource},
-                                                                         economy_parameters_config, param_name,
-                                                                         param_def, sim_params,
-                                                                         (uac * " - economy_parameters"))
+                extracted_economic_params[param_name] = extract_parameter(GridConnection{IsSource},
+                                                                          economic_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - economic_parameters"))
             catch e
                 @error "$(sprint(showerror, e))"
                 constructor_errored = true
@@ -176,9 +176,9 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params, "component")
 
         # do the same for economy
-        if sim_params["economy_parameter"]["calculate_economy"]
-            validate_mutex_params(economy_parameters_config, uac, GRID_ECONOMY_PARAMETERS)
-            validate_config(GridConnection{IsSource}, economy_parameters_config, extracted_economy_params, uac,
+        if sim_params["economic_parameter"]["calculate_economy"]
+            validate_mutex_params(economic_parameters_config, uac, GRID_ECONOMIC_PARAMETERS)
+            validate_config(GridConnection{IsSource}, economic_parameters_config, extracted_economic_params, uac,
                             sim_params, "economy")
         end
 
@@ -201,7 +201,7 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     end
 
     # initialize and construct the object
-    extracted_params["economy_parameters"] = handle_profiles(extracted_economy_params)
+    extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
     extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
     init_values = init_from_params(GridConnection{IsSource}, uac, extracted_params, config, sim_params)
     return GridConnection{IsSource}(init_values...)
@@ -238,18 +238,18 @@ function component_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
     return params
 end
 
-function economy_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
-    return deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
+    return deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
     delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
     return params
 end
 
-function economy_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
     delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
     return params
 end
@@ -284,20 +284,14 @@ function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{Strin
         return convert(Temperature, default(config, param_name, nothing))
     end
 
-    if param_name == "energy_price_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    elseif param_name == "energy_emissions_profile_file_path"
-        return load_optional_profile(config, param_name, sim_params)
-    end
-
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String) where {IsSource}
     if param_type == "economy"
-        parameter = economy_parameters(GridConnection{IsSource})
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(GridConnection{IsSource})
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(GridConnection{IsSource})
         uac = uac * " - emission_parameters"
@@ -316,7 +310,7 @@ function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params
     # return tuple in the order expected by new()
     return (uac,                                     # uac
             Controller(params["control_parameters"]),#
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             sys_function,                            # sys_function
             medium,                                  # medium

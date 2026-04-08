@@ -352,7 +352,7 @@ const BATTERY_COMPONENT_PARAMETERS = Dict(
     ),
 )
 
-const BATTERY_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+const BATTERY_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 12,
             "capex_specific" => nothing,
@@ -374,6 +374,7 @@ const BATTERY_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 12,
         "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/Wh"
@@ -396,7 +397,7 @@ Base.@kwdef mutable struct Battery <: Component
     m_el_out::Symbol
     m_heat_lt_out::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     model_type::String
@@ -479,8 +480,8 @@ function component_parameters(x::Type{Battery})::Dict{String,NamedTuple}
     return deepcopy(BATTERY_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{Battery})::Dict{String,NamedTuple}
-    return deepcopy(BATTERY_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{Battery})::Dict{String,NamedTuple}
+    return deepcopy(BATTERY_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{Battery})::Dict{String,NamedTuple}
@@ -499,8 +500,8 @@ end
 function validate_config(x::Type{Battery}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(Battery)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(Battery)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(Battery)
         uac = uac * " - emission_parameters"
@@ -552,7 +553,7 @@ function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any
             m_el_in,
             m_el_out,
             m_heat_lt_out,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
             params["model_type"],
             params["capacity"],
@@ -1334,7 +1335,7 @@ function f_V_cell(extracted_charge::Number, current::Number, unit::Battery, n::N
     return V_cell
 end
 
-function get_capex_reference(unit::Battery)
+function get_reference_for_capex_and_embodied_emissions(unit::Battery)
     return unit.capacity # [Wh]
 end
 

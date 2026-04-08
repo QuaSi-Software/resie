@@ -544,7 +544,7 @@ const SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS = Dict(
     )
 )
 
-const SEASONAL_THERMAL_STORAGE_ECONOMY_PARAMETERS = get_economy_standard_params("storage",
+const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     Dict{String,Any}(
             "lifetime_years" => 50,
             "capex_specific" => nothing,
@@ -565,7 +565,8 @@ const SEASONAL_THERMAL_STORAGE_ECONOMY_PARAMETERS = get_economy_standard_params(
 const SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 20,
-        "embodied_emissions_specific" => 0.0
+        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
         "embodied_emissions_specific" => "kg CO2/m^3"
@@ -586,7 +587,7 @@ mutable struct SeasonalThermalStorage <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
-    economy_parameter::Dict{String,Any}
+    economic_parameter::Dict{String,Any}
     emission_parameter::Dict{String,Any}
 
     ## geometry and physical properties
@@ -760,8 +761,8 @@ function component_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Name
     return deepcopy(SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
 end
 
-function economy_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
-    return deepcopy(SEASONAL_THERMAL_STORAGE_ECONOMY_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
 end
 
 function emission_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
@@ -784,8 +785,8 @@ end
 function validate_config(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economy_parameters(SeasonalThermalStorage)
-        uac = uac * " - economy_parameters"
+        parameter = economic_parameters(SeasonalThermalStorage)
+        uac = uac * " - economic_parameters"
     elseif param_type == "emission"
         parameter = emission_parameters(SeasonalThermalStorage)
         uac = uac * " - emission_parameters"
@@ -807,7 +808,7 @@ function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
-            params["economy_parameters"],
+            params["economic_parameters"],
             params["emission_parameters"],
 
             # geometry and physical properties
@@ -2466,7 +2467,7 @@ function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real
     return (1 - β) * Tr1 + β * Tr2
 end
 
-function get_capex_reference(unit::SeasonalThermalStorage)
+function get_reference_for_capex_and_embodied_emissions(unit::SeasonalThermalStorage)
     return unit.volume # [m^3]
 end
 
