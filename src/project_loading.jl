@@ -446,6 +446,112 @@ const SIMULATION_PARAMETERS_DEF = Dict(
     ),
 )
 
+ECONOMIC_PARAMETERS_DEF = Dict{String,NamedTuple}(
+    "calculate_economy" => (
+        default=false,
+        description="If set to true, performs the calculation of economic results, " *
+                    "requiring the input parameters for all components.",
+        display_name="Calculate economy?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "observation_period_in_years" => (
+        default=20,
+        description="The period in consideration for the calculation of economic results.",
+        display_name="Observation period",
+        required=false,
+        type=Int,
+        json_type="number",
+        unit="a"
+    ),
+    "interest_rate" => (
+        default=0.02,
+        description="Interest rate for the calculation of annuities.",
+        display_name="Interest rate",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "labour_costs_per_hour" => (
+        default=100,
+        description="Cost of labour for the operation of components.",
+        display_name="Labour costs",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="€/h"
+    ),
+    "labour_costs_price_change_rate_per_year" => (
+        default=0.035,
+        description="Rate of change of labour costs per year.",
+        display_name="Labour costs change rate",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "repeat_method" => (
+        default="last_year",
+        description="Defines which period of the result data is repeated to fill up the " *
+                    "remainder of the observation period. This can be equal or less than " *
+                    "the simulation period, for example simulating three years, but only " *
+                    "repeating the last year for the entire observation period.",
+        display_name="Repeat method",
+        required=false,
+        options=["all", "last_year", "last_month", "last_week"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+
+EMISSIONS_PARAMATERS_DEF = Dict{String,NamedTuple}(
+    "calculate_emissions" => (
+        default=false,
+        description="If set to true, performs the calculation of GHG emissions results, " *
+                    "requiring the input parameters for all components.",
+        display_name="Calculate emissions?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "observation_period_in_years" => (
+        default=20,
+        description="The period in consideration for the calculation of GHG emissions.",
+        display_name="Observation period",
+        required=false,
+        type=Int,
+        json_type="number",
+        unit="a"
+    ),
+    "include_embodied_emissions" => (
+        default=true,
+        description="If set to true, includes embodied emissions in the calculation.",
+        display_name="Include embodied emissions?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "repeat_method" => (
+        default="last_year",
+        description="Defines which period of the result data is repeated to fill up the " *
+                    "remainder of the observation period. This can be equal or less than " *
+                    "the simulation period, for example simulating three years, but only " *
+                    "repeating the last year for the entire observation period.",
+        display_name="Repeat method",
+        required=false,
+        options=["all", "last_year", "last_month", "last_week"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+
 OUTPUT_SPECIFICATION_SETTINGS = [
     ("output_plot", "output_plot_spec"),
     ("sankey_plot", "sankey_plot_spec"),
@@ -581,8 +687,8 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
                            "show_detailed_errors" => io_settings["show_detailed_errors"],
                        ))
 
-    sim_params["economic_parameter"] = get_economic_parameter(project_config, sim_params)
-    sim_params["emissions_parameter"] = get_emission_parameter(project_config, sim_params)
+    sim_params["economic_parameter"] = get_economic_parameters(project_config, sim_params)
+    sim_params["emissions_parameter"] = get_emissions_parameters(project_config, sim_params)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.
@@ -915,37 +1021,52 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
 end
 
 """
-    get_economic_parameter(project_config)
+    get_economic_parameters(project_config, sim_params)
 
 Extract economic parameters form input file.
 
 Args:
--`project_config::AbstractDict{}`: The project config data
+-`project_config::Dict{String,Any}`: The project config data
+-`sim_params::Dict{String,Any}`: Simulation parameters, that have been extracted so far
 Return:
--`Dict{String,Any}`: The economic parameters from the input file. If non are given, calculate_economy will be set to false.
+-`Dict{String,Any}`: The economic parameters from the input file. If none are given,
+    calculate_economy will be set to false.
 """
-function get_economic_parameter(project_config::AbstractDict{AbstractString,Any},
-                                sim_params::Dict{String,Any})::Dict{String,Any}
-    if haskey(project_config, "economic_parameter")
-        return Dict{String,Any}(
-            "calculate_economy" => default(project_config["economic_parameter"], "calculate_economy", false),
-            "observation_period_in_years" => default(project_config["economic_parameter"],
-                                                     "observation_period_in_years",
-                                                     20),
-            "interest_rate" => default(project_config["economic_parameter"], "interest_rate", 0.02),
-            "labour_costs_per_hour" => default(project_config["economic_parameter"], "labour_costs_per_hour", 100.0),
-            "labour_costs_price_change_rate_per_year" => default(project_config["economic_parameter"],
-                                                                 "labour_costs_price_change_rate_per_year", 0.035),
-            "repeat_period" => get_repeat_period(default(project_config["economic_parameter"], "repeat_method",
-                                                         "last_year"), sim_params, "economic"),
-        )
-    else
+function get_economic_parameters(project_config::AbstractDict{String,Any},
+                                 sim_params::Dict{String,Any})::Dict{String,Any}
+    if !haskey(project_config, "economic_parameter")
         return Dict{String,Any}(
             "calculate_economy" => false,
         )
     end
+
+    economic_parameters = Dict{String,Any}()
+    for (name, param_def) in pairs(ECONOMIC_PARAMETERS_DEF)
+        economic_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config, name,
+                                                                    param_def, sim_params, "Economic parameters")
+    end
+
+    EnergySystems.validate_config(EnergySystems.Component, economic_parameters, "Economic parameters",
+                                  sim_params, ECONOMIC_PARAMETERS_DEF)
+
+    economic_parameters["repeat_period"] = get_repeat_period(economic_parameters["repeat_method"],
+                                                             sim_params, "economic")
+
+    return economic_parameters
 end
 
+"""
+    get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
+
+Get the repeat period as Dates module object (Day or similar) from the given repeat method.
+
+# Arguments
+-`repeat_method::String`: The repeat method from the settings
+-`sim_params::Dict{String,Any}`: Simulation parameters
+-`type::String`: The type (economic or emissions), used for error messages.
+# Returns
+-`Any`: An object of the Dates module, typically Day
+"""
 function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
     if repeat_method == "all"
         # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
@@ -970,31 +1091,38 @@ function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, 
 end
 
 """
-    get_emission_parameter(project_config)
+    get_emissions_parameters(project_config)
 
-Extract emission parameters form input file.
+Extract emissions parameters form input file.
 
 Args:
--`project_config::AbstractDict{}`: The project config data
+-`project_config::Dict{String,Any}`: The project config data
+-`sim_params::Dict{String,Any}`: Simulation parameters, that have been extracted so far
 Return:
--`Dict{String,Any}`: The emission parameters from the input file. If non are given, calculate_emissions will be set to false.
+-`Dict{String,Any}`: The emissions parameters from the input file. If none are given,
+    calculate_emissions will be set to false.
 """
-function get_emission_parameter(project_config::AbstractDict{AbstractString,Any},
-                                sim_params::Dict{String,Any})::Dict{String,Any}
-    if haskey(project_config, "emissions_parameter")
-        return Dict{String,Any}(
-            "calculate_emissions" => default(project_config["emissions_parameter"], "calculate_emissions", false),
-            "observation_period_in_years" => default(project_config["emissions_parameter"],
-                                                     "observation_period_in_years", 20.0),
-            "include_embodied_emissions" => default(project_config["emissions_parameter"], "include_embodied_emissions",
-                                                    true),
-            "repeat_period" => get_repeat_period(default(project_config["emissions_parameter"], "repeat_method",
-                                                         "last_year"), sim_params, "emissions"))
-    else
+function get_emissions_parameters(project_config::AbstractDict{String,Any},
+                                  sim_params::Dict{String,Any})::Dict{String,Any}
+    if !haskey(project_config, "emissions_parameter")
         return Dict{String,Any}(
             "calculate_emissions" => false,
         )
     end
+
+    emissions_parameters = Dict{String,Any}()
+    for (name, param_def) in pairs(EMISSIONS_PARAMATERS_DEF)
+        emissions_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config, name,
+                                                                     param_def, sim_params, "Emissions parameters")
+    end
+
+    EnergySystems.validate_config(EnergySystems.Component, emissions_parameters, "Emissions parameters",
+                                  sim_params, EMISSIONS_PARAMATERS_DEF)
+
+    emissions_parameters["repeat_period"] = get_repeat_period(emissions_parameters["repeat_method"],
+                                                              sim_params, "emissions")
+
+    return emission_parameters
 end
 
 # calculation of the order of operations has its own include files due to its complexity
