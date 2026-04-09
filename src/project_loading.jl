@@ -458,7 +458,7 @@ OUTPUT_SPECIFICATION_SETTINGS = [
 
 Read and parse the JSON-encoded Dict in the given file.
 """
-function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
+function read_JSON(filepath::String)::OrderedDict{String,Any}
     open(filepath, "r") do file_handle
         content = read(file_handle, String)
         return JSON.parse(content; dicttype=OrderedDict)
@@ -466,20 +466,16 @@ function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
 end
 
 """
-    get_io_settings(project_config)
+    get_io_settings(project_config::AbstractDict{String,Any})
 
 Constructs the dictionary of IO settings from the given config, considering default values.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
+-`project_config::AbstractDict{String,Any}`: The project config
 # Returns
 -`Dict{String,Any}`: The IO settings dictionary
 """
-function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    # convert config to what the function expects
-    # @TODO: find a better way to avoid copying, maybe consistent argument types
-    config = Dict{String,Any}(pairs(project_config["io_settings"]))
-
+function get_io_settings(project_config::AbstractDict{String,Any})::Dict{String,Any}
     # extract most parameter values using the extract function on the base type component
     # (even though we are not checking components...)
     io_settings = Dict{String,Any}()
@@ -487,8 +483,8 @@ function get_io_settings(project_config::AbstractDict{AbstractString,Any})::Dict
         if name in ["sankey_plot_spec", "output_plot_spec", "csv_output_keys"]
             continue
         end
-        io_settings[name] = EnergySystems.extract_parameter(EnergySystems.Component, config, name, param_def,
-                                                            Dict{String,Any}(), "IO settings")
+        io_settings[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config["io_settings"],
+                                                            name, param_def, Dict{String,Any}(), "IO settings")
     end
 
     # special parameters for output specifications
@@ -538,12 +534,12 @@ end
 Constructs the dictionary of simulation parameters.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
+-`project_config::Dict{String,Any}`: The project config
 -`io_settings::Dict{String,Any}`: IO settings, already extracted from the project config
 # Returns
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
-function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
+function get_simulation_params(project_config::AbstractDict{String,Any},
                                io_settings::Dict{String,Any})::Dict{String,Any}
     # load time and step info directly, bypassing extraction and validation
     time_step,
@@ -553,10 +549,6 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
     nr_of_steps,
     nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
 
-    # convert config to what the function extract_parameter expects
-    # @TODO: find a better way to avoid copying, maybe consistent argument types
-    config = Dict{String,Any}(pairs(project_config["simulation_parameters"]))
-
     # extract most parameter values using the extract function on the base type component
     # (even though we are not checking components...)
     sim_params = Dict{String,Any}()
@@ -564,8 +556,9 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any},
         if name in ["start", "start_output", "end", "start_end_unit", "time_step", "time_step_unit"]
             continue
         end
-        sim_params[name] = EnergySystems.extract_parameter(EnergySystems.Component, config, name, param_def,
-                                                           Dict{String,Any}(), "Sim params")
+        sim_params[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                           project_config["simulation_parameters"],
+                                                           name, param_def, Dict{String,Any}(), "Sim params")
     end
 
     # again, we use the component validation function as it avoids duplicate code
@@ -626,14 +619,14 @@ end
 Construct and prepare parameters, energy system components and the order of operation.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
+-`project_config::AbstractDict{String,Any}`: The project config
 # Returns
 -`Dict{String,Any}`: Simulation parameters
 -`Dict{String,Any}`: IO settings
 -`Grouping`: The constructed energy system components
 -`OrderOfOperations`: Order of operations
 """
-function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
+function prepare_inputs(project_config::AbstractDict{String,Any}, run_ID::UUID)
     io_settings = get_io_settings(project_config)
     sim_params = get_simulation_params(project_config, io_settings)
     sim_params["run_ID"] = run_ID

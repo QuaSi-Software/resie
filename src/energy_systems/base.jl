@@ -1630,7 +1630,7 @@ function get_additional_opex_from_component(component::Component, sim_params::Di
 end
 
 """
-    extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
+    extract_parameter(config::AbstractDict{String,Any}, param_name::String, param_def::NamedTuple)
 
 Helper to extract and process a parameter from config using its definition.
 Handles special processing like function parsing where needed.
@@ -1638,14 +1638,14 @@ Handles special processing like function parsing where needed.
 # Args
 - `x::Type{Component}`: Not a required input, instead used for leveraging multiple
     dispatch for type-specific methods that may invoke the base method.
-- `config::Dict{String,Any}`: The component config
+- `config::AbstractDict{String,Any}`: The component config
 - `param_name::String`: Name of the parameter. Has to be an exact match, this is not checked
     in this function.
 - `param_def::NamedTuple`: The parameter definition with its metadata
 - `sim_params::Dict{String,Any}`: Simulation parameters
 - `uac::String`: UAC of the component, typically used for error messages
 """
-function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
+function extract_parameter(x::Type{Component}, config::AbstractDict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name in ["energy_price_profile_file_path",
                       "unmet_energy_price_profile_file_path",
