@@ -660,7 +660,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_para
     )
 )
 
-const GEOTHERMAL_HEAT_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const GEOTHERMAL_HEAT_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 30,
         "embodied_emissions_specific" => 0.0,
@@ -691,8 +691,8 @@ mutable struct GeothermalHeatCollector <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ambient_temperature_profile::Union{Profile,Nothing}
     constant_ambient_temperature::Temperature
@@ -832,8 +832,8 @@ function economic_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
     return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
-    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, param_name::String,
@@ -861,9 +861,9 @@ function validate_config(x::Type{GeothermalHeatCollector}, config::Dict{String,A
     if param_type == "economy"
         parameter = economic_parameters(GeothermalHeatCollector)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(GeothermalHeatCollector)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(GeothermalHeatCollector)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(GeothermalHeatCollector)
     end
@@ -883,7 +883,7 @@ function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params:
             m_heat_in,
             m_heat_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             some_or_none(params["ambient_temperature_profile_file_path"],
                          params["ambient_temperature_from_global_file"]),
             params["constant_ambient_temperature"],

@@ -17,8 +17,8 @@ For each output channel:
       - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
-                         economic_parameter::Union{Nothing,AbstractDict{String,Any}},
-                         emissions_parameter::Union{Nothing,AbstractDict{String,Any}},
+                         economic_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
@@ -124,8 +124,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         end
     end
 
-    # Economy and emission filter
-    function is_economic_emission_key(ok::EnergySystems.OutputKey)
+    # Economy and emissions filter
+    function is_economic_emissions_key(ok::EnergySystems.OutputKey)
         occursin("OUT", ok.value_key) ||
             occursin("IN", ok.value_key) ||
             occursin("Supply", ok.value_key) ||
@@ -135,8 +135,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
-    do_economy = economic_parameter["calculate_economy"]
-    do_emissions = emissions_parameter["calculate_emissions"]
+    do_economy = economic_parameters["calculate_economy"]
+    do_emissions = emissions_parameters["calculate_emissions"]
 
     # Decide if we need all-keys lists
     need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy || do_emissions
@@ -178,7 +178,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     if do_economy || do_emissions
         # Use excl_flows "all" as base
         output_keys_economic_emissions = copy(all_output_keys_excl_flows)
-        filter!(is_economic_emission_key, output_keys_economic_emissions)
+        filter!(is_economic_emissions_key, output_keys_economic_emissions)
         # keep stable ordering (all_output_keys_excl_flows is already sorted)
     else
         output_keys_economic_emissions = nothing

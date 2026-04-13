@@ -462,7 +462,7 @@ const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params(
     )
 )
 
-const SOLARTHERMAL_COLLECTOR_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 18,
         "embodied_emissions_specific" => 0.0,
@@ -483,8 +483,8 @@ mutable struct SolarthermalCollector <: Component
     output_interfaces::InterfaceMap
     m_heat_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ## collector installation
     collector_gross_area::Float64
@@ -578,8 +578,8 @@ function economic_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
     return deepcopy(SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
-    return deepcopy(SOLARTHERMAL_COLLECTOR_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{SolarthermalCollector}, config::Dict{String,Any}, param_name::String,
@@ -609,9 +609,9 @@ function validate_config(x::Type{SolarthermalCollector}, config::Dict{String,Any
     if param_type == "economy"
         parameter = economic_parameters(SolarthermalCollector)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(SolarthermalCollector)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(SolarthermalCollector)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(SolarthermalCollector)
     end
@@ -636,7 +636,7 @@ function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::D
             InterfaceMap(m_heat_out => nothing),
             m_heat_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["collector_gross_area"],
             params["tilt_angle"],
             params["azimuth_angle"],

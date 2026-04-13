@@ -442,7 +442,7 @@ const GEOTHERMAL_PROBES_ECONOMIC_PARAMETERS = get_economic_standard_params("stor
     )
 )
 
-const GEOTHERMAL_PROBES_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const GEOTHERMAL_PROBES_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 50,
         "embodied_emissions_specific" => 0.0,
@@ -463,8 +463,8 @@ mutable struct GeothermalProbes <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     model_type::String
 
@@ -563,8 +563,8 @@ function economic_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
     return deepcopy(GEOTHERMAL_PROBES_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
-    return deepcopy(GEOTHERMAL_PROBES_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_PROBES_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{GeothermalProbes}, config::Dict{String,Any}, param_name::String,
@@ -577,9 +577,9 @@ function validate_config(x::Type{GeothermalProbes}, config::Dict{String,Any}, ex
     if param_type == "economy"
         parameter = economic_parameters(GeothermalProbes)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(GeothermalProbes)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(GeothermalProbes)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(GeothermalProbes)
     end
@@ -599,7 +599,7 @@ function init_from_params(x::Type{GeothermalProbes}, uac::String, params::Dict{S
             m_heat_in,
             m_heat_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["model_type"],
             params["max_probe_temperature_loading"],
             params["min_probe_temperature_unloading"],

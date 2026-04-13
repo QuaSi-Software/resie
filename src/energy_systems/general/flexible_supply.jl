@@ -98,7 +98,7 @@ const FLEXIBLE_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connec
     Dict{String,Any}(),
 )
 
-const FLEXIBLE_SUPPLY_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+const FLEXIBLE_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -126,8 +126,8 @@ mutable struct FlexibleSupply <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     max_power_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
@@ -151,8 +151,8 @@ function economic_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
     return deepcopy(FLEXIBLE_SUPPLY_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
-    return deepcopy(FLEXIBLE_SUPPLY_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
+    return deepcopy(FLEXIBLE_SUPPLY_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FlexibleSupply}, config::Dict{String,Any}, param_name::String,
@@ -173,9 +173,9 @@ function validate_config(x::Type{FlexibleSupply}, config::Dict{String,Any}, extr
     if param_type == "economy"
         parameter = economic_parameters(FlexibleSupply)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(FlexibleSupply)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FlexibleSupply)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(FlexibleSupply)
     end
@@ -198,7 +198,7 @@ function init_from_params(x::Type{FlexibleSupply}, uac::String, params::Dict{Str
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             max_power_profile,                       # max_power_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor

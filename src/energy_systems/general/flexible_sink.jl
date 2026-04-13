@@ -99,7 +99,7 @@ const FLEXIBLE_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connecti
     Dict{String,Any}(),
 )
 
-const FLEXIBLE_SINK_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+const FLEXIBLE_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -127,8 +127,8 @@ mutable struct FlexibleSink <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     max_power_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
@@ -152,8 +152,8 @@ function economic_parameters(x::Type{FlexibleSink})::Dict{String,Any}
     return deepcopy(FLEXIBLE_SINK_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FlexibleSink})::Dict{String,Any}
-    return deepcopy(FLEXIBLE_SINK_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{FlexibleSink})::Dict{String,Any}
+    return deepcopy(FLEXIBLE_SINK_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FlexibleSink}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -174,9 +174,9 @@ function validate_config(x::Type{FlexibleSink}, config::Dict{String,Any}, extrac
     if param_type == "economy"
         parameter = economic_parameters(FlexibleSink)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(FlexibleSink)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FlexibleSink)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(FlexibleSink)
     end
@@ -199,7 +199,7 @@ function init_from_params(x::Type{FlexibleSink}, uac::String, params::Dict{Strin
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             max_power_profile,                       # max_power_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor

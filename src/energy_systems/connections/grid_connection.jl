@@ -73,7 +73,7 @@ const GRID_ECONOMIC_PARAMETERS = get_economic_standard_params("connection",
     Dict{String,Any}(),
 )
 
-const GRID_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+const GRID_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection",
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -98,8 +98,8 @@ provide a given temperature.
 mutable struct GridConnection{IsSource} <: Component
     uac::String
     controller::Controller
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
     sys_function::SystemFunction
     medium::Symbol
 
@@ -134,7 +134,7 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     # extract economic parameters using the economic parameter dictionary as the source of truth
     extracted_economic_params = Dict{String,Any}()
     economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
-    if sim_params["economic_parameter"]["calculate_economy"]
+    if sim_params["economic_parameters"]["calculate_economy"]
         for (param_name, param_def) in GRID_ECONOMIC_PARAMETERS
             try
                 extracted_economic_params[param_name] = extract_parameter(GridConnection{IsSource},
@@ -148,16 +148,16 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         end
     end
 
-    # extract emission parameters using the emission parameter dictionary as the source of truth
-    extracted_emission_params = Dict{String,Any}()
-    emission_parameters_config = get(config, "emission_parameters", Dict{String,Any}())
-    if sim_params["emissions_parameter"]["calculate_emissions"]
-        for (param_name, param_def) in GRID_EMISSION_PARAMETERS
+    # extract emissions parameters using the emissions parameter dictionary as the source of truth
+    extracted_emissions_params = Dict{String,Any}()
+    emissions_parameters_config = get(config, "emissions_parameters", Dict{String,Any}())
+    if sim_params["emissions_parameters"]["calculate_emissions"]
+        for (param_name, param_def) in GRID_EMISSIONS_PARAMETERS
             try
-                extracted_emission_params[param_name] = extract_parameter(GridConnection{IsSource},
-                                                                          emission_parameters_config, param_name,
-                                                                          param_def, sim_params,
-                                                                          (uac * " - emission_parameters"))
+                extracted_emissions_params[param_name] = extract_parameter(GridConnection{IsSource},
+                                                                           emissions_parameters_config, param_name,
+                                                                           param_def, sim_params,
+                                                                           (uac * " - emissions_parameters"))
             catch e
                 constructor_errored = handle_extraction_error(e, sim_params)
             end
@@ -202,7 +202,7 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
 
     # initialize and construct the object
     extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
-    extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
+    extracted_params["emissions_parameters"] = handle_profiles(extracted_emissions_params)
     init_values = init_from_params(GridConnection{IsSource}, uac, extracted_params, config, sim_params)
     return GridConnection{IsSource}(init_values...)
 end
@@ -254,18 +254,18 @@ function economic_parameters(x::Type{GridOutput})::Dict{String,Any}
     return params
 end
 
-function emission_parameters(x::Type{GridConnection{IsSource}})::Dict{String,Any} where {IsSource}
-    return deepcopy(GRID_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{GridConnection{IsSource}})::Dict{String,Any} where {IsSource}
+    return deepcopy(GRID_EMISSIONS_PARAMETERS)
 end
 
-function emission_parameters(x::Type{GridInput})::Dict{String,Any}
-    params = deepcopy(GRID_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{GridInput})::Dict{String,Any}
+    params = deepcopy(GRID_EMISSIONS_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
     return params
 end
 
-function emission_parameters(x::Type{GridOutput})::Dict{String,Any}
-    params = deepcopy(GRID_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{GridOutput})::Dict{String,Any}
+    params = deepcopy(GRID_EMISSIONS_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
     return params
 end
@@ -292,9 +292,9 @@ function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,
     if param_type == "economy"
         parameter = economic_parameters(GridConnection{IsSource})
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(GridConnection{IsSource})
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(GridConnection{IsSource})
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(GridConnection{IsSource})
     end
@@ -311,7 +311,7 @@ function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params
     return (uac,                                     # uac
             Controller(params["control_parameters"]),#
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             sys_function,                            # sys_function
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces

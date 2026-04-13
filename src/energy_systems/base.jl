@@ -2010,7 +2010,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
     for (name, value) in pairs(extracted)
         # skip control_parameters, as they have their own validation. also skip is_source
         # from GridConnection as it is an internal parameter
-        if name in ["control_parameters", "is_source", "economic_parameters", "emission_parameters"]
+        if name in ["control_parameters", "is_source", "economic_parameters", "emissions_parameters"]
             continue
         end
 
@@ -2100,7 +2100,7 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     # extract economic parameters using the economic parameter dictionary as the source of truth
     extracted_economic_params = Dict{String,Any}()
     economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
-    if sim_params["economic_parameter"]["calculate_economy"]
+    if sim_params["economic_parameters"]["calculate_economy"]
         type_def_economy = economic_parameters(T)
         for (param_name, param_def) in type_def_economy
             try
@@ -2113,16 +2113,16 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         end
     end
 
-    # extract emission parameters using the emission parameter dictionary as the source of truth
-    extracted_emission_params = Dict{String,Any}()
-    emission_parameters_config = get(config, "emission_parameters", Dict{String,Any}())
-    if sim_params["emissions_parameter"]["calculate_emissions"]
-        type_def_emissions = emission_parameters(T)
+    # extract emissions parameters using the emissions parameter dictionary as the source of truth
+    extracted_emissions_params = Dict{String,Any}()
+    emissions_parameters_config = get(config, "emissions_parameters", Dict{String,Any}())
+    if sim_params["emissions_parameters"]["calculate_emissions"]
+        type_def_emissions = emissions_parameters(T)
         for (param_name, param_def) in type_def_emissions
             try
-                extracted_emission_params[param_name] = extract_parameter(T, emission_parameters_config, param_name,
-                                                                          param_def, sim_params,
-                                                                          (uac * " - emission_parameters"))
+                extracted_emissions_params[param_name] = extract_parameter(T, emissions_parameters_config, param_name,
+                                                                           param_def, sim_params,
+                                                                           (uac * " - emissions_parameters"))
             catch e
                 constructor_errored = handle_extraction_error(e, sim_params)
             end
@@ -2141,15 +2141,15 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         validate_config(T, config, extracted_params, uac, sim_params, "component")
 
         # do the same for economy
-        if sim_params["economic_parameter"]["calculate_economy"]
+        if sim_params["economic_parameters"]["calculate_economy"]
             validate_mutex_params(economic_parameters_config, uac, type_def_economy)
             validate_config(T, economic_parameters_config, extracted_economic_params, uac, sim_params, "economy")
         end
 
         # do the same for emissions
-        if sim_params["emissions_parameter"]["calculate_emissions"]
-            validate_mutex_params(emission_parameters_config, uac, type_def_emissions)
-            validate_config(T, emission_parameters_config, extracted_emission_params, uac, sim_params, "emission")
+        if sim_params["emissions_parameters"]["calculate_emissions"]
+            validate_mutex_params(emissions_parameters_config, uac, type_def_emissions)
+            validate_config(T, emissions_parameters_config, extracted_emissions_params, uac, sim_params, "emissions")
         end
 
     catch e
@@ -2165,7 +2165,7 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
 
     # initialize the parameters ready for feeding into new()
     extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
-    extracted_params["emission_parameters"] = handle_profiles(extracted_emission_params)
+    extracted_params["emissions_parameters"] = handle_profiles(extracted_emissions_params)
     return init_from_params(T, uac, extracted_params, config, sim_params)
 end
 
@@ -2442,14 +2442,14 @@ end
 """
     get_emissions_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
 
-Returns the standard parameter definition of the SSOT for emission parameters, differently for
+Returns the standard parameter definition of the SSOT for emissions parameters, differently for
 Storages/Transformer and Connection components.
 Defaults have to be passed using the "defaults" dict.
 
 Args:
 -`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
--`defaults::Dict{String,Any}`: Defaults for the standard emission parameter
--`units::Dict{String,Any}`: Units for some of the standard emission parameter
+-`defaults::Dict{String,Any}`: Defaults for the standard emissions parameter
+-`units::Dict{String,Any}`: Units for some of the standard emissions parameter
 Returns:
 - `Dict{String,Any}`: A Dict with the emissions standard parameter settings for the SSOT
 """
@@ -2490,8 +2490,8 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         return Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
-                description="Path to a specific emission profile file",
-                display_name="Emission profile file",
+                description="Path to a specific emissions profile file",
+                display_name="Emissions profile file",
                 required=false,
                 conditionals=[("constant_energy_emissions", "mutex")],
                 validations=[("at_least_one", "constant_energy_emissions", "energy_emissions_profile_file_path")],
@@ -2510,7 +2510,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             ),
             "constant_energy_emissions" => (
                 default=defaults["constant_energy_emissions"],
-                description="Constant specific emission for the grid connection",
+                description="Constant specific emissions for the grid connection",
                 display_name="constant energy emissions",
                 required=false,
                 conditionals=[("energy_emissions_profile_file_path", "mutex")],

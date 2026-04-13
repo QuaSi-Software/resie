@@ -274,7 +274,7 @@ const BUFFER_TANK_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     )
 )
 
-const BUFFER_TANK_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const BUFFER_TANK_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
@@ -315,8 +315,8 @@ mutable struct BufferTank <: Component
     output_interfaces::InterfaceMap
     medium::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     model_type::Symbol
 
@@ -377,8 +377,8 @@ function economic_parameters(x::Type{BufferTank})::Dict{String,Any}
     return deepcopy(BUFFER_TANK_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{BufferTank})::Dict{String,Any}
-    return deepcopy(BUFFER_TANK_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{BufferTank})::Dict{String,Any}
+    return deepcopy(BUFFER_TANK_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -399,9 +399,9 @@ function validate_config(x::Type{BufferTank}, config::Dict{String,Any}, extracte
     if param_type == "economy"
         parameter = economic_parameters(BufferTank)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(BufferTank)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(BufferTank)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(BufferTank)
     end
@@ -419,7 +419,7 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
             InterfaceMap(medium => nothing),
             medium,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             Symbol(params["model_type"]),
             params["capacity"],
             params["volume"],

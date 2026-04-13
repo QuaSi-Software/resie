@@ -112,13 +112,13 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot,
     output_keys_to_CSV,
-    output_keys_economic_emission = get_output_keys(io_settings,
-                                                    sim_params["economic_parameter"],
-                                                    sim_params["emissions_parameter"],
-                                                    components)
+    output_keys_economic_emissions = get_output_keys(io_settings,
+                                                     sim_params["economic_parameters"],
+                                                     sim_params["emissions_parameters"],
+                                                     components)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
-                                                                                  something(output_keys_economic_emission,
+                                                                                  something(output_keys_economic_emissions,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -129,8 +129,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
     csv_output_file_path = io_settings["csv_output_file"]
     csv_time_unit = io_settings["csv_time_unit"]
-    do_calculate_economy = sim_params["economic_parameter"]["calculate_economy"]
-    do_calculate_emissions = sim_params["emissions_parameter"]["calculate_emissions"]
+    do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
+    do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
 
     # Initialize the arrays for output
     output_weather_lineplot = do_create_plot_weather ?
@@ -271,8 +271,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     if do_calculate_economy || do_calculate_emissions
         output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
-                                                     time_and_subset_cols(key_indexes, output_keys_economic_emission)))
-        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emission,
+                                                     time_and_subset_cols(key_indexes, output_keys_economic_emissions)))
+        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emissions,
                                                                   output_data_economic_emissions)
         economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
         emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
@@ -353,17 +353,17 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
     end
 
-    # output emission results
+    # output emissions results
     if do_calculate_emissions
         # plot figure with yearly emissions
         filepath = io_settings["emissions_plot_file_path"]
         success = plot_emissions_results(emissions_result, filepath, sim_params)
         success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
 
-        # export emission results to CSV
+        # export emissions results to CSV
         filepath = io_settings["emissions_CSV_file_path"]
         success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
-        success && @info "Emission results exported to $(sim_params["run_path"](filepath))"
+        success && @info "Emissions results exported to $(sim_params["run_path"](filepath))"
     end
 end
 

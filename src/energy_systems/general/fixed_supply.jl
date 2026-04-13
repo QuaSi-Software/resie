@@ -135,7 +135,7 @@ const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connectio
     Dict{String,Any}(),
 )
 
-const FIXED_SUPPLY_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -165,8 +165,8 @@ mutable struct FixedSupply <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
@@ -195,8 +195,8 @@ function economic_parameters(x::Type{FixedSupply})::Dict{String,Any}
     return deepcopy(FIXED_SUPPLY_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FixedSupply})::Dict{String,Any}
-    return deepcopy(FIXED_SUPPLY_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{FixedSupply})::Dict{String,Any}
+    return deepcopy(FIXED_SUPPLY_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -217,9 +217,9 @@ function validate_config(x::Type{FixedSupply}, config::Dict{String,Any}, extract
     if param_type == "economy"
         parameter = economic_parameters(FixedSupply)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(FixedSupply)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FixedSupply)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(FixedSupply)
     end
@@ -242,7 +242,7 @@ function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             energy_profile,                          # energy_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor

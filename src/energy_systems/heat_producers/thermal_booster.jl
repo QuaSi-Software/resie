@@ -180,7 +180,7 @@ const THERMAL_BOOSTER_ECONOMIC_PARAMETERS = get_economic_standard_params("transf
     )
 )
 
-const THERMAL_BOOSTER_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+const THERMAL_BOOSTER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 18,
         "embodied_emissions_specific" => 0.0,
@@ -211,8 +211,8 @@ mutable struct ThermalBooster <: Component
     m_heat_out::Symbol
     m_heat_in::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     output_temperature::Temperature
     input_temperature::Temperature
@@ -250,8 +250,8 @@ function economic_parameters(x::Type{ThermalBooster})::Dict{String,Any}
     return deepcopy(THERMAL_BOOSTER_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{ThermalBooster})::Dict{String,Any}
-    return deepcopy(THERMAL_BOOSTER_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{ThermalBooster}, config::Dict{String,Any}, param_name::String,
@@ -270,9 +270,9 @@ function validate_config(x::Type{ThermalBooster}, config::Dict{String,Any}, extr
     if param_type == "economy"
         parameter = economic_parameters(ThermalBooster)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(ThermalBooster)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(ThermalBooster)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(ThermalBooster)
     end
@@ -297,7 +297,7 @@ function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{Str
             m_heat_out,
             m_heat_in,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["output_temperature"],
             params["input_temperature"],
             params["power_losses_factor"],

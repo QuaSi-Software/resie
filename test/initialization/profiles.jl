@@ -48,8 +48,8 @@ function test_profile_aggregation_two()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -96,8 +96,8 @@ function test_profile_aggregation_four()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -140,8 +140,8 @@ function test_profile_segmentation_half()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -225,8 +225,8 @@ function test_profile_segmentation_third()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -353,8 +353,8 @@ function test_profile_segmentation_half_linear_classic()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -438,8 +438,8 @@ function test_profile_segmentation_third_linear_classic()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -564,8 +564,8 @@ function test_profile_segmentation_half_linear_time_preserving()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -649,8 +649,8 @@ function test_profile_segmentation_third_linear_time_preserving()
         "run_path" => function (path)
             return path
         end,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

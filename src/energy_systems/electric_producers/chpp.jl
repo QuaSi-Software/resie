@@ -133,7 +133,7 @@ const CHPP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
     )
 )
 
-const CHPP_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+const CHPP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 15,
         "embodied_emissions_specific" => 0.0,
@@ -172,8 +172,8 @@ mutable struct CHPP <: Component
     m_heat_out::Symbol
     m_el_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     power::Float64
     linear_interface::Symbol
@@ -202,8 +202,8 @@ function economic_parameters(x::Type{CHPP})::Dict{String,Any}
     return deepcopy(CHPP_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{CHPP})::Dict{String,Any}
-    return deepcopy(CHPP_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{CHPP}, config::Dict{String,Any}, param_name::String,
@@ -216,9 +216,9 @@ function validate_config(x::Type{CHPP}, config::Dict{String,Any}, extracted::Dic
     if param_type == "economy"
         parameter = economic_parameters(CHPP)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(CHPP)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(CHPP)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(CHPP)
     end
@@ -250,7 +250,7 @@ function init_from_params(x::Type{CHPP}, uac::String, params::Dict{String,Any},
             m_heat_out,
             m_el_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["power_el"] / efficiencies[Symbol("el_out")](1.0),
             linear_interface,
             params["min_power_fraction"],

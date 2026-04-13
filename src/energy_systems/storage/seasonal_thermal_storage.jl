@@ -562,7 +562,7 @@ const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_param
     )
 )
 
-const SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
@@ -587,8 +587,8 @@ mutable struct SeasonalThermalStorage <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ## geometry and physical properties
     # capacity of the STES [Wh]
@@ -765,8 +765,8 @@ function economic_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
     return deepcopy(SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
-    return deepcopy(SEASONAL_THERMAL_STORAGE_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, param_name::String,
@@ -787,9 +787,9 @@ function validate_config(x::Type{SeasonalThermalStorage}, config::Dict{String,An
     if param_type == "economy"
         parameter = economic_parameters(SeasonalThermalStorage)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(SeasonalThermalStorage)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(SeasonalThermalStorage)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(SeasonalThermalStorage)
     end
@@ -809,7 +809,7 @@ function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::
             m_heat_in,
             m_heat_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
 
             # geometry and physical properties
             0.0, # capacity

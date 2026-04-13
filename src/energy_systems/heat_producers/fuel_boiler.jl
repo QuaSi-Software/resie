@@ -113,7 +113,7 @@ const FUEL_BOILER_ECONOMIC_PARAMETERS = get_economic_standard_params("transforme
     )
 )
 
-const FUEL_BOILER_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+const FUEL_BOILER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
@@ -150,8 +150,8 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     power::Float64
     linear_interface::Symbol
@@ -180,8 +180,8 @@ function economic_parameters(x::Type{FuelBoiler})::Dict{String,Any}
     return deepcopy(FUEL_BOILER_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FuelBoiler})::Dict{String,Any}
-    return deepcopy(FUEL_BOILER_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,
@@ -194,9 +194,9 @@ function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracte
     if param_type == "economy"
         parameter = economic_parameters(FuelBoiler)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(FuelBoiler)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FuelBoiler)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(FuelBoiler)
     end
@@ -225,7 +225,7 @@ function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,
             m_fuel_in,
             m_heat_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["power_th"] / efficiencies[Symbol("heat_out")](1.0),
             linear_interface,
             params["min_power_fraction"],

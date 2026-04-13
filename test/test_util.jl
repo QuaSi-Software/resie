@@ -104,8 +104,8 @@ function get_default_sim_params()::Dict{String,Any}
             return path
         end,
         "show_detailed_errors" => true,
-        "economic_parameter" => Dict{String,Any}("calculate_economy" => false),
-        "emissions_parameter" => Dict{String,Any}("calculate_emissions" => false),
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 end
 

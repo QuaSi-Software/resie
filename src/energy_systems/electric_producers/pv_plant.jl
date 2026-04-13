@@ -44,7 +44,7 @@ const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fi
     Dict{String,Any}(),
 )
 
-const PV_PLANT_EMISSION_PARAMETERS = get_emissions_standard_params("connection", 
+const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -71,8 +71,8 @@ mutable struct PVPlant <: Component
 
     m_el_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     energy_profile::Profile
     scaling_factor::Float64
@@ -92,8 +92,8 @@ function economic_parameters(x::Type{PVPlant})::Dict{String,Any}
     return deepcopy(PV_PLANT_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{PVPlant})::Dict{String,Any}
-    return deepcopy(PV_PLANT_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -106,9 +106,9 @@ function validate_config(x::Type{PVPlant}, config::Dict{String,Any}, extracted::
     if param_type == "economy"
         parameter = economic_parameters(PVPlant)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(PVPlant)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(PVPlant)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(PVPlant)
     end
@@ -130,7 +130,7 @@ function init_from_params(x::Type{PVPlant}, uac::String, params::Dict{String,Any
             InterfaceMap(m_el_out => nothing),
             m_el_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             energy_profile,
             params["scale"],
             0.0)  # supply

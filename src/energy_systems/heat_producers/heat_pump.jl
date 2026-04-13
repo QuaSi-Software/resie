@@ -343,7 +343,7 @@ const HEAT_PUMP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer"
     )
 )
 
-const HEAT_PUMP_EMISSION_PARAMETERS = get_emissions_standard_params("transformer",
+const HEAT_PUMP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
@@ -384,8 +384,8 @@ mutable struct HeatPump <: Component
     m_heat_out_secondary::Symbol
     m_heat_in::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     has_secondary_interface::Bool
     primary_el_sources::Vector{String}
@@ -444,8 +444,8 @@ function economic_parameters(x::Type{HeatPump})::Dict{String,Any}
     return deepcopy(HEAT_PUMP_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{HeatPump})::Dict{String,Any}
-    return deepcopy(HEAT_PUMP_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{HeatPump})::Dict{String,Any}
+    return deepcopy(HEAT_PUMP_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_name::String,
@@ -468,9 +468,9 @@ function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted:
     if param_type == "economy"
         parameter = economic_parameters(HeatPump)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(HeatPump)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(HeatPump)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(HeatPump)
     end
@@ -529,7 +529,7 @@ function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,An
             m_heat_out_secondary,
             m_heat_in,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["has_secondary_interface"],
             params["primary_el_sources"],
             params["secondary_el_sources"],

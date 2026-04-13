@@ -370,7 +370,7 @@ const BATTERY_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     )
 )
 
-const BATTERY_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const BATTERY_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 12,
         "embodied_emissions_specific" => 0.0,
@@ -397,8 +397,8 @@ Base.@kwdef mutable struct Battery <: Component
     m_el_out::Symbol
     m_heat_lt_out::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     model_type::String
     capacity::Float64
@@ -484,8 +484,8 @@ function economic_parameters(x::Type{Battery})::Dict{String,Any}
     return deepcopy(BATTERY_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{Battery})::Dict{String,Any}
-    return deepcopy(BATTERY_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{Battery})::Dict{String,Any}
+    return deepcopy(BATTERY_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{Battery}, config::Dict{String,Any}, param_name::String,
@@ -502,9 +502,9 @@ function validate_config(x::Type{Battery}, config::Dict{String,Any}, extracted::
     if param_type == "economy"
         parameter = economic_parameters(Battery)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(Battery)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(Battery)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(Battery)
     end
@@ -554,7 +554,7 @@ function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any
             m_el_out,
             m_heat_lt_out,
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["model_type"],
             params["capacity"],
             params["initial_load"] * params["capacity"],

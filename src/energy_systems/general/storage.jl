@@ -53,7 +53,7 @@ const STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
     )
 )
 
-const STORAGE_EMISSION_PARAMETERS = get_emissions_standard_params("storage",
+const STORAGE_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => 0.0,
@@ -81,8 +81,8 @@ mutable struct Storage <: Component
 
     medium::Symbol
 
-    economic_parameter::Dict{String,Any}
-    emission_parameter::Dict{String,Any}
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     capacity::Float64
     load::Float64
@@ -107,8 +107,8 @@ function economic_parameters(x::Type{Storage})::Dict{String,Any}
     return deepcopy(STORAGE_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{Storage})::Dict{String,Any}
-    return deepcopy(STORAGE_EMISSION_PARAMETERS)
+function emissions_parameters(x::Type{Storage})::Dict{String,Any}
+    return deepcopy(STORAGE_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{Storage}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -121,9 +121,9 @@ function validate_config(x::Type{Storage}, config::Dict{String,Any}, extracted::
     if param_type == "economy"
         parameter = economic_parameters(Storage)
         uac = uac * " - economic_parameters"
-    elseif param_type == "emission"
-        parameter = emission_parameters(Storage)
-        uac = uac * " - emission_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(Storage)
+        uac = uac * " - emissions_parameters"
     elseif param_type == "component"
         parameter = component_parameters(Storage)
     end
@@ -142,7 +142,7 @@ function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any
             InterfaceMap(medium => nothing), # output_interfaces
             medium,                          # medium
             params["economic_parameters"],
-            params["emission_parameters"],
+            params["emissions_parameters"],
             params["capacity"],              # capacity
             params["initial_load"] * params["capacity"], # load
             0.0,                             # load_end_of_last_timestep

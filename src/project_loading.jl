@@ -188,7 +188,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         unit="-"
     ),
     "emissions_CSV_file_path" => (
-        default="./output/emission_results.csv",
+        default="./output/emissions_results.csv",
         description="File path to where the emissions are written to CSV",
         display_name="Emissions CSV file",
         required=false,
@@ -687,8 +687,8 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
                            "show_detailed_errors" => io_settings["show_detailed_errors"],
                        ))
 
-    sim_params["economic_parameter"] = get_economic_parameters(project_config, sim_params)
-    sim_params["emissions_parameter"] = get_emissions_parameters(project_config, sim_params)
+    sim_params["economic_parameters"] = get_economic_parameters(project_config, sim_params)
+    sim_params["emissions_parameters"] = get_emissions_parameters(project_config, sim_params)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.
@@ -1034,7 +1034,7 @@ Return:
 """
 function get_economic_parameters(project_config::AbstractDict{String,Any},
                                  sim_params::Dict{String,Any})::Dict{String,Any}
-    if !haskey(project_config, "economic_parameter")
+    if !haskey(project_config, "economic_parameters")
         return Dict{String,Any}(
             "calculate_economy" => false,
         )
@@ -1104,7 +1104,7 @@ Return:
 """
 function get_emissions_parameters(project_config::AbstractDict{String,Any},
                                   sim_params::Dict{String,Any})::Dict{String,Any}
-    if !haskey(project_config, "emissions_parameter")
+    if !haskey(project_config, "emissions_parameters")
         return Dict{String,Any}(
             "calculate_emissions" => false,
         )
@@ -1122,7 +1122,7 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
     emissions_parameters["repeat_period"] = get_repeat_period(emissions_parameters["repeat_method"],
                                                               sim_params, "emissions")
 
-    return emission_parameters
+    return emissions_parameters
 end
 
 # calculation of the order of operations has its own include files due to its complexity
