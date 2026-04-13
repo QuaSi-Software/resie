@@ -84,16 +84,16 @@ mutable struct PVPlant <: Component
     end
 end
 
-function component_parameters(x::Type{PVPlant})::Dict{String,NamedTuple}
-    return deepcopy(PV_PLANT_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{PVPlant})::Dict{String,NamedTuple}
-    return deepcopy(PV_PLANT_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{PVPlant})::Dict{String,NamedTuple}
-    return deepcopy(PV_PLANT_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,

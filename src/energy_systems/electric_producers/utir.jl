@@ -156,16 +156,16 @@ mutable struct UTIR <: Component
     end
 end
 
-function component_parameters(x::Type{UTIR})::Dict{String,NamedTuple}
-    return deepcopy(UTIR_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{UTIR})::Dict{String,NamedTuple}
-    return deepcopy(UTIR_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{UTIR})::Dict{String,NamedTuple}
-    return deepcopy(UTIR_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{UTIR}, config::Dict{String,Any}, param_name::String,

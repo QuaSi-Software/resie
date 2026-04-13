@@ -170,23 +170,23 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
 
         # check mutex conditionals, based on given parameter values, not extracted (as they
         # include the default values)
-        validate_mutex_params(config, uac, GRID_CONNECTION_PARAMETERS)
+        validate_mutex_params(config, uac, component_parameters(GridConnection{IsSource}))
 
         # validate configuration, e.g. for interdependencies and allowed values
         validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params, "component")
 
         # do the same for economy
-        if sim_params["economic_parameter"]["calculate_economy"]
-            validate_mutex_params(economic_parameters_config, uac, GRID_ECONOMIC_PARAMETERS)
+        if sim_params["economic_parameters"]["calculate_economy"]
+            validate_mutex_params(economic_parameters_config, uac, economic_parameters(GridConnection{IsSource}))
             validate_config(GridConnection{IsSource}, economic_parameters_config, extracted_economic_params, uac,
                             sim_params, "economy")
         end
 
         # do the same for emissions
-        if sim_params["emissions_parameter"]["calculate_emissions"]
-            validate_mutex_params(emission_parameters_config, uac, GRID_EMISSION_PARAMETERS)
-            validate_config(GridConnection{IsSource}, emission_parameters_config, extracted_emission_params, uac,
-                            sim_params, "emission")
+        if sim_params["emissions_parameters"]["calculate_emissions"]
+            validate_mutex_params(emissions_parameters_config, uac, emissions_parameters(GridConnection{IsSource}))
+            validate_config(GridConnection{IsSource}, emissions_parameters_config, extracted_emissions_params, uac,
+                            sim_params, "emissions")
         end
     catch e
         @error "$(sprint(showerror, e))"
@@ -222,50 +222,50 @@ end
 const GridInput = GridConnection{true}
 const GridOutput = GridConnection{false}
 
-function component_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
-    return deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GridConnection{IsSource}})::Dict{String,Any} where {IsSource}
+    return deepcopy(GRID_CONNECTION_PARAMETERS)
 end
 
-function component_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GridInput})::Dict{String,Any}
+    params = deepcopy(GRID_CONNECTION_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
     return params
 end
 
-function component_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GridOutput})::Dict{String,Any}
+    params = deepcopy(GRID_CONNECTION_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
     return params
 end
 
-function economic_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
-    return deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridConnection{IsSource}})::Dict{String,Any} where {IsSource}
+    return deepcopy(GRID_ECONOMIC_PARAMETERS)
 end
 
-function economic_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridInput})::Dict{String,Any}
+    params = deepcopy(GRID_ECONOMIC_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
     return params
 end
 
-function economic_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GridOutput})::Dict{String,Any}
+    params = deepcopy(GRID_ECONOMIC_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
     return params
 end
 
-function emission_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
-    return deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{GridConnection{IsSource}})::Dict{String,Any} where {IsSource}
+    return deepcopy(GRID_EMISSION_PARAMETERS)
 end
 
-function emission_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{GridInput})::Dict{String,Any}
+    params = deepcopy(GRID_EMISSION_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
     return params
 end
 
-function emission_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
-    params = deepcopy(GRID_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{GridOutput})::Dict{String,Any}
+    params = deepcopy(GRID_EMISSION_PARAMETERS)
     delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
     return params
 end

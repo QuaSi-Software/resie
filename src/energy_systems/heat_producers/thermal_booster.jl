@@ -242,16 +242,16 @@ mutable struct ThermalBooster <: Component
     end
 end
 
-function component_parameters(x::Type{ThermalBooster})::Dict{String,NamedTuple}
-    return deepcopy(THERMAL_BOOSTER_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{ThermalBooster})::Dict{String,NamedTuple}
-    return deepcopy(THERMAL_BOOSTER_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{ThermalBooster})::Dict{String,NamedTuple}
-    return deepcopy(THERMAL_BOOSTER_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{ThermalBooster}, config::Dict{String,Any}, param_name::String,

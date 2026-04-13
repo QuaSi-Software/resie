@@ -223,8 +223,8 @@ function Bus(uac::String,
                epsilon)
 end
 
-function component_parameters(x::Type{Bus})::Dict{String,NamedTuple}
-    return deepcopy(BUS_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{Bus})::Dict{String,Any}
+    return deepcopy(BUS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,

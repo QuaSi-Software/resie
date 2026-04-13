@@ -99,16 +99,16 @@ mutable struct Storage <: Component
     end
 end
 
-function component_parameters(x::Type{Storage})::Dict{String,NamedTuple}
-    return deepcopy(STORAGE_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{Storage})::Dict{String,Any}
+    return deepcopy(STORAGE_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{Storage})::Dict{String,NamedTuple}
-    return deepcopy(STORAGE_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{Storage})::Dict{String,Any}
+    return deepcopy(STORAGE_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{Storage})::Dict{String,NamedTuple}
-    return deepcopy(STORAGE_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{Storage})::Dict{String,Any}
+    return deepcopy(STORAGE_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{Storage}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,

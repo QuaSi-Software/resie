@@ -172,16 +172,16 @@ mutable struct FuelBoiler <: Component
     end
 end
 
-function component_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
-    return deepcopy(FUEL_BOILER_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
-    return deepcopy(FUEL_BOILER_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
-    return deepcopy(FUEL_BOILER_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,

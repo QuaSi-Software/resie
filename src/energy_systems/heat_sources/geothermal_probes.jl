@@ -555,16 +555,16 @@ mutable struct GeothermalProbes <: Component
     end
 end
 
-function component_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_PROBES_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_PROBES_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_PROBES_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_PROBES_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_PROBES_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{GeothermalProbes})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_PROBES_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{GeothermalProbes}, config::Dict{String,Any}, param_name::String,

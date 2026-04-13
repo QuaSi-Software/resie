@@ -1550,14 +1550,14 @@ given type.
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the parameters where keys are parameter names and
+-`Dict{String,Any}`: Definition of the parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
+function component_parameters(x::Type{Component})::Dict{String,Any}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
-    return Dict{String,NamedTuple}()
+    return Dict{String,Any}()
 end
 
 """
@@ -1569,33 +1569,33 @@ given type.
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the economic parameters where keys are parameter names and
+-`Dict{String,Any}`: Definition of the economic parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function economic_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+function economic_parameters(x::Type{<:Component})::Dict{String,Any}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
-    return Dict{String,NamedTuple}()
+    return Dict{String,Any}()
 end
 
 """
-    emission_parameters(x::Type{Component})::Dict{String,Any}
+    emissions_parameters(x::Type{Component})::Dict{String,Any}
 
-Lists all emission parameters accepted by the constructor of the component with the
+Lists all emissions parameters accepted by the constructor of the component with the
 given type.
 
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the emission parameters where keys are parameter names and
+-`Dict{String,Any}`: Definition of the emissions parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function emission_parameters(x::Type{<:Component})::Dict{String,NamedTuple}
+function emissions_parameters(x::Type{<:Component})::Dict{String,Any}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
-    return Dict{String,NamedTuple}()
+    return Dict{String,Any}()
 end
 
 """
@@ -1889,7 +1889,7 @@ function evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Bool
 end
 
 """
-    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,Any})::Bool
 
 Returns if the conditionals for the given parameter apply.
 
@@ -1903,11 +1903,11 @@ evaluated.
 # Args
 - `name::String`: The name of the parameter to check
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 # Returns
 - `Bool`: True if the parameter is active, false if not
 """
-function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,Any})::Bool
     if !(name in keys(type_def) && isdefined(type_def[name], :conditionals))
         return true
     end
@@ -1958,7 +1958,7 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
 end
 
 """
-    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
 
 Validates the given component parameter config for mutex conditionals.
 
@@ -1967,9 +1967,9 @@ If a mutex conditional is triggered, throws an InputError.
 # Arguments
 - `config::Dict{String,Any}`: The component parameter config
 - `uac::String`: The UAC of the component, mostly used in error messages
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 """
-function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
     for (name, value) in pairs(config)
         if name in keys(type_def) && isdefined(type_def[name], :conditionals)
             for cond in type_def[name].conditionals
@@ -1991,7 +1991,7 @@ function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::
 end
 
 """
-    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
 
 Validates the given configuration for interdependencies and consistency.
 
@@ -2003,10 +2003,10 @@ Throws `InputError` if validation fails.
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
 - `uac::String`: The UAC of the component, mostly used in error messages
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 """
 function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
+                         sim_params::Dict{String,Any}, type_def::Dict{String,Any})
     for (name, value) in pairs(extracted)
         # skip control_parameters, as they have their own validation. also skip is_source
         # from GridConnection as it is an internal parameter
@@ -2216,13 +2216,13 @@ Args:
 -`defaults::Dict{String,Any}`: Defaults for the standard economic parameter
 -`units::Dict{String,Any}`: Units for some of the standard economic parameter
 Returns:
-- `Dict{String,NamedTuple}`: A Dict with the economic standard parameter settings for the SSOT
+- `Dict{String,Any}`: A Dict with the economic standard parameter settings for the SSOT
 """
 function get_economic_standard_params(type::String, defaults::Dict{String,Any},
-                                      units::Dict{String,Any})::Dict{String,NamedTuple}
+                                      units::Dict{String,Any})::Dict{String,Any}
     #! format: off
     if type in ["transformer", "storage"]
-        return Dict{String,NamedTuple}(
+        return Dict{String,Any}(
             "lifetime_years" => (
                 default=defaults["lifetime_years"],
                 description="Lifetime of the component until replacement is required",
@@ -2323,7 +2323,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
             )
         )
     elseif type in ["connection", "connection_fixed"]
-        connection_general_parameter = Dict{String,NamedTuple}(
+        connection_general_parameter = Dict{String,Any}(
             "energy_price_profile_file_path" => (
                 default=defaults["energy_price_profile_file_path"],
                 description="Path to an energy price profile file",
@@ -2388,7 +2388,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
             return connection_general_parameter
         elseif type ==  "connection_fixed"
             # additional economic parameter for pricing of unmet energies
-            fixed_connection_parameter = Dict{String,NamedTuple}(
+            fixed_connection_parameter = Dict{String,Any}(
                 "unmet_energy_price_profile_file_path" => (
                     default=defaults["unmet_energy_price_profile_file_path"],
                     description="Path to an price profile file for unmet energies",
@@ -2451,13 +2451,13 @@ Args:
 -`defaults::Dict{String,Any}`: Defaults for the standard emission parameter
 -`units::Dict{String,Any}`: Units for some of the standard emission parameter
 Returns:
-- `Dict{String,NamedTuple}`: A Dict with the emission standard parameter settings for the SSOT
+- `Dict{String,Any}`: A Dict with the emissions standard parameter settings for the SSOT
 """
 function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
-                                       units::Dict{String,Any})::Dict{String,NamedTuple}
+                                       units::Dict{String,Any})::Dict{String,Any}
     #! format: off
     if type in ["transformer", "storage"]
-        return Dict{String,NamedTuple}(
+        return Dict{String,Any}(
             "lifetime_years" => (
                 default=defaults["lifetime_years"],
                 description="Lifetime of the component until replacement is required",
@@ -2487,7 +2487,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             ),
         )
     elseif type in ["connection"]
-        return Dict{String,NamedTuple}(
+        return Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
                 description="Path to a specific emission profile file",

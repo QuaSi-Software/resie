@@ -8,7 +8,7 @@ const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
 
 #! format: off
-const IO_SETTINGS_DEF = Dict(
+const IO_SETTINGS_DEF = Dict{String,Any}(
     "base_path" => (
         default=nothing,
         description="If given, this path will be used as the base path for all relative " *
@@ -296,7 +296,7 @@ const IO_SETTINGS_DEF = Dict(
     ),
 )
 
-const SIMULATION_PARAMETERS_DEF = Dict(
+const SIMULATION_PARAMETERS_DEF = Dict{String,Any}(
     "start" => (
         description="Date and time of the beginning of the simulation (inclusive)",
         display_name="Start date",
@@ -446,7 +446,7 @@ const SIMULATION_PARAMETERS_DEF = Dict(
     ),
 )
 
-ECONOMIC_PARAMETERS_DEF = Dict{String,NamedTuple}(
+ECONOMIC_PARAMETERS_DEF = Dict{String,Any}(
     "calculate_economy" => (
         default=false,
         description="If set to true, performs the calculation of economic results, " *
@@ -508,7 +508,7 @@ ECONOMIC_PARAMETERS_DEF = Dict{String,NamedTuple}(
     ),
 )
 
-EMISSIONS_PARAMATERS_DEF = Dict{String,NamedTuple}(
+EMISSIONS_PARAMATERS_DEF = Dict{String,Any}(
     "calculate_emissions" => (
         default=false,
         description="If set to true, performs the calculation of GHG emissions results, " *

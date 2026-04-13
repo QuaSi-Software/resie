@@ -199,16 +199,16 @@ This is an alias to the generic implementation of a fixed sink.
 """
 const Demand = FixedSink
 
-function component_parameters(x::Type{FixedSink})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SINK_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{FixedSink})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SINK_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FixedSink})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SINK_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,

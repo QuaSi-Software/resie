@@ -143,16 +143,16 @@ mutable struct FlexibleSupply <: Component
     end
 end
 
-function component_parameters(x::Type{FlexibleSupply})::Dict{String,NamedTuple}
-    return deepcopy(FLEXIBLE_SUPPLY_COMPONENT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
+    return deepcopy(FLEXIBLE_SUPPLY_COMPONENT_PARAMETERS)
 end
 
-function economic_parameters(x::Type{FlexibleSupply})::Dict{String,NamedTuple}
-    return deepcopy(FLEXIBLE_SUPPLY_ECONOMIC_PARAMETERS) # return a copy to prevent external modification
+function economic_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
+    return deepcopy(FLEXIBLE_SUPPLY_ECONOMIC_PARAMETERS)
 end
 
-function emission_parameters(x::Type{FlexibleSupply})::Dict{String,NamedTuple}
-    return deepcopy(FLEXIBLE_SUPPLY_EMISSION_PARAMETERS) # return a copy to prevent external modification
+function emission_parameters(x::Type{FlexibleSupply})::Dict{String,Any}
+    return deepcopy(FLEXIBLE_SUPPLY_EMISSION_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FlexibleSupply}, config::Dict{String,Any}, param_name::String,
