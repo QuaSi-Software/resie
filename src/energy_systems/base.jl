@@ -2008,9 +2008,8 @@ Throws `InputError` if validation fails.
 function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, type_def::Dict{String,Any})
     for (name, value) in pairs(extracted)
-        # skip control_parameters, as they have their own validation. also skip is_source
-        # from GridConnection as it is an internal parameter
-        if name in ["control_parameters", "is_source", "economic_parameters", "emissions_parameters"]
+        # skip control, economic and emissions parameters, as they have their own validation
+        if name in ["control_parameters", "economic_parameters", "emissions_parameters"]
             continue
         end
 
@@ -2574,7 +2573,8 @@ include("general/fixed_supply.jl")
 include("general/flexible_supply.jl")
 include("general/flexible_sink.jl")
 include("general/storage.jl")
-include("connections/grid_connection.jl")
+include("connections/grid_input.jl")
+include("connections/grid_output.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
 include("storage/buffer_tank.jl")
