@@ -9,10 +9,9 @@ include("../../test_util.jl")
 function test_one_to_one_grid()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
-            "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

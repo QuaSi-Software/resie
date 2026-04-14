@@ -25,10 +25,9 @@ function get_config_heat_pump_1S1D()
             "scale" => 6000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -235,10 +234,9 @@ end
 function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
     base_dict = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -261,10 +259,9 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
                 "constant_temperature" => 60,
             ),
             "TST_SRC_01" => Dict{String,Any}(
-                "type" => "GridConnection",
+                "type" => "GridInput",
                 "medium" => "m_h_w_lt1",
                 "output_refs" => ["TST_HP_01"],
-                "is_source" => true,
             ),
         )
     else
@@ -272,10 +269,9 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
 
         extended = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
-                "type" => "GridConnection",
+                "type" => "GridOutput",
                 "medium" => "m_h_w_ht1",
                 "output_refs" => [],
-                "is_source" => false,
             ),
             "TST_SRC_01" => Dict{String,Any}(
                 "type" => "FixedSupply",
@@ -564,10 +560,9 @@ function get_config_heat_pump_2S2D()
             ),
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",

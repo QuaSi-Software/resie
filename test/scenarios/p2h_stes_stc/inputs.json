@@ -144,10 +144,9 @@
             "scale": 200000.0
         },
         "TST_GRO_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_e_ac_230v",
-            "is_source": false
+            "medium": "m_e_ac_230v"
         },
         "TST_HP_01": {
             "type": "HeatPump",
@@ -176,12 +175,11 @@
             "nr_optimisation_passes": 10
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "TST_BUS_02"
             ],
-            "medium": "m_e_ac_230v",
-            "is_source": true
+            "medium": "m_e_ac_230v"
         },
         "TST_DEM_02": {
             "type": "Demand",

@@ -25,10 +25,9 @@ function test_gasboiler_demand_driven_with_bus()
             ),
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GB_01"],
-            "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -220,10 +219,9 @@ function test_gasboiler_demand_driven_without_bus()
             "scale" => 1500,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GB_01"],
-            "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",

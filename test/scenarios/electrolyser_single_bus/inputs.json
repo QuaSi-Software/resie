@@ -322,32 +322,28 @@
             "ground_model": "simplified"
         },
         "TST_01_HZG_01_GRI": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_g_natgas",
             "output_refs": [
                 "TST_01_HZG_01_GBO"
-            ],
-            "is_source": true
+            ]
         },
         "TST_01_ELT_01_GRI": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_01_ELT_01_BUS"
-            ],
-            "is_source": true
+            ]
         },
         "TST_01_ELT_02_GRI": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_e_ac_230v",
-            "output_refs": [ ],
-            "is_source": false
+            "output_refs": []
         },
         "TST_01_ELT_01_GRO": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_c_g_o2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         }
     }
 }

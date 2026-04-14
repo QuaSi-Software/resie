@@ -84,22 +84,19 @@
             "scale": 3000
         },
         "TST_DEM_O2_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_c_g_o2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         },
         "TST_GRI_EL_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
-            "output_refs": ["TST_HP_01"],
-            "is_source": true
+            "output_refs": ["TST_HP_01"]
         },
         "TST_GRI_EL_02": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
-            "output_refs": ["TST_01_ELT_01_ELY"],
-            "is_source": true
+            "output_refs": ["TST_01_ELT_01_ELY"]
         },
         "TST_HP_01": {
             "type": "HeatPump",

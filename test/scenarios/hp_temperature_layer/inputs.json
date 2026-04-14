@@ -62,12 +62,11 @@
             "constant_temperature": 26
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"
-            ],
-            "is_source": true
+            ]
         },
         "TST_HP_01": {
             "type": "HeatPump",

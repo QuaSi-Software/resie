@@ -44,28 +44,25 @@
             "constant_temperature": 20
         },
         "TST_GRI_natgas": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_natgas",
             "output_refs": [
                 "TST_CHP_01"
-            ],
-            "is_source": true
+            ]
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"
-            ],
-            "is_source": true
+            ]
         },
         "TST_GRI_02": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_e_ac_230v",
             "input_refs": [
                 "TST_BUS_EL"
-            ],
-            "is_source": false
+            ]
         },
         "TST_HP_01": {
             "type": "HeatPump",

@@ -255,12 +255,11 @@
             }
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_HP_01"
-            ],
-            "is_source": true
+            ]
         },
         "TST_HP_01": {
             "type": "HeatPump",

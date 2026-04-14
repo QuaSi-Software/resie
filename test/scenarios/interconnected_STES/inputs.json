@@ -203,12 +203,11 @@
             }
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "TST_BUS_02"
             ],
-            "medium": "m_e_ac_230v",
-            "is_source": true
+            "medium": "m_e_ac_230v"
         },
         "TST_BUS_02": {
             "type": "Bus",
@@ -343,24 +342,21 @@
             "scale": 70000.0
         },
         "TST_GRO_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_c_g_o2",
-            "is_source": false
+            "medium": "m_c_g_o2"
         },
         "TST_GRI_02": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "TST_CHPP_01"
             ],
-            "medium": "m_c_g_natgas",
-            "is_source": true
+            "medium": "m_c_g_natgas"
         },
         "TST_GRO_03": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_e_ac_230v",
-            "is_source": false
+            "medium": "m_e_ac_230v"
         },
         "TST_STS_01": {
             "type": "SeasonalThermalStorage",

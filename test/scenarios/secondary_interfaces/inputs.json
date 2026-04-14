@@ -68,12 +68,11 @@
             "constant_power": 2
         },
         "SRC_GRID": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "BUS_EL"
-            ],
-            "is_source": true
+            ]
         },
         "BUS_EL": {
             "type": "Bus",

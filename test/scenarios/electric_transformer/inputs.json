@@ -20,12 +20,11 @@
     },
     "components": {
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "TST_TRF_01"
             ],
-            "medium": "m_e_ac_5kv",
-            "is_source": true
+            "medium": "m_e_ac_5kv"
         },
         "TST_BUS_DC": {
             "type": "Bus",
@@ -159,18 +158,16 @@
             "min_power_fraction" : 0.1
         },
         "TST_GRI_GAS" : {
-            "type" : "GridConnection",
+            "type" : "GridInput",
             "medium" : "m_c_g_natgas",
             "output_refs" : [
                 "TST_CHP_01"
-            ],
-            "is_source" : true
+            ]
         },
         "TST_GRO_HEAT" : {
-            "type" : "GridConnection",
+            "type" : "GridOutput",
             "medium" : "m_h_w_ht1",
-            "output_refs" : [],
-            "is_source" : false
+            "output_refs" : []
         }
     }
 }

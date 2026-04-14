@@ -121,11 +121,9 @@
             "scale": 1500
         },
         "ESS_GRI_EG_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_g_natgas",
-            "output_refs": [
-                "ESS_GBO_01"],
-            "is_source": true
+            "output_refs": ["ESS_GBO_01"]
         },
         "ESS_GBO_01": {
             "type": "FuelBoiler",

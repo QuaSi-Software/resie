@@ -151,10 +151,9 @@
             "constant_power": 1e8
         },
         "Grid_OUT": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_power",
-            "is_source": false
+            "medium": "m_power"
         },
         "Photovoltaic": {
             "type": "PVPlant",

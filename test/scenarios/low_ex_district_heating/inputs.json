@@ -140,12 +140,11 @@
             }
         },
         "GRI_Power_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "BUS_Power_Houses"
             ],
-            "medium": "electricity",
-            "is_source": true
+            "medium": "electricity"
         },
         "TB_House_01": {
             "type": "ThermalBooster",
@@ -236,20 +235,18 @@
             "nr_optimisation_passes": 10
         },
         "GRI_Power_02": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
-            "medium": "electricity",
-            "is_source": true
+            "medium": "electricity"
         },
         "GRI_Air": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
             "medium": "ambient_air",
-            "is_source": true,
             "temperature_profile_file_path": "./profiles/examples/district/ambient_temperature_TRY2015_Stuttgart.prf"
         },
         "BFT_DistrictHeating_LowEx": {
@@ -324,10 +321,9 @@
             "scale": 350
         },
         "GRO_Power": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "electricity",
-            "is_source": false
+            "medium": "electricity"
         }
     }
 }
