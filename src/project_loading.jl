@@ -1042,8 +1042,12 @@ function get_economic_parameters(project_config::AbstractDict{String,Any},
 
     economic_parameters = Dict{String,Any}()
     for (name, param_def) in pairs(ECONOMIC_PARAMETERS_DEF)
-        economic_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config, name,
-                                                                    param_def, sim_params, "Economic parameters")
+        economic_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                                    project_config["economic_parameters"],
+                                                                    name,
+                                                                    param_def,
+                                                                    sim_params,
+                                                                    "Economic parameters")
     end
 
     EnergySystems.validate_config(EnergySystems.Component, economic_parameters, "Economic parameters",
@@ -1112,8 +1116,12 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
 
     emissions_parameters = Dict{String,Any}()
     for (name, param_def) in pairs(EMISSIONS_PARAMATERS_DEF)
-        emissions_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config, name,
-                                                                     param_def, sim_params, "Emissions parameters")
+        emissions_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                                     project_config["emissions_parameters"],
+                                                                     name,
+                                                                     param_def,
+                                                                     sim_params,
+                                                                     "Emissions parameters")
     end
 
     EnergySystems.validate_config(EnergySystems.Component, emissions_parameters, "Emissions parameters",
