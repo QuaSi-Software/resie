@@ -1133,5 +1133,22 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
     return emissions_parameters
 end
 
+"""
+    all_general_parameters()::Dict{String,Any}
+
+Lists all general, non-component parameters for the simulation engine.
+
+# Returns
+-`Dict{String,Any}`: The parameter definitions
+"""
+function all_general_parameters()::Dict{String,Any}
+    return Dict{String,Any}(
+        "simulation" => SIMULATION_PARAMETERS_DEF,
+        "io_settings" => IO_SETTINGS_DEF,
+        "economic" => ECONOMIC_PARAMETERS_DEF,
+        "emissions" => EMISSIONS_PARAMATERS_DEF,
+    )
+end
+
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")

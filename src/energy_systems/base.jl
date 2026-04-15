@@ -3190,25 +3190,31 @@ end
 """
     all_component_parameters()::Dict{String,Any}
 
-Returns a dictionary, with type names as keys, of the parameters of all components.
+Returns a dictionary, with type names as keys, of the parameters of all component types.
 
-Parameters for economic and emissions calculation are placed in sub-dictionaries. An example
-in JSON notation might look like this:
+Parameters for economic and emissions calculation are placed in sub-dictionaries. Control
+parameters, which are the same for all component types, are placed in top-level sub-
+dictionaries. An example in JSON notation might look like this:
 ```
 {
-    "BufferTank": {
-        "medium": {...},
-        ...
-        "economic": {
-            "lifetime_years": {...},
-            ...
+    "control": {...},
+    "types": {
+        "BufferTank": {
+            "parameters": {
+                "medium": {...},
+                ...
+            },
+            "economic": {
+                "lifetime_years": {...},
+                ...
+            },
+            "emissions": {
+                "constant_energy_emissions: {...},
+                ...
+            }
         },
-        "emissions": {
-            "lifetime_years: {...},
-            ...
-        }
-    },
-    ...
+        ...
+    }
 }
 ```
 
@@ -3221,18 +3227,28 @@ function all_component_parameters()::Dict{String,Any}
              GeothermalProbes, GridInput, GridOutput, HeatPump, PVPlant, SeasonalThermalStorage,
              SolarthermalCollector, Storage, ThermalBooster, UTIR]
 
-    all_parameters = Dict{String,Any}()
+    all_parameters = Dict{String,Any}(
+        "control" => CONTROL_PARAMS_DEF,
+        "control_modules" => Dict{String,Any}(),
+        "types" => Dict{String,Any}(),
+    )
+
     for cmp_type in types
         # turning the Type into a Symbol gives the fully qualified name including modules,
         # but we care only about the last part, the actual type name
         name = String(Symbol(cmp_type))
         type_name = last(split(name, "."))
-        all_parameters[type_name] = Dict{String,Any}(
+        all_parameters["types"][type_name] = Dict{String,Any}(
             "parameters" => component_parameters(cmp_type),
             "economic" => economic_parameters(cmp_type),
             "emissions" => emissions_parameters(cmp_type),
         )
     end
+
+    for (name, cm_type) in pairs(Resie.load_control_module_class_mapping())
+        all_parameters["control_modules"][name] = control_module_parameters(cm_type)
+    end
+
     return all_parameters
 end
 
