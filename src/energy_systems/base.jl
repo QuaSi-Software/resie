@@ -3223,6 +3223,7 @@ function all_component_parameters()::Dict{String,Any}
 
     all_parameters = Dict{String,Any}(
         "control" => CONTROL_PARAMS_DEF,
+        "control_modules" => Dict{String,Any}(),
         "types" => Dict{String,Any}(),
     )
 
@@ -3236,6 +3237,10 @@ function all_component_parameters()::Dict{String,Any}
             "economic" => economic_parameters(cmp_type),
             "emissions" => emissions_parameters(cmp_type),
         )
+    end
+
+    for (name, cm_type) in pairs(Resie.load_control_module_class_mapping())
+        all_parameters["control_modules"][name] = control_module_parameters(cm_type)
     end
 
     return all_parameters

@@ -1,6 +1,41 @@
 using Dates
 using ..Resie
 
+#! format: off
+CONMOD_ECONOMIC_CONTROL_PARAMS = Dict(
+    "price_profile_path" => (
+        default=nothing,
+        description="File path to the profile with the grid price.",
+        display_name="Price profile path",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "limit_price" => (
+        default=0.0,
+        description="Limit of the grid price at which the modules switches from one " *
+                    "control scheme to the other.",
+        display_name="Limit price",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="€"
+    ),
+    "new_connections_below_limit" => (
+        default=nothing,
+        description="The bus' connection matrix and priorities when the grid price is " *
+                    "below the limit. This is a complex object and equivalent to the " *
+                    "`connections` sub-configuration of a Bus component.",
+        display_name="Connections below limit",
+        required=true,
+        type=Dict,
+        json_type="object",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Control module for setting limits to the PLR of a component according to a price_profile and 
 available storage capacity or demand.
@@ -103,6 +138,9 @@ end
 
 # method for control module name on type-level
 control_module_name(x::Type{CM_EconomicControl})::String = "economic_control"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_EconomicControl})::Dict{String,NamedTuple} = CONMOD_ECONOMIC_CONTROL_PARAMS
 
 function has_method_for(mod::CM_EconomicControl, func::ControlModuleFunction)::Bool
     return func == cmf_change_bus_priorities || func == cmf_reorder_operations
