@@ -142,16 +142,16 @@ function calculate_economy(shared_data::Vector{EconomyEmissionsData}, sim_params
                                                                                             result.annuity_energies,
                                                                                             result.breakdown,
                                                                                             type)
-
-        else
-            # start and end energy of storage?! TODO
-            # calculate capex, operation-related opex and optional additional component-specific opex
-            result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component,
-                                                                                                              sim_params,
-                                                                                                              result.annuity_capex,
-                                                                                                              result.annuity_opex,
-                                                                                                              result.breakdown)
         end
+
+        # calculate capex, operation-related opex and optional additional component-specific opex for all components
+        result.annuity_capex, result.annuity_opex, result.breakdown = calculate_annuity_of_capex_and_opex(component,
+                                                                                                          sim_params,
+                                                                                                          result.annuity_capex,
+                                                                                                          result.annuity_opex,
+                                                                                                          result.breakdown)
+
+        # start and end energy of storage?! TODO
     end
     result.total_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
     return result

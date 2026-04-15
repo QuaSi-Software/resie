@@ -150,9 +150,22 @@ const GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS = get_economic_standard_params("co
         "constant_energy_price" => nothing,
         "energy_price_change_rate_per_year" =>  0.02,
         "base_cost_per_year" => 0.0,
-        "base_cost_change_rate_per_year" => 0.0
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => nothing,
+        "subsidy_max" => nothing
     ),
-    Dict{String,Any}(),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_power or scaling_factor)"
+    ),
 )
 
 const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
@@ -346,6 +359,14 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
 
     if sum(energy_demand; init=0.0) < 0.0
         add!(outface, abs.(energy_demand), temperature_min, temperature_max)
+    end
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::GenericHeatSource)
+    if unit.constant_power !== nothing
+        return unit.max_energy
+    else
+        return unit.scaling_factor
     end
 end
 

@@ -57,9 +57,22 @@ const GRID_OUTPUT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection
         "constant_energy_price" => nothing,
         "energy_price_change_rate_per_year" =>  0.02,
         "base_cost_per_year" => 0.0,
-        "base_cost_change_rate_per_year" => 0.0
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => nothing,
+        "subsidy_max" => nothing
     ),
-    Dict{String,Any}(),
+    Dict{String,Any}(            
+        "capex_specific" => "€"
+    ),
 )
 
 const GRID_OUTPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection",
@@ -204,6 +217,10 @@ function process(unit::GridOutput, sim_params::Dict{String,Any})
         unit.input_sum += energy_supply
         sub!(inface, abs(energy_supply), unit.temperature, nothing)
     end
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::GridOutput)
+    return 1.0 # absolute costs here
 end
 
 function output_values(unit::GridOutput)::Vector{String}
