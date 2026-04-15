@@ -2321,8 +2321,6 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="€"
             )
         )
-    else
-        capex_parameter = Dict{String,Any}()
     end
 
     if type in ["connection", "connection_fixed"]
@@ -2386,8 +2384,6 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="1/year"
             ),
         )
-    else
-        energy_opex_parameter = Dict{String,Any}()
     end
 
     if type == "connection_fixed"
@@ -2434,8 +2430,6 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="1/year"
             ),
         )
-    else
-        energy_unmet_parameter = Dict{String,Any}()
     end
     #! format: on
 
