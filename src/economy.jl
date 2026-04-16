@@ -334,13 +334,14 @@ end
 
 """
 For point cashflows:
-index 1 -> t=0
-index 2 -> t=1
+index 1 -> begin of year 1 (t=0)
+index 2 -> begin of year 2 (t=1)
 ...
 Used for A0, replacements, residual, subsidies.
 """
 function get_annuity_point_cashflows(cashflows::Vector{Float64},
-                                     sim_params::Dict{String,Any})::Float64
+                                     sim_params::Dict{String,Any};
+                                     terminal_cashflow::Float64=0.0)::Float64
     q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
     years = length(cashflows)
 
@@ -349,14 +350,18 @@ function get_annuity_point_cashflows(cashflows::Vector{Float64},
         present_value += cashflows[k] / q^(k - 1)
     end
 
+    # terminal cashflow at t = years
+    # use this to apply residual values that are discounted by years instead of (years-1)
+    present_value += terminal_cashflow / q^years
+
     a = annuity_factor(sim_params, years)
     return present_value * a
 end
 
 """
 For recurring yearly costs/revenues:
-index 1 -> end of year 1
-index 2 -> end of year 2
+index 1 -> end of year 1 (t=1)
+index 2 -> end of year 2 (t=2)
 ...
 Used for energy, maintenance, repair, labour, annual revenues.
 """
@@ -382,9 +387,9 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     residuals_per_year,
     subsidies_per_year = get_capex_from_component(component, sim_params)
 
-    component_capex_annuity = get_annuity_point_cashflows(investments_per_year .- residuals_per_year .-
-                                                          subsidies_per_year,
-                                                          sim_params)
+    component_capex_annuity = get_annuity_point_cashflows(investments_per_year .- subsidies_per_year,
+                                                          sim_params;
+                                                          terminal_cashflow=(-residuals_per_year[end]))
     annuity_capex += component_capex_annuity
 
     # calculate opex (operation-related costs) including inspections, servicing and repair 
