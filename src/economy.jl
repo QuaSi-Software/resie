@@ -843,7 +843,7 @@ function get_embodied_emissions_from_component(component::EnergySystems.Componen
     # calculate residual value
     t_last = n * lifetime_years
     remaining_fraction = max(0.0, ((n + 1) * lifetime_years - observation_period) / lifetime_years)
-    emissions_per_year[observation_period] = (emissions_first_year * r^t_last) * remaining_fraction
+    emissions_per_year[observation_period] -= (emissions_first_year * r^t_last) * remaining_fraction
 
     return emissions_per_year
 end
