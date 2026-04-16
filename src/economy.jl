@@ -249,8 +249,9 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     end
 
     # calculate annuity
-    component_energies_annuity = get_annuity(energy_costs_per_year_result .+ energy_base_costs_per_year_result,
-                                             sim_params)
+    component_energies_annuity = get_annuity_recurring_cashflows(energy_costs_per_year_result .+
+                                                                 energy_base_costs_per_year_result,
+                                                                 sim_params)
     annuity_energies += component_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
@@ -310,7 +311,7 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     end
 
     # calculate annuity
-    component_unmet_energies_annuity = get_annuity(unmet_energy_costs_per_year_result, sim_params)
+    component_unmet_energies_annuity = get_annuity_recurring_cashflows(unmet_energy_costs_per_year_result, sim_params)
     annuity_energies += component_unmet_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
@@ -320,24 +321,56 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     return annuity_energies, breakdown
 end
 
-function get_annuity(costs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
-    q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
-    years = length(costs)
+function annuity_factor(sim_params::Dict{String,Any}, years::Int)::Float64
+    i = sim_params["economic_parameters"]["interest_rate"]
+    q = 1.0 + i
 
-    # Timing convention: costs[1] occurs at t=0, costs[k] at t=k-1
-    # Present value of the given cost stream
+    if abs(i) < sim_params["epsilon"]
+        return 1.0 / years
+    else
+        return (q^years * (q - 1.0)) / (q^years - 1.0)
+    end
+end
+
+"""
+For point cashflows:
+index 1 -> t=0
+index 2 -> t=1
+...
+Used for A0, replacements, residual, subsidies.
+"""
+function get_annuity_point_cashflows(cashflows::Vector{Float64},
+                                     sim_params::Dict{String,Any})::Float64
+    q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
+    years = length(cashflows)
+
     present_value = 0.0
     for k in 1:years
-        present_value += costs[k] / q^(k - 1)
+        present_value += cashflows[k] / q^(k - 1)
     end
 
-    # Annuity factor a(q,years)
-    a = if abs(sim_params["economic_parameters"]["interest_rate"]) < sim_params["epsilon"]
-        1.0 / years
-    else
-        (q^years * (q - 1.0)) / (q^years - 1.0)
+    a = annuity_factor(sim_params, years)
+    return present_value * a
+end
+
+"""
+For recurring yearly costs/revenues:
+index 1 -> end of year 1
+index 2 -> end of year 2
+...
+Used for energy, maintenance, repair, labour, annual revenues.
+"""
+function get_annuity_recurring_cashflows(cashflows::Vector{Float64},
+                                         sim_params::Dict{String,Any})::Float64
+    q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
+    years = length(cashflows)
+
+    present_value = 0.0
+    for y in 1:years
+        present_value += cashflows[y] / q^y
     end
 
+    a = annuity_factor(sim_params, years)
     return present_value * a
 end
 
@@ -349,7 +382,9 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     residuals_per_year,
     subsidies_per_year = get_capex_from_component(component, sim_params)
 
-    component_capex_annuity = get_annuity(investments_per_year .- residuals_per_year .- subsidies_per_year, sim_params)
+    component_capex_annuity = get_annuity_point_cashflows(investments_per_year .- residuals_per_year .-
+                                                          subsidies_per_year,
+                                                          sim_params)
     annuity_capex += component_capex_annuity
 
     # calculate opex (operation-related costs) including inspections, servicing and repair 
@@ -358,14 +393,15 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     repair_per_year,
     labour_per_year = get_opex_from_component(component, investment_first_year, sim_params)
 
-    component_opex_annuity = get_annuity(maintenance_per_year .+ repair_per_year .+ labour_per_year, sim_params)
+    component_opex_annuity = get_annuity_point_cashflows(maintenance_per_year .+ repair_per_year .+ labour_per_year,
+                                                         sim_params)
     annuity_opex += component_opex_annuity
 
     # get additional component-specific opex of material flows not represented by any interfaces
     # call component-specific function to get special opex, e.g. electrolysers water demand and oxygen production
     names, additional_opex_per_year = get_additional_opex_from_component(component, sim_params)
     for (idx, name) in enumerate(names)
-        component_additional_opex_annuity = get_annuity(additional_opex_per_year[idx], sim_params)
+        component_additional_opex_annuity = get_annuity_point_cashflows(additional_opex_per_year[idx], sim_params)
         component_opex_annuity += component_additional_opex_annuity
         annuity_opex += component_additional_opex_annuity
         add_to_breakdown!(breakdown, component.uac, Dict(name => additional_opex_per_year[idx]))
