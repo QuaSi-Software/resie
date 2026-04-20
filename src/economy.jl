@@ -535,14 +535,20 @@ end
 
 function plot_economic_results(result::EconomicResult, output_file_path::String, sim_params::Dict{String,Any},
                                cost_type::String)
-    suffix = "_per_year"
-    suffix_discounted = "_per_year_discounted"
-
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
 
-    # collect yearly series from result struct
-    series_cashflows = Dict{String,Vector{Float64}}()
+    # check requested figure type (cashflows or discounted present values)
+    if cost_type == "cashflows"
+        suffix = "_per_year"
+        cost_name = "yearly cashflows"
+    elseif cost_type == "present_values"
+        suffix = "_per_year_discounted"
+        cost_name = "present values"
+    end
+
+    # collect yearly series from result struct. Either discounted or cashflow values, depending on suffix
+    series = Dict{String,Vector{Float64}}()
     for (component, component_results) in result.breakdown
         for (key, values) in component_results
             values isa AbstractVector{<:Real} || continue    # consider only vectors, no floats
@@ -550,33 +556,10 @@ function plot_economic_results(result::EconomicResult, output_file_path::String,
             all(iszero, values) && continue                  # consider only entries that contain values
 
             name = "$(component) | $(key)"
-            series_cashflows[name] = copy(values)
+            series[name] = copy(values)
         end
     end
-    isempty(series_cashflows) && return false
-
-    series_discounted = Dict{String,Vector{Float64}}()
-    for (component, component_results) in result.breakdown
-        for (key, values) in component_results
-            values isa AbstractVector{<:Real} || continue    # consider only vectors, no floats
-            endswith(key, suffix_discounted) || continue     # consider entries with a key ending with suffix
-            all(iszero, values) && continue                  # consider only entries that contain values
-
-            name = "$(component) | $(key)"
-            series_discounted[name] = copy(values)
-        end
-    end
-    isempty(series_discounted) && return false
-
-    if cost_type == "cashflows"
-        # do nothing, values are already cashflows
-        cost_name = "yearly cashflows"
-        series = series_cashflows
-    elseif cost_type == "present_values"
-        # calculate net present values
-        cost_name = "present values"
-        series = series_discounted
-    end
+    isempty(series) && return false
 
     # parameter 
     observation_period_in_years = Int(sim_params["economic_parameters"]["observation_period_in_years"])
