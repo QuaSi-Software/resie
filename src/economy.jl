@@ -451,7 +451,7 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
 
     # subsidies as one-time event at the beginning of the observation period
     if !isnothing(subsidy_rate_of_capex)
-        cap = (isnothing(subsidy_max) || subsidy_max ≤ 0) ? Inf : subsidy_max
+        cap = (isnothing(subsidy_max) || subsidy_max < 0) ? Inf : subsidy_max
         subsidies_first_year = min(investment_first_year * subsidy_rate_of_capex, cap)
         subsidies_per_year[1] += subsidies_first_year
     end
