@@ -249,15 +249,21 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     end
 
     # calculate annuity
-    component_energies_annuity = get_annuity_recurring_cashflows(energy_costs_per_year_result .+
-                                                                 energy_base_costs_per_year_result,
-                                                                 sim_params)
+    energy_costs_per_year_result_discounted = discount_values(energy_costs_per_year_result, sim_params, "end_of_year")
+    energy_base_costs_per_year_result_discounted = discount_values(energy_base_costs_per_year_result, sim_params,
+                                                                   "end_of_year")
+
+    component_energies_annuity = calculate_annuity_from_discounted(energy_costs_per_year_result_discounted .+
+                                                                   energy_base_costs_per_year_result_discounted,
+                                                                   sim_params)
     annuity_energies += component_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_energies" => component_energies_annuity,
                            energy_name => energy_costs_per_year_result,
-                           base_name => energy_base_costs_per_year_result))
+                           energy_name * "_discounted" => energy_costs_per_year_result_discounted,
+                           base_name => energy_base_costs_per_year_result,
+                           base_name * "_discounted" => energy_base_costs_per_year_result_discounted))
 
     return annuity_energies, breakdown
 end
@@ -311,12 +317,17 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     end
 
     # calculate annuity
-    component_unmet_energies_annuity = get_annuity_recurring_cashflows(unmet_energy_costs_per_year_result, sim_params)
+    unmet_energy_costs_per_year_result_discounted = discount_values(unmet_energy_costs_per_year_result, sim_params,
+                                                                    "end_of_year")
+
+    component_unmet_energies_annuity = calculate_annuity_from_discounted(unmet_energy_costs_per_year_result_discounted,
+                                                                         sim_params)
     annuity_energies += component_unmet_energies_annuity
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_unmet_energies" => component_unmet_energies_annuity,
-                           energy_name => unmet_energy_costs_per_year_result))
+                           energy_name => unmet_energy_costs_per_year_result,
+                           energy_name * "_discounted" => unmet_energy_costs_per_year_result_discounted))
 
     return annuity_energies, breakdown
 end
@@ -332,51 +343,40 @@ function annuity_factor(sim_params::Dict{String,Any}, years::Int)::Float64
     end
 end
 
-"""
-For point cashflows:
-index 1 -> begin of year 1 (t=0)
-index 2 -> begin of year 2 (t=1)
-...
-Used for A0, replacements, residual, subsidies.
-"""
-function get_annuity_point_cashflows(cashflows::Vector{Float64},
-                                     sim_params::Dict{String,Any};
-                                     terminal_cashflow::Float64=0.0)::Float64
-    q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
-    years = length(cashflows)
-
-    present_value = 0.0
-    for k in 1:years
-        present_value += cashflows[k] / q^(k - 1)
-    end
-
-    # terminal cashflow at t = years
-    # use this to apply residual values that are discounted by years instead of (years-1)
-    present_value += terminal_cashflow / q^years
-
-    a = annuity_factor(sim_params, years)
-    return present_value * a
+# this function expects discounted values per year!
+function calculate_annuity_from_discounted(discounted_cashflows::Vector{Float64}, sim_params::Dict{String,Any})
+    return sum(discounted_cashflows; init=0.0) * annuity_factor(sim_params, length(discounted_cashflows))
 end
 
 """
-For recurring yearly costs/revenues:
+type = "begin_of_year":
+index 1 -> begin of year 1 (t=0)
+index 2 -> begin of year 2 (t=1)
+Used for A0, replacements, residual, subsidies.
+
+type = "end_of_year":
 index 1 -> end of year 1 (t=1)
 index 2 -> end of year 2 (t=2)
-...
 Used for energy, maintenance, repair, labour, annual revenues.
 """
-function get_annuity_recurring_cashflows(cashflows::Vector{Float64},
-                                         sim_params::Dict{String,Any})::Float64
+function discount_values(cashflows::Vector{Float64}, sim_params::Dict{String,Any}, type::String)
     q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
     years = length(cashflows)
+    discounted_cashflows = zeros(years)
 
-    present_value = 0.0
-    for y in 1:years
-        present_value += cashflows[y] / q^y
+    if type == "end_of_year"
+        for k in 1:years
+            discounted_cashflows[k] = cashflows[k] / q^k
+        end
+    elseif type == "begin_of_year"
+        for k in 1:years
+            discounted_cashflows[k] = cashflows[k] / q^(k - 1)
+        end
+    else
+        @error "Internal error in function discount_values(). Type has to be either begin_of_year or end_of_year!"
     end
 
-    a = annuity_factor(sim_params, years)
-    return present_value * a
+    return discounted_cashflows
 end
 
 function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component, sim_params::Dict{String,Any},
@@ -387,9 +387,14 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     residuals_per_year,
     subsidies_per_year = get_capex_from_component(component, sim_params)
 
-    component_capex_annuity = get_annuity_point_cashflows(investments_per_year .- subsidies_per_year,
-                                                          sim_params;
-                                                          terminal_cashflow=(-residuals_per_year[end]))
+    investments_per_year_discounted = discount_values(investments_per_year, sim_params, "begin_of_year")
+    residuals_per_year_discounted = discount_values(residuals_per_year, sim_params, "end_of_year")
+    subsidies_per_year_discounted = discount_values(subsidies_per_year, sim_params, "begin_of_year")
+
+    component_capex_annuity = calculate_annuity_from_discounted(investments_per_year_discounted .-
+                                                                subsidies_per_year_discounted .-
+                                                                residuals_per_year_discounted,
+                                                                sim_params)
     annuity_capex += component_capex_annuity
 
     # calculate opex (operation-related costs) including inspections, servicing and repair 
@@ -398,29 +403,46 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
     repair_per_year,
     labour_per_year = get_opex_from_component(component, investment_first_year, sim_params)
 
-    component_opex_annuity = get_annuity_point_cashflows(maintenance_per_year .+ repair_per_year .+ labour_per_year,
-                                                         sim_params)
+    maintenance_per_year_discounted = discount_values(maintenance_per_year, sim_params, "end_of_year")
+    repair_per_year_discounted = discount_values(repair_per_year, sim_params, "end_of_year")
+    labour_per_year_discounted = discount_values(labour_per_year, sim_params, "end_of_year")
+
+    component_opex_annuity = calculate_annuity_from_discounted(maintenance_per_year_discounted .+
+                                                               repair_per_year_discounted .+
+                                                               labour_per_year_discounted,
+                                                               sim_params)
     annuity_opex += component_opex_annuity
 
     # get additional component-specific opex of material flows not represented by any interfaces
     # call component-specific function to get special opex, e.g. electrolysers water demand and oxygen production
     names, additional_opex_per_year = get_additional_opex_from_component(component, sim_params)
     for (idx, name) in enumerate(names)
-        component_additional_opex_annuity = get_annuity_point_cashflows(additional_opex_per_year[idx], sim_params)
+        component_additional_opex_annuity_discounted = discount_values(additional_opex_per_year[idx], sim_params,
+                                                                       "end_of_year")
+        component_additional_opex_annuity = calculate_annuity_from_discounted(component_additional_opex_annuity_discounted,
+                                                                              sim_params)
         component_opex_annuity += component_additional_opex_annuity
         annuity_opex += component_additional_opex_annuity
         add_to_breakdown!(breakdown, component.uac, Dict(name => additional_opex_per_year[idx]))
+        add_to_breakdown!(breakdown, component.uac,
+                          Dict(name * "_discounted" => component_additional_opex_annuity_discounted))
     end
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_capex" => component_capex_annuity,
                            "annuity_opex" => component_opex_annuity,
                            "investments_costs_per_year" => investments_per_year,
+                           "investments_costs_per_year_discounted" => investments_per_year_discounted,
                            "residual_revenues_per_year" => .-residuals_per_year,
+                           "residual_revenues_per_year_discounted" => .-residuals_per_year_discounted,
                            "subsidy_revenues_per_year" => .-subsidies_per_year,
+                           "subsidy_revenues_per_year_discounted" => .-subsidies_per_year_discounted,
                            "maintenance_costs_per_year" => maintenance_per_year,
+                           "maintenance_costs_per_year_discounted" => maintenance_per_year_discounted,
                            "repairs_costs_per_year" => repair_per_year,
-                           "labour_costs_per_year" => labour_per_year
+                           "repairs_costs_per_year_discounted" => repair_per_year_discounted,
+                           "labour_costs_per_year" => labour_per_year,
+                           "labour_costs_per_year_discounted" => labour_per_year_discounted
                            ))
 
     return annuity_capex, annuity_opex, breakdown
@@ -514,38 +536,46 @@ end
 function plot_economic_results(result::EconomicResult, output_file_path::String, sim_params::Dict{String,Any},
                                cost_type::String)
     suffix = "_per_year"
+    suffix_discounted = "_per_year_discounted"
+
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
 
     # collect yearly series from result struct
-    series = Dict{String,Vector{Float64}}()
+    series_cashflows = Dict{String,Vector{Float64}}()
     for (component, component_results) in result.breakdown
         for (key, values) in component_results
-            values isa AbstractVector{<:Real} || continue   # consider only vectors, no floats
-            endswith(key, suffix) || continue               # consider entries with a key ending with suffix
-            all(iszero, values) && continue                 # consider only entries that contain values
+            values isa AbstractVector{<:Real} || continue    # consider only vectors, no floats
+            endswith(key, suffix) || continue                # consider entries with a key ending with suffix
+            all(iszero, values) && continue                  # consider only entries that contain values
 
             name = "$(component) | $(key)"
-            series[name] = copy(values)
+            series_cashflows[name] = copy(values)
         end
     end
-    isempty(series) && return false
+    isempty(series_cashflows) && return false
+
+    series_discounted = Dict{String,Vector{Float64}}()
+    for (component, component_results) in result.breakdown
+        for (key, values) in component_results
+            values isa AbstractVector{<:Real} || continue    # consider only vectors, no floats
+            endswith(key, suffix_discounted) || continue     # consider entries with a key ending with suffix
+            all(iszero, values) && continue                  # consider only entries that contain values
+
+            name = "$(component) | $(key)"
+            series_discounted[name] = copy(values)
+        end
+    end
+    isempty(series_discounted) && return false
 
     if cost_type == "cashflows"
         # do nothing, values are already cashflows
         cost_name = "yearly cashflows"
+        series = series_cashflows
     elseif cost_type == "present_values"
         # calculate net present values
         cost_name = "present values"
-        q = 1.0 + sim_params["economic_parameters"]["interest_rate"]
-
-        for (key, values) in series
-            present_values = similar(values)
-            for t in eachindex(values)
-                present_values[t] = values[t] / q^(t - 1)
-            end
-            series[key] = present_values
-        end
+        series = series_discounted
     end
 
     # parameter 
