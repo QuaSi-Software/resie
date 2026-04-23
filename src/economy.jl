@@ -2,7 +2,13 @@ using PlotlyJS, Printf
 
 export extend_profile
 
-# Calculate economic results of the energy system simulation using an annuity method
+# Calculate economic balance of the energy system simulation using the annuity method
+# based on VDI 2067
+# 
+# Convention in output:
+# costs: positive values
+# revenues: negative values
+# Note that this is contrary to the definition of the VDI 2067!
 
 """
 Holds the energy profiles of each component that are relevant for economy calculation

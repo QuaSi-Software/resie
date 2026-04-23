@@ -1,5 +1,14 @@
 using PlotlyJS, Printf
 
+# Calculate emissions balance, including emissions and credits of energies and embodied emission.
+# Replacement investments of components induce new embodied emissions, while 
+# possible remaining usable time of a components creates a credit of emissions. Note that no
+# explicit end-of-life emissions are included, they need to be part of the total embodied emissions.
+#
+# Convention in output:
+# emissions to the environment: positive values
+# credits / avoided emissions: negative values
+
 Base.@kwdef mutable struct EmissionsResult
     total_emissions::Float64 = 0.0
     emissions_energies::Float64 = 0.0
