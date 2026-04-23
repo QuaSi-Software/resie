@@ -465,7 +465,7 @@ const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params(
 const SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
         "lifetime_years" => 18,
-        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_specific" => "const:0.0",
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(

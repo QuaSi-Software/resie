@@ -2473,11 +2473,12 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         ),
         "embodied_emissions_specific" => (
             default=defaults["embodied_emissions_specific"],
-            description="Embodies emissions per volume",
-            display_name="embodied emissions specific",
+            description="Function for specific embodies emissions",
+            display_name="embodied emissions function",
             required=false,
-            type=Float64,
-            json_type="number",
+            type=String,
+            json_type="string",
+            function_type="1dim",
             unit=units["embodied_emissions_specific"]
         ),
         "embodied_emissions_change_rate_per_year" => (

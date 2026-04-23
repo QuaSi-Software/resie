@@ -157,7 +157,7 @@ const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connect
         "energy_emissions_change_rate_per_year" =>  0.0,
     
         "lifetime_years" => 20,
-        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_specific" => "const:0.0",
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
