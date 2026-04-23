@@ -281,7 +281,7 @@ const BUFFER_TANK_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage"
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "kg CO2/m^3"
+        "embodied_emissions_specific" => "g CO2/m^3"
     ),
 )
 #! format: on

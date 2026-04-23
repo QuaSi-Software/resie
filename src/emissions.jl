@@ -21,7 +21,7 @@ function calculate_emissions(shared_data::Vector{EconomyEmissionsData}, sim_para
             continue
         end
         if isa(component, ConnectionComponent)
-            # get energy profiles
+            # get energy profiles of connection components
             if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source]
                 energy = extend_profile(item.energy_out, emissions_parameters["observation_period_in_years"],
                                         sim_params) # source output
@@ -39,8 +39,10 @@ function calculate_emissions(shared_data::Vector{EconomyEmissionsData}, sim_para
                                                                                           result.emissions_energies,
                                                                                           result.breakdown,
                                                                                           type)
-        elseif emissions_parameters["include_embodied_emissions"]
-            # calculate embodied emissions of transformers and storages
+        end
+
+        if emissions_parameters["include_embodied_emissions"]
+            # calculate embodied emissions of all components
             result.embodied_emissions, result.breakdown = calculate_embodied_emissions(component,
                                                                                        sim_params,
                                                                                        result.embodied_emissions,
@@ -57,14 +59,14 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     observation_period = Int(sim_params["emissions_parameters"]["observation_period_in_years"])
 
     if isnothing(component.emissions_parameters["constant_energy_emissions"])
-        # get price profile from component (one of them is given)
+        # get emission profile from component (one of them is given)
         step = Millisecond(Second(sim_params["time_step_seconds"]))
         times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         emissions_profile_energy = component.emissions_parameters["energy_emissions_profile_scale"] .*
                                    [component.emissions_parameters["energy_emissions_profile"].data[t] for t in times]
     else
-        # create profile from constant energy price
+        # create profile from constant emissions
         emissions_profile_energy = fill(component.emissions_parameters["constant_energy_emissions"],
                                         sim_params["number_of_time_steps_output"])
     end
@@ -164,6 +166,7 @@ function plot_emissions_results(result::EmissionsResult,
                                 output_file_path::String,
                                 sim_params::Dict{String,Any})
     suffix = "_per_year"
+    # unit and factor for output. Note that internally, everything is based on [g/W] or [g/Wh]
     emissions_unit = "kgCO₂e"
     emissions_factor = 1e-3
     # Convention:
@@ -201,8 +204,6 @@ function plot_emissions_results(result::EmissionsResult,
     end
     cum = cumsum(net)
 
-    total_emissions_over_period = sum(net)
-
     # build traces
     traces = PlotlyJS.AbstractTrace[]
 
@@ -228,8 +229,7 @@ function plot_emissions_results(result::EmissionsResult,
                                text="Emissions results. Positive values are emissions, negative values are credits." *
                                     "<br><sup>Total emissions: $(round(emissions_factor*result.total_emissions; digits=2)) $(emissions_unit), " *
                                     "Energy emissions: $(round(emissions_factor*result.emissions_energies; digits=2)) $(emissions_unit), " *
-                                    "Embodied emissions: $(round(emissions_factor*result.embodied_emissions; digits=2)) $(emissions_unit), " *
-                                    "Net sum of plotted yearly values: $(round(total_emissions_over_period; digits=2)) $(emissions_unit)</sup>"),
+                                    "Embodied emissions: $(round(emissions_factor*result.embodied_emissions; digits=2)) $(emissions_unit)</sup>"),
                     xaxis_title_text="Year",
                     yaxis_title_text="Yearly emissions [$emissions_unit/year]",
                     barmode="relative",
@@ -249,6 +249,7 @@ end
 function write_emissions_results_to_CSV(emissions_result::EmissionsResult,
                                         filepath::String,
                                         sim_params::Dict{String,Any})
+    # unit and factor for output. Note that internally, everything is based on [g/W] or [g/Wh]
     emissions_unit = "kgCO₂e"
     emissions_factor = 1e-3
 

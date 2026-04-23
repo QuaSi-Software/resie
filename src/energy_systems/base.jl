@@ -2461,38 +2461,38 @@ Returns:
 function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                                        units::Dict{String,Any})::Dict{String,Any}
     #! format: off
-    if type in ["transformer", "storage"]
-        return Dict{String,Any}(
-            "lifetime_years" => (
-                default=defaults["lifetime_years"],
-                description="Lifetime of the component until replacement is required",
-                display_name="lifetime",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit="years"
-            ),
-            "embodied_emissions_specific" => (
-                default=defaults["embodied_emissions_specific"],
-                description="Embodies emissions per volume",
-                display_name="embodied emissions specific",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit=units["embodied_emissions_specific"]
-            ),
-            "embodied_emissions_change_rate_per_year" => (
-                default=defaults["embodied_emissions_change_rate_per_year"],
-                description="Yearly change rate of embodied emissions)",
-                display_name="Embodied emissions change rate per year",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit="1/year"
-            ),
-        )
-    elseif type in ["connection"]
-        return Dict{String,Any}(
+    base_params = Dict{String,Any}(
+        "lifetime_years" => (
+            default=defaults["lifetime_years"],
+            description="Lifetime of the component until replacement is required",
+            display_name="lifetime",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="years"
+        ),
+        "embodied_emissions_specific" => (
+            default=defaults["embodied_emissions_specific"],
+            description="Embodies emissions per volume",
+            display_name="embodied emissions specific",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit=units["embodied_emissions_specific"]
+        ),
+        "embodied_emissions_change_rate_per_year" => (
+            default=defaults["embodied_emissions_change_rate_per_year"],
+            description="Yearly change rate of embodied emissions)",
+            display_name="Embodied emissions change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+    )
+
+    if type in ["connection"]
+        connection_params = Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
                 description="Path to a specific emissions profile file",
@@ -2534,6 +2534,13 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 unit="1/year"
             )
         )
+    end
+
+
+    if type in ["transformer", "storage"]
+        return base_params 
+    elseif type in ["connection"]
+        return Base.merge(base_params, connection_params)
     else
         @error "Unknown type in function get_economic_defaults."
     end

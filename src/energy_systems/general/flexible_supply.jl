@@ -117,8 +117,14 @@ const FLEXIBLE_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("conn
         "energy_emissions_profile_scale" => 1.0,
         "constant_energy_emissions" => nothing,
         "energy_emissions_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
-    Dict{String,Any}(),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_power or scaling_factor)"
+    )
 )
 #! format: on
 

@@ -449,7 +449,7 @@ const GEOTHERMAL_PROBES_EMISSIONS_PARAMETERS = get_emissions_standard_params("st
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "kg CO2/m"
+        "embodied_emissions_specific" => "g CO2/m"
     ),
 )
 #! format: on
