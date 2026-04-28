@@ -23,7 +23,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "plot_weather_data" => (
         default=false,
-        description="Toggle if weather data should be included in the line plots",
+        description="Toggle if the weather data read in from the given weather file " *
+                    "should be included in the line plot",
         display_name="Plot weather data?",
         required=false,
         type=Bool,
@@ -32,7 +33,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "csv_output_weather" => (
         default=false,
-        description="Toggle if weather data should be included in the CSV output",
+        description="Toggle if the weather data read in from the given weather file " *
+                    "should be included in the CSV output",
         display_name="Weather data in CSV?",
         required=false,
         type=Bool,
@@ -41,8 +43,10 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "write_csv_continuously" => (
         default=false,
-        description="Toggle if CSV output should be written in every time step. Negatively " *
-                    "affects performance.",
+        description="Toggle if CSV output will be written continuously, meaning in every " *
+                    "time step. Activating this functionality will ensure partial output " *
+                    "if the simulation fails during execution, however it also incurs a " *
+                    "substantial performance penalty due to frequent file access.",
         display_name="Write CSV continously?",
         required=false,
         type=Bool,
@@ -51,7 +55,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "csv_output_file" => (
         default="./output/out.csv",
-        description="File path to where CSV outputs are written",
+        description="File path to where the CSV output will be written",
         display_name="CSV output file",
         required=false,
         type=String,
@@ -59,8 +63,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         unit="-"
     ),
     "csv_time_unit" => (
-        default="seconds",
-        description="Time unit for the CSV output",
+        default="date",
+        description="Time unit for the timestamp of the CSV output",
         display_name="CSV time unit",
         required=false,
         options=["seconds", "minutes", "hours", "date"],
@@ -70,7 +74,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "output_plot_file" => (
         default="./output/output_plot.html",
-        description="File path to where the line plots are written",
+        description="File path to where the output line plot will be written",
         display_name="Output plot file",
         required=false,
         type=String,
@@ -79,7 +83,9 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "output_plot_time_unit" => (
         default="date",
-        description="Time unit for the output plots",
+        description="Unit for x-axis of the output plot. Note that the plotted energies " *
+                    "always refer to the simulation time step and not to the unit " *
+                    "specified here!",
         display_name="Output plot time unit",
         required=false,
         options=["seconds", "minutes", "hours", "date"],
@@ -89,7 +95,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "sankey_plot_file" => (
         default="./output/output_sankey.html",
-        description="File path to where the sankey plot is written",
+        description="File path to where the Sankey plot will be written",
         display_name="Sankey plot file",
         required=false,
         type=String,
@@ -98,7 +104,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "show_detailed_errors" => (
         default=false,
-        description="Toggle if some errors show a more detailed error message",
+        description="Toggle if errors should show a more detailed message. Only affects " *
+                    "some errors.",
         display_name="Show detailed errors?",
         required=false,
         type=Bool,
@@ -107,7 +114,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "auxiliary_info" => (
         default=false,
-        description="Toggle if auxiliary info should be written to file",
+        description="Toggle if auxiliary info about the current run should be written to " *
+                    "markdown file",
         display_name="Write auxiliary info?",
         required=false,
         type=Bool,
@@ -116,7 +124,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "auxiliary_info_file" => (
         default="./output/auxiliary_info.md",
-        description="File path to where the auxiliary info is written",
+        description="File path to where the auxiliary information will be written",
         display_name="Auxiliary info file",
         required=false,
         type=String,
@@ -125,7 +133,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "auxiliary_plots" => (
         default=false,
-        description="Toggle if auxiliary plots should be created",
+        description="Toggle if additional plots of components, if they are available, " *
+                    "are created",
         display_name="Create auxiliary plots?",
         required=false,
         type=Bool,
@@ -134,7 +143,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "auxiliary_plots_path" => (
         default="./output/",
-        description="Directory to where the auxiliary plots are written",
+        description="Directory path to where the additional plots will be saved",
         display_name="Auxiliary plots path",
         required=false,
         type=String,
@@ -298,24 +307,39 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
 
 const SIMULATION_PARAMETERS_DEF = Dict{String,Any}(
     "start" => (
-        description="Date and time of the beginning of the simulation (inclusive)",
-        display_name="Start date",
+        description="Start time of the simulation as datetime format",
+        display_name="Start datetime",
         required=true,
         type=String,
         json_type="string",
         unit="-"
     ),
+    "start_output" => (
+        default=nothing,
+        description="The start time as datetime format at which the simulation begins " *
+                    "to output the simulation results. Has to be equal or later than " *
+                    "`start`. Can be used to perform heat-up simulation ahead of the " *
+                    "actual simulation. Note that during heat-up, no warnings are " *
+                    "printed. The energies in the various output files are starting at " *
+                    "the time specified in `start_output`.",
+        display_name="Start output",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
     "end" => (
-        description="Date and time of the end of the simulation (inclusive). Will be " *
+        description="End time (inclusive) of the simulation as datetime format. Will be " *
                     "rounded down to the nearest multiple of the time step.",
-        display_name="End date",
+        display_name="End datetime",
         required=true,
         type=String,
         json_type="string",
         unit="-"
     ),
     "start_end_unit" => (
-        description="Datetime format specifier for parameters `start`, `start_output` and `end`",
+        description="Datetime format specifier for parameters `start`, `start_output` " *
+                    "and `end`",
         display_name="Start/end format",
         required=true,
         type=String,
@@ -359,7 +383,7 @@ const SIMULATION_PARAMETERS_DEF = Dict{String,Any}(
     "weather_interpolation_type_general" => (
         default="linear_classic",
         description="Interpolation type for weather data from weather file, except for " *
-                    "solar radiation data",
+                    "solar radiation data. See the documentation for more details.",
         display_name="Weather interpol. general",
         options=["stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"],
         required=false,
@@ -370,7 +394,8 @@ const SIMULATION_PARAMETERS_DEF = Dict{String,Any}(
     ),
     "weather_interpolation_type_solar" => (
         default="linear_solar_radiation",
-        description="Interpolation method for solar radiation data from weather file",
+        description="Interpolation method for solar radiation data from weather file. " *
+                    "See the documentation for more details.",
         display_name="Weather interpol. solar",
         options=["stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"],
         required=false,
