@@ -2220,8 +2220,8 @@ Returns:
 function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                                       units::Dict{String,Any})::Dict{String,Any}
     #! format: off
-    if type in ["transformer", "storage"]
-        return Dict{String,Any}(
+    if type in ["transformer", "storage", "connection", "connection_fixed"]
+        capex_parameter = Dict{String,Any}(
             "lifetime_years" => (
                 default=defaults["lifetime_years"],
                 description="Lifetime of the component until replacement is required",
@@ -2321,8 +2321,10 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="€"
             )
         )
-    elseif type in ["connection", "connection_fixed"]
-        connection_general_parameter = Dict{String,Any}(
+    end
+
+    if type in ["connection", "connection_fixed"]
+        energy_opex_parameter = Dict{String,Any}(
             "energy_price_profile_file_path" => (
                 default=defaults["energy_price_profile_file_path"],
                 description="Path to an energy price profile file",
@@ -2382,60 +2384,64 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 unit="1/year"
             ),
         )
+    end
 
-        if type == "connection"
-            return connection_general_parameter
-        elseif type ==  "connection_fixed"
-            # additional economic parameter for pricing of unmet energies
-            fixed_connection_parameter = Dict{String,Any}(
-                "unmet_energy_price_profile_file_path" => (
-                    default=defaults["unmet_energy_price_profile_file_path"],
-                    description="Path to an price profile file for unmet energies",
-                    display_name="Unmet energy price profile file",
-                    required=false,
-                    conditionals=[("constant_unmet_energy_price", "mutex")],
-                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
-                    type=String,
-                    json_type="string",
-                    unit="€/Wh"
-                ),
-                "unmet_energy_price_profile_scale" => (
-                    default=defaults["unmet_energy_price_profile_scale"],
-                    description="Scale factor for unmet energy price profile",
-                    display_name="Scale factor unmet energy price profile",
-                    required=false,
-                    type=Float64,
-                    json_type="number",
-                    unit="-"
-                ),
-                "constant_unmet_energy_price" => (
-                    default=defaults["constant_unmet_energy_price"],
-                    description="Constant unmet energy price",
-                    display_name="Constant unmet energy price",
-                    required=false,
-                    conditionals=[("unmet_energy_price_profile_file_path", "mutex")],
-                    validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
-                    type=Float64,
-                    json_type="number",
-                    unit="€/Wh"
-                ),
-                "unmet_energy_price_change_rate_per_year" => (
-                    default=defaults["unmet_energy_price_change_rate_per_year"],
-                    description="Yearly change rate of the unmet energy price",
-                    display_name="unmet energy price change rate per year",
-                    required=false,
-                    type=Float64,
-                    json_type="number",
-                    unit="1/year"
-                ),
-            )
-
-            return Base.merge(connection_general_parameter, fixed_connection_parameter)
-        end
-    else
-        @error "Unknown type in function get_economic_defaults."
+    if type == "connection_fixed"
+        # additional economic parameter for pricing of unmet energies
+        energy_unmet_parameter = Dict{String,Any}(
+            "unmet_energy_price_profile_file_path" => (
+                default=defaults["unmet_energy_price_profile_file_path"],
+                description="Path to an price profile file for unmet energies",
+                display_name="Unmet energy price profile file",
+                required=false,
+                conditionals=[("constant_unmet_energy_price", "mutex")],
+                validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="€/Wh"
+            ),
+            "unmet_energy_price_profile_scale" => (
+                default=defaults["unmet_energy_price_profile_scale"],
+                description="Scale factor for unmet energy price profile",
+                display_name="Scale factor unmet energy price profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_unmet_energy_price" => (
+                default=defaults["constant_unmet_energy_price"],
+                description="Constant unmet energy price",
+                display_name="Constant unmet energy price",
+                required=false,
+                conditionals=[("unmet_energy_price_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="€/Wh"
+            ),
+            "unmet_energy_price_change_rate_per_year" => (
+                default=defaults["unmet_energy_price_change_rate_per_year"],
+                description="Yearly change rate of the unmet energy price",
+                display_name="unmet energy price change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+        )
     end
     #! format: on
+
+    if type in ["transformer", "storage"]
+        return capex_parameter
+    elseif type == "connection"
+        return Base.merge(capex_parameter, energy_opex_parameter)
+    elseif type == "connection_fixed"
+        return Base.merge(capex_parameter, energy_opex_parameter, energy_unmet_parameter)
+    else
+        @error "Unknown type $type in function get_economic_defaults."
+    end
 end
 
 """
@@ -2455,38 +2461,39 @@ Returns:
 function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                                        units::Dict{String,Any})::Dict{String,Any}
     #! format: off
-    if type in ["transformer", "storage"]
-        return Dict{String,Any}(
-            "lifetime_years" => (
-                default=defaults["lifetime_years"],
-                description="Lifetime of the component until replacement is required",
-                display_name="lifetime",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit="years"
-            ),
-            "embodied_emissions_specific" => (
-                default=defaults["embodied_emissions_specific"],
-                description="Embodies emissions per volume",
-                display_name="embodied emissions specific",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit=units["embodied_emissions_specific"]
-            ),
-            "embodied_emissions_change_rate_per_year" => (
-                default=defaults["embodied_emissions_change_rate_per_year"],
-                description="Yearly change rate of embodied emissions)",
-                display_name="Embodied emissions change rate per year",
-                required=false,
-                type=Float64,
-                json_type="number",
-                unit="1/year"
-            ),
-        )
-    elseif type in ["connection"]
-        return Dict{String,Any}(
+    base_params = Dict{String,Any}(
+        "lifetime_years" => (
+            default=defaults["lifetime_years"],
+            description="Lifetime of the component until replacement is required",
+            display_name="lifetime",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="years"
+        ),
+        "embodied_emissions_specific" => (
+            default=defaults["embodied_emissions_specific"],
+            description="Function for specific embodies emissions",
+            display_name="embodied emissions function",
+            required=false,
+            type=String,
+            json_type="string",
+            function_type="1dim",
+            unit=units["embodied_emissions_specific"]
+        ),
+        "embodied_emissions_change_rate_per_year" => (
+            default=defaults["embodied_emissions_change_rate_per_year"],
+            description="Yearly change rate of embodied emissions)",
+            display_name="Embodied emissions change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+    )
+
+    if type in ["connection"]
+        connection_params = Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
                 description="Path to a specific emissions profile file",
@@ -2528,6 +2535,13 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
                 unit="1/year"
             )
         )
+    end
+
+
+    if type in ["transformer", "storage"]
+        return base_params 
+    elseif type in ["connection"]
+        return Base.merge(base_params, connection_params)
     else
         @error "Unknown type in function get_economic_defaults."
     end

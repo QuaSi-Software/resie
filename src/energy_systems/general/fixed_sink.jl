@@ -127,12 +127,26 @@ const FIXED_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_
         "energy_price_change_rate_per_year" =>  0.02,
         "base_cost_per_year" => 0.0,
         "base_cost_change_rate_per_year" => 0.0,
+
         "unmet_energy_price_profile_file_path" => nothing,
         "unmet_energy_price_profile_scale" => 1.0,
         "constant_unmet_energy_price" => 0.0,
         "unmet_energy_price_change_rate_per_year" =>  0.00,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => nothing,
+        "subsidy_max" => nothing
     ),
-    Dict{String,Any}(),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_demand or scaling_factor)"
+    ),
 )
 
 const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
@@ -141,8 +155,14 @@ const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connectio
         "energy_emissions_profile_scale" => 1.0,
         "constant_energy_emissions" => nothing,
         "energy_emissions_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
     ),
-    Dict{String,Any}(),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_demand or scaling_factor)"
+    )
 )
 #! format: on
 
@@ -314,6 +334,14 @@ end
 function process(unit::FixedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.demand, unit.temperature, nothing)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::FixedSink)
+    if unit.constant_demand !== nothing
+        return unit.demand
+    else
+        return unit.scaling_factor
+    end
 end
 
 function output_values(unit::FixedSink)::Vector{String}

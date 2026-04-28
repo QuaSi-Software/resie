@@ -116,11 +116,11 @@ const FUEL_BOILER_ECONOMIC_PARAMETERS = get_economic_standard_params("transforme
 const FUEL_BOILER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
     Dict{String,Any}(
         "lifetime_years" => 20,
-        "embodied_emissions_specific" => 0.0,
+        "embodied_emissions_specific" => "const:0.0",
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "kg CO2/W"
+        "embodied_emissions_specific" => "g CO2/W"
     ),
 )
 #! format: on
