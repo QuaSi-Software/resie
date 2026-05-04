@@ -2210,6 +2210,8 @@ function add_non_recursive!(node_set, unit, caller_uac)
         inface.is_secondary_interface && continue
         if inface.source.uac == caller_uac
             continue
+        elseif inface.source in node_set
+            continue
         elseif inface.source.sys_function === unit.sys_function
             add_non_recursive!(node_set, inface.source, unit.uac)
         end
@@ -2218,6 +2220,8 @@ function add_non_recursive!(node_set, unit, caller_uac)
     for outface in values(unit.output_interfaces)
         outface.is_secondary_interface && continue
         if outface.target.uac == caller_uac
+            continue
+        elseif outface.target in node_set
             continue
         elseif outface.target.sys_function === unit.sys_function
             add_non_recursive!(node_set, outface.target, unit.uac)
