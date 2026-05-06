@@ -2259,7 +2259,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "maintenance_inspection_price_change_rate_per_year" => (
                 default=defaults["maintenance_inspection_price_change_rate_per_year"],
@@ -2279,7 +2279,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "repair_price_change_rate_per_year" => (
                 default=defaults["repair_price_change_rate_per_year"],
@@ -2309,7 +2309,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num_or_nothing", 1.0)],
                 type=Floathing,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "subsidy_max" => (
                 default=defaults["subsidy_max"],
