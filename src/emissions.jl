@@ -33,10 +33,11 @@ function calculate_emissions(shared_data::Vector{EconomyEmissionsData}, sim_para
             # get energy profiles of connection components
             if sf in [EnergySystems.sf_fixed_source, EnergySystems.sf_flexible_source]
                 energy = extend_profile(item.energy_out, emissions_parameters["observation_period_in_years"],
-                                        sim_params) # source output
+                                        emissions_parameters["repeat_period"], sim_params) # source output
                 type = :source
             elseif sf in [EnergySystems.sf_flexible_sink, EnergySystems.sf_fixed_sink]
-                energy = extend_profile(item.energy_in, emissions_parameters["observation_period_in_years"], sim_params) # sink input
+                energy = extend_profile(item.energy_in, emissions_parameters["observation_period_in_years"],
+                                        emissions_parameters["repeat_period"], sim_params) # sink input
                 type = :sink
             end
             # Note: Both energies from sources AND energies into sinks are positive at this point
@@ -79,7 +80,8 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
         emissions_profile_energy = fill(component.emissions_parameters["constant_energy_emissions"],
                                         sim_params["number_of_time_steps_output"])
     end
-    emissions_profile_energy = extend_profile(emissions_profile_energy, observation_period, sim_params)
+    emissions_profile_energy = extend_profile(emissions_profile_energy, observation_period,
+                                              sim_params["emissions_parameters"]["repeat_period"], sim_params)
 
     # factors
     r_energy_emissions = 1.0 + component.emissions_parameters["energy_emissions_change_rate_per_year"]  # change factor of energy emissions

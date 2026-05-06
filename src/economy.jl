@@ -113,23 +113,27 @@ function calculate_economy(shared_data::Vector{EconomyEmissionsData}, sim_params
         if isa(component, ConnectionComponent)
             # get energy profiles
             if sf === EnergySystems.sf_fixed_source
-                energy = extend_profile(item.energy_out, economic_parameters["observation_period_in_years"], sim_params) # source output
+                energy = extend_profile(item.energy_out, economic_parameters["observation_period_in_years"],
+                                        economic_parameters["repeat_period"], sim_params) # source output
                 energy_supply = extend_profile(item.energy_supply, economic_parameters["observation_period_in_years"],
-                                               sim_params) # source supply
+                                               economic_parameters["repeat_period"], sim_params) # source supply
                 energy_unmet = energy_supply .- energy # unmet supply of source
                 type = :source
             elseif sf === EnergySystems.sf_flexible_source
-                energy = extend_profile(item.energy_out, economic_parameters["observation_period_in_years"], sim_params) #  source output
+                energy = extend_profile(item.energy_out, economic_parameters["observation_period_in_years"],
+                                        economic_parameters["repeat_period"], sim_params) #  source output
                 energy_unmet = nothing # unmet supply of source
                 type = :source
             elseif sf === EnergySystems.sf_flexible_sink
-                energy = extend_profile(item.energy_in, economic_parameters["observation_period_in_years"], sim_params) # sink input
+                energy = extend_profile(item.energy_in, economic_parameters["observation_period_in_years"],
+                                        economic_parameters["repeat_period"], sim_params) # sink input
                 energy_unmet = nothing  # unmet demand of sink
                 type = :sink
             elseif sf === EnergySystems.sf_fixed_sink
-                energy = extend_profile(item.energy_in, economic_parameters["observation_period_in_years"], sim_params) # sink input
+                energy = extend_profile(item.energy_in, economic_parameters["observation_period_in_years"],
+                                        economic_parameters["repeat_period"], sim_params) # sink input
                 energy_demand = extend_profile(item.energy_demand, economic_parameters["observation_period_in_years"],
-                                               sim_params) # sink demand
+                                               economic_parameters["repeat_period"], sim_params) # sink demand
                 energy_unmet = energy_demand .- energy # unmet demand of sink
                 type = :sink
             end
@@ -165,13 +169,15 @@ function calculate_economy(shared_data::Vector{EconomyEmissionsData}, sim_params
 end
 
 function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years::Union{Float64,Int64},
-                        sim_params::Dict{String,Any})
+                        repeat_period::Period, sim_params::Dict{String,Any})
+    number_of_timesteps = Int(ceil(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"]))
+
     if profile === nothing || profile == []
         return nothing
     end
     if sim_params["start_date_output"] + Year(observation_period_in_years) <= sim_params["end_date"]
-        # no repeat required, whole period simulated
-        return profile
+        # no repeat required, cut profile to observation_period_in_years * 365 days
+        return profile[1:number_of_timesteps]
     end
 
     economic_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
@@ -182,7 +188,6 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
                                 sim_params["time_step_seconds"]))
         data_to_repeat = profile
     else
-        repeat_period = sim_params["economic_parameters"]["repeat_period"] # Days
         nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economic_end_date,
                                                                                 sim_params["end_date"]))) /
                                 Dates.value(Dates.Second(repeat_period))))
@@ -194,10 +199,7 @@ function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_per
     profile_extended = vcat(profile, repeat(data_to_repeat, nr_to_repeat))
 
     # cut profile to observation_period_in_years * 365 days
-    number_of_timesteps = Int(ceil(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"]))
-    profile_extended = profile_extended[1:number_of_timesteps]
-
-    return profile_extended
+    return profile_extended[1:number_of_timesteps]
 end
 
 function add_to_breakdown!(breakdown::Dict{String,Any}, uac::String, dict_to_add::Dict{String,<:Any})
@@ -224,7 +226,8 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
         price_profile_energy = fill(component.economic_parameters["constant_energy_price"],
                                     sim_params["number_of_time_steps_output"])
     end
-    price_profile_energy = extend_profile(price_profile_energy, observation_period, sim_params)
+    price_profile_energy = extend_profile(price_profile_energy, observation_period,
+                                          sim_params["economic_parameters"]["repeat_period"], sim_params)
 
     # factors
     r_energy_costs = 1.0 + energy_price_change_rate_per_year  # price change factor of energy costs/revenues
@@ -299,7 +302,8 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
         price_profile_unmet_energy = fill(component.economic_parameters["constant_unmet_energy_price"],
                                           sim_params["number_of_time_steps_output"])
     end
-    price_profile_unmet_energy = extend_profile(price_profile_unmet_energy, observation_period, sim_params)
+    price_profile_unmet_energy = extend_profile(price_profile_unmet_energy, observation_period,
+                                                sim_params["economic_parameters"]["repeat_period"], sim_params)
 
     # factors
     r_unmet_energy_costs = 1.0 + unmet_energy_price_change_rate_per_year  # price change factor of unmet energy costs/revenues
