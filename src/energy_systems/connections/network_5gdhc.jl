@@ -4,9 +4,9 @@ using Plots: plot, savefig
 using Plots: Plots
 using SparseArrays
 using LinearAlgebra
-
+using Infiltrator
 #! format: off
-const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
+const NETWORK_5GDHC_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for regeneration/loading)",
@@ -640,6 +640,15 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         json_type="number",
         unit="K"
     ),
+    "spec_flow_rate" => (
+        default=0.01,
+        description="Constant specific flow rate per m² pipe area.",
+        display_name="Specific flow rate",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="m^3/(s*m^2)"
+    )
 )
 #! format: on
 
@@ -653,7 +662,7 @@ Possible improvements in the future:
 - Adaptation of the model to be able to simulate a single pipe (requires adaptation of the
   boundary conditions)
 """
-mutable struct GeothermalHeatCollector <: Component
+mutable struct Network5GDHC <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -787,16 +796,19 @@ mutable struct GeothermalHeatCollector <: Component
     max_picard_iter::Int
     picard_tol::Float64
 
-    function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        new(SSOT_parameter_constructor(GeothermalHeatCollector, uac, config, sim_params)...)
+    spec_flow_rate::Float64
+    losses::Float64
+
+    function Network5GDHC(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+        new(SSOT_parameter_constructor(Network5GDHC, uac, config, sim_params)...)
     end
 end
 
-function component_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{Network5GDHC})::Dict{String,NamedTuple}
+    return deepcopy(NETWORK_5GDHC_PARAMETERS) # return a copy to prevent external modification
 end
 
-function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, param_name::String,
+function extract_parameter(x::Type{Network5GDHC}, config::Dict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name in ("ambient_temperature_from_global_file", "global_solar_radiation_from_global_file",
                       "infrared_sky_radiation_from_global_file")
@@ -816,19 +828,19 @@ function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
-function validate_config(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
+function validate_config(x::Type{Network5GDHC}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalHeatCollector))
+    validate_config(Component, extracted, uac, sim_params, component_parameters(Network5GDHC))
 end
 
-function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params::Dict{String,Any},
+function init_from_params(x::Type{Network5GDHC}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     m_heat_in = Symbol(params["m_heat_in"])
     m_heat_out = Symbol(params["m_heat_out"])
 
     return (uac,
             Controller(params["control_parameters"]),
-            sf_storage,
+            sf_transformer,
             InterfaceMap(m_heat_in => nothing),
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
@@ -915,13 +927,14 @@ function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params:
             false,                          # process_done,
             false,                          # load_done
             params["max_picard_iter"],
-            params["picard_tol"])
+            params["picard_tol"],
+            params["spec_flow_rate"],
+            0.0
+            )
 end
-function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    if unit.regeneration
-        set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                              unload_storages(unit.controller, unit.m_heat_in))
-    end
+function initialise!(unit::Network5GDHC, sim_params::Dict{String,Any})
+    set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
+                          unload_storages(unit.controller, unit.m_heat_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
 
@@ -932,12 +945,8 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     # calculate max_energy
     A_collector = unit.pipe_length * unit.pipe_spacing * unit.number_of_pipes
     unit.max_output_energy = sim_params["watt_to_wh"](unit.max_output_power * A_collector)
-    if unit.regeneration
-        unit.max_input_energy = sim_params["watt_to_wh"](unit.max_input_power * A_collector)
-    else
-        unit.max_input_energy = 0.0
-    end
-
+    unit.max_input_energy = sim_params["watt_to_wh"](unit.max_input_power * A_collector)
+ 
     # calculate coefficients for freezing function 
     unit.sigma_lat = (unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature) / 5
     unit.t_lat = (unit.phase_change_upper_boundary_temperature + unit.phase_change_lower_boundary_temperature) / 2
@@ -1069,138 +1078,12 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     # vector to hold the results of the temperatures for each node in each simulation time step
     unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps_output"], n_nodes_y, n_nodes_x)
+
+    unit.current_input_temperature = unit.fluid_temperature
+    unit.current_output_temperature = unit.fluid_temperature
 end
 
-""" 
-    create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth,
-                  pipe_radius_outer, total_depth_simulation_domain)
-
-Creates a non-uniform mesh for a geothermal heat collector in y-direction (orthogonal to
-ground surface and orthogonal to pipe).
-
-| -------- (ground surface)
-| O        (pipe cross section)
-V ........ (lower bound)
-
-The arrow shows the y-direction.
-
-The mesh starts at the ground surface with an initial width of `min_mesh_width`. The width
-expands by a factor of `expansion_factor` for each node until reaching halfway to the
-pipe-laying depth. At that point, the mesh width begins to decrease. The pipe itself is
-represented by one node, surrounded by one node each in the positive and negative
-y-directions. Below the pipe area, the mesh width starts again at `min_mesh_width`,
-increases up to halfway to the lower bound, and then decreases symmetrically.
-
-The function determines the width of each volume element around a node point, starting with
-the surface layer. The node itself is located in the center of the respective width.
-
-Note: The node spacing at the turning point between increasing and decreasing mesh width may
-deviate from the value calculated using the expansion factor.
-"""
-function create_mesh_y(min_mesh_width::Float64,
-                       max_mesh_width::Float64,
-                       expansion_factor::Float64,
-                       pipe_laying_depth::Float64,
-                       pipe_radius_outer::Float64,
-                       total_depth_simulation_domain::Float64)
-    function calculate_increasing_decreasing_distances(midpoint::Float64,
-                                                       min_mesh_width::Float64,
-                                                       max_mesh_width::Float64,
-                                                       expansion_factor::Float64)
-        distances = []
-        current_width = min_mesh_width
-
-        while distances == [] || sum(distances) + current_width < midpoint
-            push!(distances, current_width)
-            current_width = min(max_mesh_width, current_width * expansion_factor)
-        end
-        distance_to_midpoint = midpoint - sum(distances)
-        if distance_to_midpoint > distances[end]
-            push!(distances, distance_to_midpoint)
-            push!(distances, distance_to_midpoint)
-            mirrored_values = reverse(distances[1:(end - 2)])
-        else
-            push!(distances, 2 * distance_to_midpoint)
-            mirrored_values = reverse(distances[1:(end - 1)])
-        end
-        append!(distances, mirrored_values)
-
-        return distances
-    end
-
-    # define segments of the computing grid in y-direction 
-    sy1 = 0                                         # surface
-    sy2 = pipe_laying_depth - pipe_radius_outer * 3 / 2     # node above fluid node
-    sy3 = pipe_laying_depth + pipe_radius_outer * 3 / 2     # node below fluid node
-    sy4 = total_depth_simulation_domain             # lower simulation boundary
-
-    # segment 1: surface to pipe 
-    midpoint = (sy2 - sy1) / 2
-    dy_1 = calculate_increasing_decreasing_distances(midpoint, min_mesh_width, max_mesh_width, expansion_factor)
-
-    # detect node number of pipe 
-    y_pipe_node_num = length(dy_1) + 2
-
-    # segment 2: pipe
-    dy_2 = [pipe_radius_outer, pipe_radius_outer, pipe_radius_outer]
-
-    # segment 3: pipe to lower boundary 
-    midpoint = (sy4 - sy3) / 2
-    dy_3 = calculate_increasing_decreasing_distances(midpoint, min_mesh_width, max_mesh_width, expansion_factor)
-
-    return [dy_1..., dy_2..., dy_3...], y_pipe_node_num
-end
-
-""" 
-    create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_radius_outer, pipe_spacing)
-
-Creates a non-uniform mesh for a geothermal collector in x-direction (parallel to ground
-surface and orthogonal to pipe).
-
------------------------  (ground surface)
-O ------->               (pipe cross section) 
-.......................  (lower bound)
-
-The arrow shows the x-direction.
-
-Starts with half the pipe diameter to represent the pipe nodes and increases the mesh width
-by the expansion factor for each node until half the pipe spacing is reached.
-
-The function determines the width of each volume element around a node point, starting with
-the vertical mirror axis in which the pipe lies. The node itself is located in the center of
-the respective width, except of the first node which is located right on the mirror axis.
-
-Note that the last dx can be smaller than calculated to meet the given boundary by
-`pipe_spacing`.
-"""
-function create_mesh_x(min_mesh_width::Float64,
-                       max_mesh_width::Float64,
-                       expansion_factor::Float64,
-                       pipe_radius_outer::Float64,
-                       pipe_spacing::Float64)
-    # maximum width of grid in x direction
-    x_bound = pipe_spacing / 2     # [m]
-
-    # set first two dx to half the pipe radius
-    dx = [pipe_radius_outer / 2, pipe_radius_outer]       # [m]
-
-    # set next dx to the minimum width
-    append!(dx, min_mesh_width)
-
-    # add dx while x_bound is not exeeded
-    while sum(dx) < x_bound
-        append!(dx, min(dx[end] * expansion_factor, max_mesh_width))
-    end
-
-    # limit to x_bound
-    if sum(dx) > x_bound
-        dx[end] -= sum(dx) - x_bound
-    end
-
-    return dx
-end
-
-function control(unit::GeothermalHeatCollector,
+function control(unit::Network5GDHC,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
@@ -1217,51 +1100,272 @@ function control(unit::GeothermalHeatCollector,
         unit.global_radiation_power = Profiles.power_at_time(unit.global_radiation_profile, sim_params) # W/m^2
     end
 
-    if unit.collector_total_heat_energy_in_out != 0
-        unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
-    else
-        unit.current_output_temperature = unit.fluid_temperature
-    end
-    unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
+    _, unit.current_output_temperature = pipe_heat_from_inlet_temp(unit, unit.current_input_temperature, sim_params)
 
-    # limit max_energy if current_output_temperature undercuts fluid_min_output_temperature
-    if unit.fluid_min_output_temperature === nothing
-        unit.current_max_output_energy = unit.max_output_energy
-    else
-        unit.current_max_output_energy = unit.current_output_temperature <= unit.fluid_min_output_temperature ?
-                                         0.0 : unit.max_output_energy
-    end
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+    # for fixed input/output temperatures, overwrite the interface with those. otherwise
+    # highest will choose the interface's temperature (including nothing)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out],
+                    nothing,
+                    nothing,
                     unit.current_output_temperature)
-
-    # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
-    if unit.regeneration
-        unit.current_input_temperature = unit.fluid_temperature + unit.loading_temperature_spread / 2
-        unit.current_input_temperature = lowest(unit.fluid_max_input_temperature, unit.current_input_temperature)
-
-        # limit max_energy if current_input_temperature exceeds fluid_max_input_temperature
-        if unit.fluid_max_input_temperature === nothing
-            unit.current_max_input_energy = unit.max_input_energy
-        else
-            unit.current_max_input_energy = unit.current_input_temperature >= unit.fluid_max_input_temperature ?
-                                            0.0 : unit.max_input_energy
-        end
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy,
-                        unit.current_input_temperature, nothing)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in],
+                    nothing,
+                    unit.current_input_temperature,
+                    nothing)
+end
+    
+# evaluate conductivity at given temperature
+function k_from_T(unit::Network5GDHC, T::Float64)
+    T0 = unit.phase_change_lower_boundary_temperature
+    T1 = unit.phase_change_upper_boundary_temperature
+    if T >= T1
+        return unit.soil_heat_conductivity
+    elseif T <= T0
+        return unit.soil_heat_conductivity_frozen
+    else
+        f = (T1 - T) / (T1 - T0)
+        return unit.soil_heat_conductivity * (1.0 - f) + unit.soil_heat_conductivity_frozen * f
     end
-
-    # reset energy summarizer
-    unit.collector_total_heat_energy_in_out = 0.0
 end
 
-function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
+function pipe_resistance_per_length(unit::Network5GDHC, T::Float64, fluid_temperature::Float64)::Float64
+    if unit.model_type == "simplified"
+        return unit.pipe_soil_thermal_resistance
+    else
+        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, fluid_temperature)
+        k_loc = k_from_T(unit, T)
+        k_eff = 1.0 / (unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
+                (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2.0 * unit.pipe_heat_conductivity) +
+                unit.dx_mesh[2] / (2.0 * k_loc))
+        return 1.0 / (k_eff * pi * unit.pipe_d_o)
+    end
+end
+
+function pipe_heat_from_inlet_temp(unit::Network5GDHC, 
+                                   inlet_temperature::Float64,
+                                   sim_params::Dict{String,Any})::Tuple{Float64,Float64}
+    # Returns:
+    #   q_ground_wh      positive: heat added to ground
+    #                    negative: heat removed from ground
+    #   outlet_temperature
+
+    # Use local soil conductivity near the pipe.
+    hpipe = unit.fluid_node_y_idx
+
+    pipe_R_len = pipe_resistance_per_length(unit, unit.t1[hpipe, 2], inlet_temperature)
+
+    mass_flow_per_pipe = unit.spec_flow_rate * (pi * unit.pipe_d_i^2 / 4) * 
+                         unit.fluid_density / unit.number_of_pipes
+
+    if mass_flow_per_pipe <= 0.0
+        return 0.0, inlet_temperature
+    end
+
+    NTU = unit.pipe_length / (mass_flow_per_pipe * unit.fluid_specific_heat_capacity * pipe_R_len)
+
+    # Plug-flow solution for pipe coupled to approximately constant surrounding soil.
+    outlet_temperature = unit.average_temperature_adjacent_to_pipe +
+                         (inlet_temperature - unit.average_temperature_adjacent_to_pipe) * 
+                         exp(-NTU)
+
+    specific_heat_flux_pipe = mass_flow_per_pipe * unit.fluid_specific_heat_capacity * (inlet_temperature - outlet_temperature) # [W]
+    q_in_out_surrounding = specific_heat_flux_pipe * unit.number_of_pipes # [W]
+
+    return sim_params["watt_to_wh"](q_in_out_surrounding), outlet_temperature
+end
+
+# function calculate_energies_temps!(unit::Network5GDHC, sim_params::Dict{String,Any})
+#     # calculate new temperatures of field to account for possible ambient effects
+#     calculate_new_temperature_field!(unit, 0.0, sim_params)
+
+#     potentials_heat_in, 
+#     in_temps_min, 
+#     in_temps_max, 
+#     _ = check_heat_in_layered(unit, sim_params)
+
+#     potentials_heat_out,
+#     _,
+#     _,
+#     _ = check_heat_out_layered(unit, sim_params)
+
+#     input_temperature = highest(in_temps_min[1], in_temps_max[1])
+    
+#     # unit.current_output_temperature = input_temperature + (unit.fluid_temperature - input_temperature) * 2
+#     unit.current_output_temperature = 
+#     unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
+
+#     # limit max_energy if current_output_temperature undercuts fluid_min_output_temperature
+#     if unit.fluid_min_output_temperature === nothing || 
+#        unit.current_output_temperature > unit.fluid_min_output_temperature
+#        #end of expression
+#         unit.current_max_output_energy = lowest([unit.max_output_energy, abs(potentials_heat_out[1]), -potentials_heat_in[1]])
+#     else
+#         unit.current_max_output_energy = 0.0
+#     end
+
+#     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
+#     unit.current_input_temperature = lowest(unit.fluid_max_input_temperature, input_temperature)
+
+#     # limit max_energy if current_input_temperature exceeds fluid_max_input_temperature
+#     if unit.fluid_max_input_temperature === nothing || 
+#        unit.current_input_temperature < unit.fluid_max_input_temperature
+#        #end of expression
+#         unit.current_max_input_energy = lowest(unit.max_input_energy, potentials_heat_in[1])
+#     else
+#         unit.current_max_input_energy = 0.0
+#     end
+
+# end
+
+function calculate_energies_temps!(unit::Network5GDHC, sim_params::Dict{String,Any})
+    # First advance field without pipe exchange to include surface/weather effects.
+    # calculate_new_temperature_field!(unit, 0.0, sim_params)
+
+    potentials_heat_in,
+    in_temps_min,
+    in_temps_max,
+    _ = check_heat_in_layered(unit, sim_params)
+
+    # -------------------------------------------------------------------------
+    # Loading / regeneration:
+    # heat is supplied TO the ground from m_heat_in.
+    # The connected system defines the inlet temperature.
+    # -------------------------------------------------------------------------
+    inlet_temperature = highest(in_temps_min[1], in_temps_max[1])
+
+    q_ground_wh, outlet_temperature = pipe_heat_from_inlet_temp(unit, inlet_temperature, sim_params)
+    unit.losses = lowest(unit.max_input_energy, q_ground_wh)
+    # Loading is only possible if the incoming fluid is warmer than the ground.
+    # q_ground_wh > 0 means heat added to soil.
+    if abs(unit.losses) > sim_params["epsilon"]
+        unit.current_input_temperature = inlet_temperature
+        unit.current_output_temperature = outlet_temperature
+
+        if unit.fluid_max_input_temperature === nothing ||
+            inlet_temperature <= unit.fluid_max_input_temperature
+
+            unit.current_max_input_energy = potentials_heat_in[1]
+            @infiltrate
+            unit.current_max_output_energy = max(unit.current_max_input_energy - unit.losses, 0)
+
+        else
+            unit.current_max_input_energy = 0.0
+            unit.current_max_output_energy = 0.0
+        end
+    else
+        @infiltrate
+        unit.current_input_temperature = inlet_temperature
+        unit.current_output_temperature = nothing
+        unit.current_max_input_energy = 0.0
+        unit.current_max_output_energy = 0.0
+    end
+end
+
+function potential(unit::Network5GDHC, sim_params::Dict{String,Any})
+    calculate_energies_temps!(unit, sim_params)
+    @infiltrate
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+                    unit.current_output_temperature)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy,
+                    unit.current_input_temperature, nothing)
+end
+
+function process(unit::Network5GDHC, sim_params::Dict{String,Any})
+    # Recompute limits and temperatures
+    calculate_energies_temps!(unit, sim_params)
+
+    outface = unit.output_interfaces[unit.m_heat_out]
+    inface  = unit.input_interfaces[unit.m_heat_in]
+
+    # check how much energy is supplied
+    current_energy_output = 0.0
+
+    if unit.current_max_output_energy >= sim_params["epsilon"]
+        exchanges_out = balance_on(outface, outface.target)
+        energy_out_available = abs(balance(exchanges_out) + energy_potential(exchanges_out))
+        # energy_out_available = unit.current_max_output_energy  # is positive
+
+        if energy_out_available < sim_params["epsilon"]
+            set_max_energy!(outface, 0.0)
+
+        else
+            for exchange in exchanges_out
+                demanded_on_interface = exchange.balance + exchange.energy_potential
+                if demanded_on_interface >= -sim_params["epsilon"]
+                    continue
+                end
+
+                if exchange.temperature_min !== nothing &&
+                   exchange.temperature_min > unit.current_output_temperature
+                    continue
+                end
+
+                used_heat = abs(demanded_on_interface)
+
+                if energy_out_available > used_heat
+                    add!(outface, used_heat, nothing, unit.current_output_temperature, exchange.purpose_uac)
+                    current_energy_output += used_heat
+                    energy_out_available -= used_heat
+                else
+                    add!(outface, energy_out_available, nothing, unit.current_output_temperature, exchange.purpose_uac)
+                    current_energy_output += energy_out_available
+                    energy_out_available = 0.0
+                end
+            end
+        end
+    end
+
+    # get the needed input energy to cover demand
+    current_energy_input = 0.0
+
+    exchanges_in = balance_on(inface, inface.source)
+    energy_supplied = balance(exchanges_in) + energy_potential(exchanges_in)
+    # energy_in_available = unit.current_max_input_energy  # is positive
+
+    if energy_supplied <= sim_params["epsilon"] || current_energy_output <= sim_params["epsilon"]
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+
+    else
+        energy_in_available = min(energy_supplied, current_energy_output + unit.losses)
+        for exchange in exchanges_in
+            exchange_energy_available = exchange.balance + exchange.energy_potential
+            if exchange_energy_available < sim_params["epsilon"]
+                continue
+            end
+
+            if exchange.temperature_max !== nothing &&
+               exchange.temperature_max < unit.current_input_temperature
+               continue
+            end
+
+            if energy_in_available > exchange_energy_available
+                sub!(inface, exchange_energy_available, unit.current_input_temperature, nothing, exchange.purpose_uac)
+                current_energy_input += exchange_energy_available
+                energy_in_available -= exchange_energy_available
+            else
+                sub!(inface, energy_in_available, unit.current_input_temperature, nothing, exchange.purpose_uac)
+                current_energy_input += energy_in_available
+                energy_in_available = 0.0
+            end
+        end
+    end
+
+    # ------------------------------------------------------------
+    # 3) APPLY NET HEAT TO SOIL (single update!)
+    # ------------------------------------------------------------
+    unit.losses = current_energy_input - current_energy_output
+    calculate_new_temperature_field!(unit, unit.losses, sim_params)
+end
+
+
+function calculate_new_temperature_field!(unit::Network5GDHC, q_in_out::Float64, sim_params)
     # Calculate temperature field using implicit Euler
     # --- helpers ---
     function idx(nx::Int, h::Int, i::Int)
         return (h - 1) * nx + i
     end
 
-    function liquid_fraction(unit::GeothermalHeatCollector, T::Float64)
+    function liquid_fraction(unit::Network5GDHC, T::Float64)
         T0 = unit.phase_change_lower_boundary_temperature
         T1 = unit.phase_change_upper_boundary_temperature
         if T <= T0
@@ -1274,7 +1378,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         end
     end
 
-    function dliquid_dT(unit::GeothermalHeatCollector, T::Float64)
+    function dliquid_dT(unit::Network5GDHC, T::Float64)
         T0 = unit.phase_change_lower_boundary_temperature
         T1 = unit.phase_change_upper_boundary_temperature
         dT = T1 - T0
@@ -1286,7 +1390,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         end
     end
 
-    function c_sensible(unit::GeothermalHeatCollector, T::Float64)
+    function c_sensible(unit::Network5GDHC, T::Float64)
         # linear blend of sensible cp across the interval
         T0 = unit.phase_change_lower_boundary_temperature
         T1 = unit.phase_change_upper_boundary_temperature
@@ -1300,21 +1404,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         end
     end
 
-    # evaluate conductivity at given temperature
-    function k_from_T(unit::GeothermalHeatCollector, T::Float64)
-        T0 = unit.phase_change_lower_boundary_temperature
-        T1 = unit.phase_change_upper_boundary_temperature
-        if T >= T1
-            return unit.soil_heat_conductivity
-        elseif T <= T0
-            return unit.soil_heat_conductivity_frozen
-        else
-            f = (T1 - T) / (T1 - T0)
-            return unit.soil_heat_conductivity * (1.0 - f) + unit.soil_heat_conductivity_frozen * f
-        end
-    end
-
-    function k_between(unit::GeothermalHeatCollector, Tmat::AbstractMatrix, h1::Int, i1::Int, h2::Int, i2::Int)
+    function k_between(unit::Network5GDHC, Tmat::AbstractMatrix, h1::Int, i1::Int, h2::Int, i2::Int)
         return (k_from_T(unit, Tmat[h1, i1]) + k_from_T(unit, Tmat[h2, i2])) / 2.0
     end
 
@@ -1340,11 +1430,11 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     infrared_sky_radiation = unit.constant_infrared_sky_radiation === nothing ?
                              Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params) :
                              unit.constant_infrared_sky_radiation
-    sky_temperature = (infrared_sky_radiation / unit.boltzmann_constant)^0.25  # [K]
+    sky_temperature = (infrared_sky_radiation / unit.boltzmann_constant)^0.25 # [K]
 
     # pipe source strength
     specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes) # [W/m]
-    q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length                                      # [W per pipe]
+    q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length # [W per pipe]
     hpipe = unit.fluid_node_y_idx
 
     # initial state
@@ -1469,6 +1559,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         end
 
         if max_dT < unit.picard_tol
+            T_guess .= T_new
             break
         else
             # light damping helps if many cells cross the phase band in one go
@@ -1486,19 +1577,9 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                2.0 * unit.t2[hpipe + 1, 2] +
                2.0 * unit.t2[hpipe - 1, 2]) / 8.0
     unit.average_temperature_adjacent_to_pipe = avg_adj
-
+    
     # Fluid temperature using pipe/soil resistance (compute with final local k)
-    if unit.model_type == "simplified"
-        pipe_R_len = unit.pipe_soil_thermal_resistance
-    else
-        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out,
-                                                                                 sim_params["wh_to_watts"])
-        k_loc = k_from_T(unit, unit.t2[hpipe, 2])
-        k_eff = 1.0 / (unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
-                       (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2.0 * unit.pipe_heat_conductivity) +
-                       unit.dx_mesh[2] / (2.0 * k_loc))
-        pipe_R_len = 1.0 / (k_eff * pi * unit.pipe_d_o)
-    end
+    pipe_R_len = pipe_resistance_per_length(unit, unit.t2[hpipe, 2], unit.fluid_temperature)
 
     unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe +
                              pipe_R_len * specific_heat_flux_pipe
@@ -1513,7 +1594,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     unit.t1 .= unit.t2
 end
 
-function plot_optional_figures_begin(unit::GeothermalHeatCollector,
+function plot_optional_figures_begin(unit::Network5GDHC,
                                      output_path::String,
                                      output_formats::Vector{String},
                                      sim_params::Dict{String,Any})
@@ -1555,7 +1636,7 @@ function plot_optional_figures_begin(unit::GeothermalHeatCollector,
     return true
 end
 
-function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}, output_path::String)
+function plot_optional_figures_end(unit::Network5GDHC, sim_params::Dict{String,Any}, output_path::String)
     # plot temperature field as 3D mesh with time-slider
     @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
           "Close figure to continue..."
@@ -1594,26 +1675,22 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Di
 end
 
 # function to calculate heat transfer coefficient alpha.
-function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64, wh2w::Function)
-
-    # calculate mass flow in pipe
-    collector_power_in_out_per_pipe = wh2w(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
-    temperature_spread = q_in_out > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
-    collector_mass_flow_per_pipe = collector_power_in_out_per_pipe /
-                                   (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
+function calculate_alpha_pipe(unit::Network5GDHC, fluid_temperature::Float64)
+    mass_flow_per_pipe = unit.spec_flow_rate * (pi * unit.pipe_d_i^2 / 4) * 
+                                   unit.fluid_density / unit.number_of_pipes
 
     if unit.use_dynamic_fluid_properties
         # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, 
         # adapted from TRNSYS Type 710, for 30 Vol-% ethylene glycol mix:
-        fluid_dynamic_viscosity = 0.0000017158 * unit.fluid_temperature^2 -
-                                  0.0001579079 * unit.fluid_temperature + 0.0048830621
-        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+        fluid_dynamic_viscosity = 0.0000017158 * fluid_temperature^2 -
+                                  0.0001579079 * fluid_temperature + 0.0048830621
+        unit.fluid_heat_conductivity = 0.0010214286 * fluid_temperature + 0.447
         unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity /
                                     unit.fluid_heat_conductivity
-        fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) / (pi * unit.pipe_d_i * fluid_dynamic_viscosity)
+        fluid_reynolds_number = (4 * mass_flow_per_pipe) / (pi * unit.pipe_d_i * fluid_dynamic_viscosity)
     else
         # calculate reynolds-number, based on kinematic viscosity with constant fluid properties.
-        fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) /
+        fluid_reynolds_number = (4 * mass_flow_per_pipe) /
                                 (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_d_i * pi)
     end
 
@@ -1633,7 +1710,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64, 
     return alpha, fluid_reynolds_number
 end
 
-function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
+function calculate_Nu_laminar(unit::Network5GDHC, fluid_reynolds_number::Float64)
     if unit.nusselt_approach == "Ramming"
         # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; "Grundlagen der
         # Technischen Thermodynamik",  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
@@ -1661,7 +1738,7 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
     return nusselt_laminar
 end
 
-function calculate_Nu_turbulent(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
+function calculate_Nu_turbulent(unit::Network5GDHC, fluid_reynolds_number::Float64)
     # Approach used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung 
     # im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240-248, 1995. 
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
@@ -1670,134 +1747,25 @@ function calculate_Nu_turbulent(unit::GeothermalHeatCollector, fluid_reynolds_nu
     return nusselt_turbulent
 end
 
-# process function that provides energy from the geothermal heat collector and calculates new temperatures 
-# according to actual delivered or received energy
-function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    # get actual required energy from output interface
-    outface = unit.output_interfaces[unit.m_heat_out]
-    exchanges = balance_on(outface, outface.target)
-    energy_demanded = balance(exchanges) + energy_potential(exchanges)
-    energy_available = unit.current_max_output_energy  # is positive
-
-    # shortcut if there is no energy demanded
-    if energy_demanded >= -sim_params["epsilon"]
-        handle_component_update!(unit, "process", sim_params)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
-        return
-    end
-
-    for exchange in exchanges
-        demanded_on_interface = exchange.balance + exchange.energy_potential
-
-        if demanded_on_interface >= -sim_params["epsilon"]
-            continue
-        end
-
-        if (exchange.temperature_min !== nothing &&
-            exchange.temperature_min > unit.current_output_temperature)
-            # we can only supply energy at a temperature at or below the collector's current
-            # output temperature
-            continue
-        end
-
-        used_heat = abs(demanded_on_interface)
-
-        if energy_available > used_heat
-            energy_available -= used_heat
-            add!(outface, used_heat, nothing, unit.current_output_temperature)
-        else
-            add!(outface, energy_available, nothing, unit.current_output_temperature)
-            energy_available = 0.0
-        end
-    end
-
-    # write output heat flux into vector
-    energy_delivered = -(unit.current_max_output_energy - energy_available)
-    unit.collector_total_heat_energy_in_out = energy_delivered
-    handle_component_update!(unit, "process", sim_params)
-end
-
-function handle_component_update!(unit::GeothermalHeatCollector, step::String, sim_params::Dict{String,Any})
-    if step == "process"
-        unit.process_done = true
-    elseif step == "load"
-        unit.load_done = true
-    end
-    if unit.process_done && unit.load_done
-        # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit, unit.collector_total_heat_energy_in_out, sim_params)
-        # reset 
-        unit.process_done = false
-        unit.load_done = false
-    end
-end
-
-function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    if !unit.regeneration
-        handle_component_update!(unit, "load", sim_params)
-        return
-    end
-
-    inface = unit.input_interfaces[unit.m_heat_in]
-    exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges)
-    energy_demand = unit.current_max_input_energy  # is positive
-
-    if energy_available <= sim_params["epsilon"]
-        # shortcut if there is no energy to be used
-        handle_component_update!(unit, "load", sim_params)
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        return
-    end
-
-    for exchange in exchanges
-        exchange_energy_available = exchange.balance + exchange.energy_potential
-
-        if exchange_energy_available < sim_params["epsilon"]
-            continue
-        end
-
-        if exchange.temperature_max !== nothing &&
-           exchange.temperature_max < unit.current_input_temperature
-            # we can only take energy if it's at a higher/equal temperature than the
-            # collector's current input temperature
-            continue
-        end
-
-        if energy_demand > exchange_energy_available
-            energy_demand -= exchange_energy_available
-            sub!(inface, exchange_energy_available, unit.current_input_temperature, nothing)
-        else
-            sub!(inface, energy_demand, unit.current_input_temperature, nothing)
-            energy_demand = 0.0
-        end
-    end
-
-    energy_taken = unit.current_max_input_energy - energy_demand
-    unit.collector_total_heat_energy_in_out += energy_taken
-    handle_component_update!(unit, "load", sim_params)
-end
-
-function output_values(unit::GeothermalHeatCollector)::Vector{String}
+function output_values(unit::Network5GDHC)::Vector{String}
     output_vals = []
-    if unit.regeneration
-        push!(output_vals, string(unit.m_heat_in) * ":IN")
-    end
     if unit.model_type == "detailed"
         push!(output_vals, "fluid_reynolds_number")
         push!(output_vals, "alpha_fluid_pipe")
     end
     append!(output_vals,
-            [string(unit.m_heat_out) * ":OUT",
+            [string(unit.m_heat_in) * ":IN",
+             string(unit.m_heat_out) * ":OUT",
              "fluid_temperature",
              "ambient_temperature",
-             "global_radiation_power"])
+             "global_radiation_power",
+             "LossesGains"])
     # push!(output_vals, "TEMPERATURE_xNodeNum_yNodeNum")
 
     return output_vals
 end
 
-function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
+function output_value(unit::Network5GDHC, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
@@ -1823,8 +1791,10 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         return unit.global_radiation_power
     elseif key.value_key == "alpha_fluid_pipe"
         return unit.alpha_fluid_pipe
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end
 
-export GeothermalHeatCollector
+export Network5GDHC

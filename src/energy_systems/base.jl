@@ -2108,6 +2108,8 @@ include("heat_producers/heat_pump.jl")
 include("heat_producers/thermal_booster.jl")
 include("electric_producers/pv_plant.jl")
 
+include("connections/network_5gdhc.jl")
+
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into separate files for less clutter
 include("efficiency.jl")

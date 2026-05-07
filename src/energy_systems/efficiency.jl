@@ -681,7 +681,7 @@ Checks the available energy on the input heat interface.
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_heat_in_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
+function check_heat_in_layered(unit::Union{HeatPump,ThermalBooster,Network5GDHC}, sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
@@ -996,7 +996,7 @@ actual input priority of the primary and secondary input interface at the target
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
 - `Vector{Stringing}`: The UACs of the targets on the interface.
 """
-function check_heat_out_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
+function check_heat_out_layered(unit::Union{HeatPump,ThermalBooster,Network5GDHC}, sim_params::Dict{String,Any})
     has_secondary_interface = hasproperty(unit, :has_secondary_interface) && unit.has_secondary_interface
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
