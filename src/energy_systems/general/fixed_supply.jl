@@ -149,7 +149,7 @@ const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connectio
     ),
 )
 
-const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
+const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,

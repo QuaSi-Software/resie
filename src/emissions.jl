@@ -68,24 +68,30 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
                                          breakdown::Dict{String,Any}, type::Symbol)
     observation_period = Int(sim_params["emissions_parameters"]["observation_period_in_years"])
 
-    if isnothing(component.emissions_parameters["constant_energy_emissions"])
+    if type == :source
+        param_name = "energy_emissions"
+    elseif type == :sink
+        param_name = "energy_emission_credits"
+    end
+
+    if isnothing(component.emissions_parameters["constant_" * param_name])
         # get emission profile from component (one of them is given)
         step = Millisecond(Second(sim_params["time_step_seconds"]))
-        profile_end_date = maximum(keys(component.emissions_parameters["energy_emissions_profile"].data))
+        profile_end_date = maximum(keys(component.emissions_parameters[param_name * "_profile"].data))
         times = collect(sim_params["start_date_output"]:step:profile_end_date)
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
-        emissions_profile_energy = component.emissions_parameters["energy_emissions_profile_scale"] .*
-                                   [component.emissions_parameters["energy_emissions_profile"].data[t] for t in times]
+        emissions_profile_energy = component.emissions_parameters[param_name * "_profile_scale"] .*
+                                   [component.emissions_parameters[param_name * "_profile"].data[t] for t in times]
     else
         # create profile from constant emissions
-        emissions_profile_energy = fill(component.emissions_parameters["constant_energy_emissions"],
+        emissions_profile_energy = fill(component.emissions_parameters["constant_" * param_name],
                                         sim_params["number_of_time_steps_output"])
     end
     emissions_profile_energy = extend_profile(emissions_profile_energy, observation_period,
                                               sim_params["emissions_parameters"]["repeat_period"], sim_params)
 
     # factors
-    r_energy_emissions = 1.0 + component.emissions_parameters["energy_emissions_change_rate_per_year"]  # change factor of energy emissions
+    r_energy_emissions = 1.0 + component.emissions_parameters[param_name * "_change_rate_per_year"]  # change factor of energy emissions
 
     # calculate yearly emissions of energies
     energy_emissions_per_year = zeros(Float64, observation_period)
@@ -99,11 +105,13 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     if type == :source
         # emissions remain positive
         energy_emissions_per_year_result = energy_emissions_per_year
-        emissions_name = "energy_emissions_per_year"
+        emissions_name = "emissions_energy"
+        emissions_name_per_year = "energy_emissions_per_year"
     elseif type == :sink
         # emissions will be negative
         energy_emissions_per_year_result = .-energy_emissions_per_year
-        emissions_name = "energy_emissions_credits_per_year"
+        emissions_name = "emission_credits_energy"
+        emissions_name_per_year = "energy_emission_credits_per_year"
     end
 
     # calculate annuity
@@ -111,8 +119,8 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     emissions_energies += component_energies_emissions
 
     add_to_breakdown!(breakdown, component.uac,
-                      Dict("emissions_energy" => component_energies_emissions,
-                           emissions_name => energy_emissions_per_year_result))
+                      Dict(emissions_name => component_energies_emissions,
+                           emissions_name_per_year => energy_emissions_per_year_result))
 
     return emissions_energies, breakdown
 end

@@ -75,7 +75,7 @@ const GRID_INPUT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection"
     ),
 )
 
-const GRID_INPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection",
+const GRID_INPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source",
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,

@@ -149,12 +149,12 @@ const FIXED_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_
     ),
 )
 
-const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
+const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_sink", 
     Dict{String,Any}(
-        "energy_emissions_profile_file_path" => nothing,
-        "energy_emissions_profile_scale" => 1.0,
-        "constant_energy_emissions" => nothing,
-        "energy_emissions_change_rate_per_year" =>  0.0,
+        "energy_emission_credits_profile_file_path" => nothing,
+        "energy_emission_credits_profile_scale" => 1.0,
+        "constant_energy_emission_credits" => nothing,
+        "energy_emission_credits_change_rate_per_year" =>  0.0,
     
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",

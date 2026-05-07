@@ -2492,7 +2492,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         ),
     )
 
-    if type in ["connection"]
+    if type in ["connection_source"]
         connection_params = Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
@@ -2516,7 +2516,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             ),
             "constant_energy_emissions" => (
                 default=defaults["constant_energy_emissions"],
-                description="Constant specific emissions for the grid connection",
+                description="Constant specific emissions for the source connection",
                 display_name="constant energy emissions",
                 required=false,
                 conditionals=[("energy_emissions_profile_file_path", "mutex")],
@@ -2537,10 +2537,54 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         )
     end
 
+    if type in ["connection_sink"]
+        connection_params = Dict{String,Any}(
+            "energy_emission_credits_profile_file_path" => (
+                default=defaults["energy_emission_credits_profile_file_path"],
+                description="Path to a specific emission credits profile file",
+                display_name="Emission credits profile file",
+                required=false,
+                conditionals=[("constant_energy_emission_credits", "mutex")],
+                validations=[("at_least_one", "constant_energy_emission_credits", "energy_emission_credits_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="g CO2/Wh"
+            ),
+            "energy_emission_credits_profile_scale" => (
+                default=defaults["energy_emission_credits_profile_scale"],
+                description="Scale factor for energy emission credits profile",
+                display_name="Scale factor energy emission credits profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_energy_emission_credits" => (
+                default=defaults["constant_energy_emission_credits"],
+                description="Constant specific emission credits for the sink component",
+                display_name="constant energy emission credits",
+                required=false,
+                conditionals=[("energy_emission_credits_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_energy_emission_credits", "energy_emission_credits_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="g CO2/Wh"
+            ),
+            "energy_emission_credits_change_rate_per_year" => (
+                default=defaults["energy_emission_credits_change_rate_per_year"],
+                description="Yearly change rate of specific energy emission credits",
+                display_name="energy emission credits change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            )
+        )
+    end
 
     if type in ["transformer", "storage"]
         return base_params 
-    elseif type in ["connection"]
+    elseif type in ["connection_source", "connection_sink"]
         return Base.merge(base_params, connection_params)
     else
         @error "Unknown type in function get_economic_defaults."
