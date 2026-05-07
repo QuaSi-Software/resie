@@ -19,7 +19,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "primary_source_uac" => nothing,
             "secondary_source_uac" => nothing,
             "heat_storage_uac" => nothing,
-            "heat_heat_demand_uac" => nothing,
+            "heat_demand_uac" => nothing,
             "renewable_source_uacs" => [],
             "price_profile_path" => nothing,
             "price_trend_profile_path" => nothing,
@@ -128,12 +128,6 @@ function change_bus_priorities!(mod::CM_EMSFuzzy,
     # set limits by using the profile limited control module thats attached to each source
     mod_params["primary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod_params["plr_limit_primary"]
     mod_params["secondary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod_params["plr_limit_secondary"]
-    # heat_bus_uac = mod_params["heat_bus_uac"]
-    # components[heat_bus_uac].connectivity = mod_params["connectivity_by_state"][heat_bus_uac][mod_params["charging_state"][heat_bus_uac]]
-    # if !isnothing(mod_params["power_bus_uac"])
-    #     power_bus_uac = mod_params["power_bus_uac"]
-    #     components[power_bus_uac].connectivity = mod_params["connectivity_by_state"][power_bus_uac][mod_params["charging_state"][power_bus_uac]]
-    # end
 
     # set connectivity to allow or disallow charging from secondary interfaces by reordering 
     # bus interfaces, but only if the control module has multiple connectivities
@@ -219,6 +213,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
         throw(InputError)
     end
 
+    # calculate the cops of both sources to calculate the electrical power they will use 
     snk_temp = mod_params["storage"].high_temperature
 
     if !isnothing(prim.input_interfaces[prim.m_heat_in].source.temperature_profile)
@@ -275,14 +270,6 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
               total_th_power
     target_power = max(max(plr, min_plr) * total_th_power, target_power)
 
-    # storage_free_energy = max(mod_params["storage"].capacity - mod_params["storage"].load, 0.0)
-    # storage_charge_power_soc = sim_params["wh_to_watts"](storage_free_energy)
-    # storage_charge_power_rate = sim_params["wh_to_watts"](mod_params["storage"].max_load_rate * mod_params["storage"].capacity)
-    # max_storage_charge_power = min(storage_charge_power_soc, storage_charge_power_rate)
-    # charge_bonus_power = chargemode > 50 ? max_storage_charge_power : 0.0
-
-    # target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power)
-
     # set state for BufferTank charging
     if chargemode >= 50
         mod_params["charging_state"][mod_params["heat_bus_uac"]] = 1 # charging on
@@ -297,64 +284,18 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
         mod_params["charging_state"][mod_params["power_bus_uac"]] = 2 # charging off
     end
 
-    ### old Implementation with SOC_target got replaced by chargemode
-
-    # Fuzzy logic returns change in plr and SOC target value
-    # plr_diff, SOC_target = fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
-    # if isnan(plr_diff) || isnan(SOC_target)
-        
-    #     @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
-    #            "Check if the parameters are inside their bounds. " *
-    #            "p_now=$p_now, p_trend=$p_trend, p_volatility=$p_volatility, SOC_now=$SOC_now"
-    #     throw(InputError)
-    # end
-
-    ## control charging and discharging in the same way
-    ## plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
-
-    # if SOC_target <= SOC_now
-    #     # reduce output power to empty the storage
-    #     current_power = plr_primary * primary_power + plr_secondary * secondary_power
-    #     target_power = clamp(current_power + plr_diff * total_power, 0.0, total_power)
-    # else
-    #     # increase output power to fill the storage
-    #     missing_power = sim_params["wh_to_watts"]((SOC_target - SOC_now) * mod_params["storage"].capacity)
-    #     target_power = clamp(missing_power, 0.0, total_power)
-    # end
-
     # calculate the plrs of the sources with respect to their maximum power and priorities
     mod_params["plr_limit_primary"] = primary_power > 0 ? clamp(target_power / available_th_power_primary, 0.0, 1.0) : 0.0
     remaining_power = max(target_power - mod_params["plr_limit_primary"] * available_th_power_primary, 0.0)
     mod_params["plr_limit_secondary"] = secondary_power > 0 ? clamp(remaining_power / available_th_power_secondary, 0.0, 1.0) : 0.0
-
-    # if sim_params["time"] >= (11*30 + 12) * 24 * 3600 + 4 * 3600 @infiltrate end
-
-    # # Check how much heat both heat sources and storage can provide
-    # storage_power_by_soc = SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
-    # storage_power_limit = hasproperty(mod_params["storage"], :max_output_energy) ?
-    #                       sim_params["wh_to_watts"](mod_params["storage"].max_output_energy) :
-    #                       storage_power_by_soc
-    # storage_available_power = min(storage_power_by_soc, storage_power_limit)
-    # maximum_heat = mod_params["plr_limit_primary"] * prim.design_power_th +
-    #                mod_params["plr_limit_secondary"] * sec.design_power_th +
-    #                storage_available_power
-   
-    # # Fallback: Ensure plr_limit is never reduced if doing so would leave demand uncovered
-    # can_raise_primary = primary_power > 0 && mod_params["plr_limit_primary"] < 1.0
-    # can_raise_secondary = secondary_power > 0 && mod_params["plr_limit_secondary"] < 1.0
-    # if energy_demand > maximum_heat && (can_raise_primary || can_raise_secondary)
-    #     mod_params["plr_limit_primary"] = primary_power > 0 ? 1.0 : 0.0
-    #     mod_params["plr_limit_secondary"] = secondary_power > 0 ? 1.0 : 0.0
-    #     println("Fuzzy Controller set plr too small")
-    # end
 end 
 
 
 # TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
-# a:"left foot"
-# b:"left shoulder" 
-# c:"right shoulder"
-# d:"right foot"
+    # a:"left foot"
+    # b:"left shoulder" 
+    # c:"right shoulder"
+    # d:"right foot"
 # TriangularMF max(min((x - a) / (b - a), (c - x) / (c - b)), 0)
     # a:"left foot"
     # b:"peak" 
@@ -362,72 +303,65 @@ end
 function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
    
     # definition of membership functions for price with rolling horizon bounds
-      # helpers for p_now rolling horizon inputs
-      # avoid degenerate membership functions when temp_min == temp_max
-      min_temp = float(temp_min)
-      max_temp = float(temp_max)
-      if !isfinite(min_temp) || !isfinite(max_temp)
-          return NaN, NaN
-      end
-      if max_temp <= min_temp
-          delta = max(abs(min_temp) * 1e-6, 1e-6)
-          min_temp -= delta
-          max_temp += delta
-      end
+    # helpers for p_now rolling horizon inputs
+    # avoid degenerate membership functions when temp_min == temp_max
+    min_temp = float(temp_min)
+    max_temp = float(temp_max)
+    if !isfinite(min_temp) || !isfinite(max_temp)
+        return NaN, NaN
+    end
+    if max_temp <= min_temp
+        delta = max(abs(min_temp) * 1e-6, 1e-6)
+        min_temp -= delta
+        max_temp += delta
+    end
 
-      a1 = min_temp - 1
-      b1 = min_temp
-      c1 = 0.5*(max_temp + min_temp)
-      a2 = min_temp
-      b2 = 0.5*(max_temp + min_temp)
-      c2 = max_temp
-      a3 = 0.5*(max_temp + min_temp)
-      b3 = max_temp
-      c3 = max_temp + 1
-      
-      cheap = max(min((p_now-a1) / (b1-a1), (c1-p_now) / (c1-b1)), 0)
-      average = max(min((p_now-a2) / (b2-a2), (c2-p_now) / (c2-b2)), 0)
-      expensive = max(min((p_now-a3) / (b3-a3), (c3-p_now) / (c3-b3)), 0) 
+    a1 = min_temp - 1
+    b1 = min_temp
+    c1 = 0.5*(max_temp + min_temp)
+    a2 = min_temp
+    b2 = 0.5*(max_temp + min_temp)
+    c2 = max_temp
+    a3 = 0.5*(max_temp + min_temp)
+    b3 = max_temp
+    c3 = max_temp + 1
     
-    # old version with fixed price bounds
-        # cheap = max(min((p_now - -137) / 1, 1, (75 - p_now) / 65), 0)
-        # average = max(min((p_now - 55) / 25, (105 - p_now) / 25), 0)
-        # expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)
+    cheap = max(min((p_now-a1) / (b1-a1), (c1-p_now) / (c1-b1)), 0)
+    average = max(min((p_now-a2) / (b2-a2), (c2-p_now) / (c2-b2)), 0)
+    expensive = max(min((p_now-a3) / (b3-a3), (c3-p_now) / (c3-b3)), 0) 
     
     # definition of membership functions for price trend
-    # TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
-      falling = max(min((p_trend - -258) / 1, 1, (1 - p_trend) / 8), 0)
-      stable = max(min((p_trend - -7) / 7, (6 - p_trend) / 6), 0)
-      rising = max(min((p_trend - -1) / 7, 1, (247 - p_trend) / 1), 0)
+    falling = max(min((p_trend - -258) / 1, 1, (1 - p_trend) / 8), 0)
+    stable = max(min((p_trend - -7) / 7, (6 - p_trend) / 6), 0)
+    rising = max(min((p_trend - -1) / 7, 1, (247 - p_trend) / 1), 0)
 
-      ant1 = min(cheap, falling)
-      ant2 = min(cheap, stable)
-      ant3 = min(cheap, rising)
-      ant4 = min(average, falling)
-      ant5 = min(average, stable)
-      ant6 = min(average, rising)
-      ant7 = min(expensive, falling)
-      ant8 = min(expensive, stable)
-      ant9 = min(expensive, rising)
-      plr_max_agg = collect(LinRange{Float64}(-1.0, 2.0, 101))
-      @inbounds for (i, x) = enumerate(plr_max_agg)
-              low = max(min((x - -1.0) / 1.0, (0.5 - x) / 0.5), 0)
-              mid = max(min((x - 0.0) / 0.5, (1.0 - x) / 0.5), 0)
-              high = max(min((x - 0.5) / 0.5, (2.0 - x) / 1.0), 0)
-              plr_max_agg[i] = max(max(max(max(max(max(max(max(min(ant1, high), min(ant2, high)), min(ant3, high)), min(ant4, mid)), min(ant5, mid)), min(ant6, mid)), min(ant7, low)), min(ant8, low)), min(ant9, low))
-          end
-      plr_num = (2 * sum((mfi * xi for (mfi, xi) = zip(plr_max_agg, LinRange{Float64}(-1.0, 2.0, 101)))) - first(plr_max_agg) * -1.0) - last(plr_max_agg) * 2.0
-      plr_den = (2 * sum(plr_max_agg) - first(plr_max_agg)) - last(plr_max_agg)
-      plr_max = plr_den == 0 ? NaN : plr_num / plr_den
-      chargemode_agg = collect(LinRange{Float64}(-1.0, 101.0, 101))
-      @inbounds for (i, x) = enumerate(chargemode_agg)
-    # TriangularMF max(min((x - a) / (b - a), (c - x) / (c - b)), 0)
-              off = max(min((x - -1.0) / 1.0, (51.0 - x) / 51.0), 0)
-              on = max(min((x - 49.0) / 51.0, (101.0 - x) / 1.0), 0)
-              chargemode_agg[i] = max(max(max(max(max(max(max(max(min(ant1, off), min(ant2, on)), min(ant3, on)), min(ant4, off)), min(ant5, on)), min(ant6, on)), min(ant7, off)), min(ant8, off)), min(ant9, on))
-          end
-      charge_num = (2 * sum((mfi * xi for (mfi, xi) = zip(chargemode_agg, LinRange{Float64}(-1.0, 101.0, 101)))) - first(chargemode_agg) * -1.0) - last(chargemode_agg) * 101.0
-      charge_den = (2 * sum(chargemode_agg) - first(chargemode_agg)) - last(chargemode_agg)
-      chargemode = charge_den == 0 ? NaN : charge_num / charge_den
-      return plr_max, chargemode
+    ant1 = min(cheap, falling)
+    ant2 = min(cheap, stable)
+    ant3 = min(cheap, rising)
+    ant4 = min(average, falling)
+    ant5 = min(average, stable)
+    ant6 = min(average, rising)
+    ant7 = min(expensive, falling)
+    ant8 = min(expensive, stable)
+    ant9 = min(expensive, rising)
+    plr_max_agg = collect(LinRange{Float64}(-1.0, 2.0, 101))
+    @inbounds for (i, x) = enumerate(plr_max_agg)
+        low = max(min((x - -1.0) / 1.0, (0.5 - x) / 0.5), 0)
+        mid = max(min((x - 0.0) / 0.5, (1.0 - x) / 0.5), 0)
+        high = max(min((x - 0.5) / 0.5, (2.0 - x) / 1.0), 0)
+        plr_max_agg[i] = max(max(max(max(max(max(max(max(min(ant1, high), min(ant2, high)), min(ant3, high)), min(ant4, mid)), min(ant5, mid)), min(ant6, mid)), min(ant7, low)), min(ant8, low)), min(ant9, low))
+    end
+    plr_num = (2 * sum((mfi * xi for (mfi, xi) = zip(plr_max_agg, LinRange{Float64}(-1.0, 2.0, 101)))) - first(plr_max_agg) * -1.0) - last(plr_max_agg) * 2.0
+    plr_den = (2 * sum(plr_max_agg) - first(plr_max_agg)) - last(plr_max_agg)
+    plr_max = plr_den == 0 ? NaN : plr_num / plr_den
+    chargemode_agg = collect(LinRange{Float64}(-1.0, 101.0, 101))
+    @inbounds for (i, x) = enumerate(chargemode_agg)
+        off = max(min((x - -1.0) / 1.0, (51.0 - x) / 51.0), 0)
+        on = max(min((x - 49.0) / 51.0, (101.0 - x) / 1.0), 0)
+        chargemode_agg[i] = max(max(max(max(max(max(max(max(min(ant1, off), min(ant2, on)), min(ant3, on)), min(ant4, off)), min(ant5, on)), min(ant6, on)), min(ant7, off)), min(ant8, off)), min(ant9, on))
+    end
+    charge_num = (2 * sum((mfi * xi for (mfi, xi) = zip(chargemode_agg, LinRange{Float64}(-1.0, 101.0, 101)))) - first(chargemode_agg) * -1.0) - last(chargemode_agg) * 101.0
+    charge_den = (2 * sum(chargemode_agg) - first(chargemode_agg)) - last(chargemode_agg)
+    chargemode = charge_den == 0 ? NaN : charge_num / charge_den
+    return plr_max, chargemode
   end

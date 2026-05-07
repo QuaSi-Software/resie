@@ -29,13 +29,13 @@ mutable struct CM_EMS <: ControlModule
             "min_reserve_power" => 0.0,
             "offer_only_freebids" => false,
             "min_storage_load" => 0.0,
-            "new_connections_below_limits" => Dict{String,Any}(), # (Normalbetrieb), Sparbetrieb, Einnahmenbetrieb
-            "storage_uac" => nothing,
+            "connections_for_baseline" => Dict{String,Any}(),
+            "heat_storage_uac" => nothing,
             "hp_uac" => nothing,
             "boiler_uac" => nothing,
             "neg_reserve_uac" => nothing,
             "pos_reserve_uac" => nothing,
-            "control_state" => nothing,
+            "init_control_state" => 1,
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -52,6 +52,8 @@ mutable struct CM_EMS <: ControlModule
             @error "Required price profile paths for control module EMS not" * 
                    "given."
         end
+
+        params["control_state"] = params["init_control_state"]
 
         params["price_profiles"] = Array{Profile}(undef, length(price_profile_paths))
         for idx in eachindex(price_profile_paths)
@@ -72,16 +74,16 @@ mutable struct CM_EMS <: ControlModule
         #     end
         # end
 
-        if isempty(params["new_connections_below_limits"])
+        if isempty(params["connections_for_baseline"])
             bus_uacs = [unit_uac]
-            params["new_connections_below_limits"][unit_uac] = []
+            params["connections_for_baseline"][unit_uac] = []
         else
-            bus_uacs = collect(keys(params["new_connections_below_limits"]))
+            bus_uacs = collect(keys(params["connections_for_baseline"]))
         end
 
         connectivity_by_state = Dict{String,Dict{UInt,ConnectionMatrix}}()
         ooo_by_state = Dict{UInt,Union{OrderOfOperations,Nothing}}()
-        N_connections = length(params["new_connections_below_limits"][bus_uacs[1]]) + 1
+        N_connections = length(params["connections_for_baseline"][bus_uacs[1]]) + 1
         # walk through all possible connections
         for idx in 1:N_connections
             new_components = deepcopy(components)
@@ -92,7 +94,7 @@ mutable struct CM_EMS <: ControlModule
                     connectivity_by_state[uac][1] = components[uac].connectivity
                 else
                     # calculate new connectivity
-                    config = Dict{String,Any}("connections" => params["new_connections_below_limits"][uac][idx-1])   
+                    config = Dict{String,Any}("connections" => params["connections_for_baseline"][uac][idx-1])   
                     # create and set new connectivity
                     connectivity_by_state[uac][idx] = ConnectionMatrix(config)
                     new_components[uac].connectivity = connectivity_by_state[uac][idx]
@@ -179,17 +181,6 @@ mutable struct CM_EMS <: ControlModule
                                         2 => table_state_freebids,
                                         3 => table_state_4h_check
                                      ))
-        # fill the connectivity and ooo to match the amount of states
-        for key in keys(state_machine.transitions)
-            if !haskey(ooo_by_state, key)
-                ooo_by_state[key] = ooo_by_state[key-1]
-                if N_connections > 1
-                    for uac in bus_uacs
-                        connectivity_by_state[uac][key] = connectivity_by_state[uac][key-1]
-                    end
-                end
-            end
-        end
 
         return new("EMS", params, state_machine, connectivity_by_state, ooo_by_state)
     end
@@ -224,10 +215,11 @@ function calc_reserve_power(sim_length::TimePeriod,
                                                 )))
 
     for (idx, dt) in enumerate(date_range)
-        components[mod_params["hp_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
-        components[mod_params["hp_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
-        components[mod_params["boiler_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
-        components[mod_params["boiler_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
+        #TODO find better way to write the scaling_factor somewhere
+        components[mod_params["hp_uac"] * "_baseline_in"].max_power_profile.data[dt] = sim_params["watt_to_wh"](baseline_el_hp[idx])
+        components[mod_params["hp_uac"] * "_baseline_out"].max_power_profile.data[dt] = sim_params["watt_to_wh"](baseline_el_hp[idx])
+        components[mod_params["boiler_uac"] * "_baseline_in"].max_power_profile.data[dt] = sim_params["watt_to_wh"](baseline_el_boiler[idx])
+        components[mod_params["boiler_uac"] * "_baseline_out"].max_power_profile.data[dt] = sim_params["watt_to_wh"](baseline_el_boiler[idx])
         #TODO remove if not necessary
         components[mod_params["boiler_uac"]].controller.modules[1].profile.data[dt] = 1.0
         components[mod_params["hp_uac"]].controller.modules[1].profile.data[dt] = 1.0
@@ -273,6 +265,7 @@ function calc_reserve_power(sim_length::TimePeriod,
 
         # negative control reserve
         if power_neg_bool
+            #TODO find better way to write the scaling_factor somewhere
             components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=0)
             components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=0)
             
@@ -291,6 +284,7 @@ function calc_reserve_power(sim_length::TimePeriod,
             end
         # positive control reserve
         elseif power_pos_bool
+            #TODO find better way to write the scaling_factor somewhere
             components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = ceil(power_value, digits=0)
             components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = ceil(power_value, digits=0)
             
@@ -530,11 +524,7 @@ function reorder_operations(mod::CM_EMS,
                             sim_params::Dict{String,Any})::OrderOfOperations
     # record "original" ooo since it might be the first time the module has access to it
     # and also it might've changed due to other control modules
-    if !isnothing(mod.parameters["control_state"])
-        state = mod.parameters["control_state"]
-    else
-        state = mod.state_machine.state
-    end
+    state = mod.parameters["control_state"]
 
     if state == 1 || mod.ooo_by_state[state] === nothing
         mod.ooo_by_state[state] = order_of_operations
@@ -558,11 +548,7 @@ function change_bus_priorities!(mod::CM_EMS,
                            components, sim_params)
     end
 
-    if !isnothing(mod.parameters["control_state"])
-        state = mod.parameters["control_state"]
-    else
-        state = mod.state_machine.state
-    end
+    state = mod.parameters["control_state"]
 
     # now reorder bus interfaces, but only if the state changed and the control module 
     # actually has multiple connectivities
