@@ -3095,7 +3095,7 @@ function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
                                sim_params::Dict{String,Any})
     if haskey(config, parameter_name) && config[parameter_name] !== nothing
         path = config[parameter_name]
-        return Profile(path, sim_params)
+        return Profile(path, sim_params; do_not_shorten_profile=true)
     end
 
     return nothing
