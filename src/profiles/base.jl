@@ -779,8 +779,6 @@ Determines the end date to which the profile should be trimmed.
 This is used to avoid e.g. price profiles used for economic calculations for multiple years
 to be trimmed to the simulation time of e.g. only one year.
 
-Note: Even with do_not_shorten_profile set to true, the profile will be trimmed to multiples of the simulation time!
-
 # Arguments
 - `timestamps::Vector{DateTime}`: The timestamp of the profile
 - `do_not_shorten_profile::Bool`: A bool indicating if the profile should be shortened to the simulation time period
@@ -791,13 +789,7 @@ Note: Even with do_not_shorten_profile set to true, the profile will be trimmed 
 """
 function get_end_date(timestamps::Vector{DateTime}, do_not_shorten_profile::Bool, sim_params::Dict{String,Any})
     if do_not_shorten_profile
-        # trim to multiples of the simulation time
-        sim_period = sim_params["end_date"] - sim_params["start_date"]
-        end_date = sim_params["start_date"]
-        while end_date + sim_period <= timestamps[end]
-            end_date += sim_period
-        end
-        return end_date
+        return timestamps[end]
     else
         return sim_params["end_date"]
     end

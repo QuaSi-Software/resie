@@ -170,26 +170,28 @@ end
 
 function extend_profile(profile::Union{Nothing,Vector{Float64}}, observation_period_in_years::Union{Float64,Int64},
                         repeat_period::Period, sim_params::Dict{String,Any})
-    number_of_timesteps = Int(ceil(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"]))
-
     if profile === nothing || profile == []
         return nothing
     end
-    if sim_params["start_date_output"] + Year(observation_period_in_years) <= sim_params["end_date"]
+
+    number_of_timesteps = Int(ceil(observation_period_in_years * 365 * 24 * 60 * 60 / sim_params["time_step_seconds"]))
+    profile_end_date = sim_params["start_date_output"] + Second(length(profile) * sim_params["time_step_seconds"])
+
+    if sim_params["start_date_output"] + Year(observation_period_in_years) <= profile_end_date
         # no repeat required, cut profile to observation_period_in_years * 365 days
         return profile[1:number_of_timesteps]
     end
 
-    economic_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
+    observation_end_date = sim_params["start_date_output"] + Year(observation_period_in_years)
     if sim_params["start_date_output"] == sim_params["end_date"]
         # special case where only 1 time step is simulated
-        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economic_end_date,
-                                                                                sim_params["end_date"]))) /
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(observation_end_date,
+                                                                                profile_end_date))) /
                                 sim_params["time_step_seconds"]))
         data_to_repeat = profile
     else
-        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(economic_end_date,
-                                                                                sim_params["end_date"]))) /
+        nr_to_repeat = Int(ceil(Dates.value(Dates.Second(sub_ignoring_leap_days(observation_end_date,
+                                                                                profile_end_date))) /
                                 Dates.value(Dates.Second(repeat_period))))
         start_idx = length(profile) + 1 -
                     Int(ceil(Dates.value(Dates.Second((repeat_period))) / sim_params["time_step_seconds"]))
@@ -217,7 +219,8 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
     if isnothing(component.economic_parameters["constant_energy_price"])
         # get price profile from component (one of them is given)
         step = Millisecond(Second(sim_params["time_step_seconds"]))
-        times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
+        profile_end_date = maximum(keys(component.economic_parameters["energy_price_profile"].data))
+        times = collect(sim_params["start_date_output"]:step:profile_end_date)
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         price_profile_energy = component.economic_parameters["energy_price_profile_scale"] .*
                                [component.economic_parameters["energy_price_profile"].data[t] for t in times]
@@ -292,7 +295,8 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     if isnothing(component.economic_parameters["constant_unmet_energy_price"])
         # get price profile from component (one of them is given)
         step = Millisecond(round(Int, sim_params["time_step_seconds"] * 1000))
-        times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
+        profile_end_date = maximum(keys(component.economic_parameters["unmet_energy_price_profile"].data))
+        times = collect(sim_params["start_date_output"]:step:profile_end_date)
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         price_profile_unmet_energy = component.economic_parameters["unmet_energy_price_profile_scale"] .*
                                      [component.economic_parameters["unmet_energy_price_profile"].data[t]

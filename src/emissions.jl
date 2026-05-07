@@ -71,7 +71,8 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     if isnothing(component.emissions_parameters["constant_energy_emissions"])
         # get emission profile from component (one of them is given)
         step = Millisecond(Second(sim_params["time_step_seconds"]))
-        times = collect(sim_params["start_date_output"]:step:sim_params["end_date"])
+        profile_end_date = maximum(keys(component.emissions_parameters["energy_emissions_profile"].data))
+        times = collect(sim_params["start_date_output"]:step:profile_end_date)
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         emissions_profile_energy = component.emissions_parameters["energy_emissions_profile_scale"] .*
                                    [component.emissions_parameters["energy_emissions_profile"].data[t] for t in times]
