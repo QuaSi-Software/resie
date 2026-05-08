@@ -779,17 +779,32 @@ Determines the end date to which the profile should be trimmed.
 This is used to avoid e.g. price profiles used for economic calculations for multiple years
 to be trimmed to the simulation time of e.g. only one year.
 
+Note: Even with do_not_shorten_profile set to true, the profile will be trimmed to multiples of the simulation time!
+
 # Arguments
 - `timestamps::Vector{DateTime}`: The timestamp of the profile
 - `do_not_shorten_profile::Bool`: A bool indicating if the profile should be shortened to the simulation time period
+- `file_path::String`: The name of the profile path of the profile
 - `sim_params::Dict{String,Any}`: The simulation parameters
 
 # Returns
 - `end_date::DateTime`: The end date to which the profile should be trimmed
 """
-function get_end_date(timestamps::Vector{DateTime}, do_not_shorten_profile::Bool, sim_params::Dict{String,Any})
+function get_end_date(timestamps::Vector{DateTime}, do_not_shorten_profile::Bool, file_path::String,
+                      sim_params::Dict{String,Any})
     if do_not_shorten_profile
-        return timestamps[end]
+        # trim to multiples of the simulation time
+        sim_period = sim_params["end_date"] - sim_params["start_date"]
+        end_date = sim_params["start_date"]
+        while end_date + sim_period <= timestamps[end]
+            end_date += sim_period
+        end
+        if end_date + Second(sim_params["time_step_seconds"]) < timestamps[end]
+            @info "The profile at $(file_path) was shortened to a multiple of the simulation time " *
+                  "(from $(Dates.format(end_date, "yyyy-mm-dd HH:MM")) (exclusive) to " *
+                  "$(Dates.format(timestamps[end], "yyyy-mm-dd HH:MM")))"
+        end
+        return end_date
     else
         return sim_params["end_date"]
     end
@@ -839,7 +854,7 @@ function convert_profile(values::Vector{Float64},
 
     if original_time_step == new_time_step && time_is_aligned   # do nothing
         # cut values and timestamps to simulation time
-        end_date = get_end_date(timestamps, do_not_shorten_profile, sim_params)
+        end_date = get_end_date(timestamps, do_not_shorten_profile, file_path, sim_params)
         mask = (timestamps .>= sim_params["start_date"]) .&& (timestamps .<= end_date)
         values = values[mask]
         timestamps = timestamps[mask]
@@ -850,7 +865,8 @@ function convert_profile(values::Vector{Float64},
                                                           original_time_step,
                                                           new_time_step,
                                                           sim_params,
-                                                          do_not_shorten_profile)
+                                                          do_not_shorten_profile,
+                                                          file_path)
         info_message *= "was shifted using linear interpolation to fit the simulation start time. "
 
     elseif original_time_step < new_time_step                   # aggregation
@@ -867,7 +883,8 @@ function convert_profile(values::Vector{Float64},
                                                               original_time_step,
                                                               original_time_step,
                                                               sim_params,
-                                                              do_not_shorten_profile)
+                                                              do_not_shorten_profile,
+                                                              file_path)
             info_message *= "was shifted using linear interpolation to fit the simulation start time and "
         end
 
@@ -876,7 +893,8 @@ function convert_profile(values::Vector{Float64},
                                                      original_time_step,
                                                      new_time_step,
                                                      sim_params,
-                                                     do_not_shorten_profile)
+                                                     do_not_shorten_profile,
+                                                     file_path)
         info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                         "timestep of $(Second(new_time_step))."
 
@@ -944,7 +962,7 @@ function convert_profile(values::Vector{Float64},
                                                  sunrise_sunset=sunrise_sunset)
 
             # cut values and timestamps to simulation time
-            end_date = get_end_date(timestamps, do_not_shorten_profile, sim_params)
+            end_date = get_end_date(timestamps, do_not_shorten_profile, file_path, sim_params)
             mask = (timestamps .>= sim_params["start_date"]) .&& (timestamps .<= end_date)
             values = values[mask]
             timestamps = timestamps[mask]
@@ -954,7 +972,8 @@ function convert_profile(values::Vector{Float64},
                                                               original_time_step,
                                                               new_time_step,
                                                               sim_params,
-                                                              do_not_shorten_profile)
+                                                              do_not_shorten_profile,
+                                                              file_path)
 
         elseif interpolation_type == "linear_time_preserving"
             values, timestamps = profile_linear_interpolation(values,
@@ -962,7 +981,8 @@ function convert_profile(values::Vector{Float64},
                                                               original_time_step,
                                                               new_time_step / 2,
                                                               sim_params,
-                                                              do_not_shorten_profile)
+                                                              do_not_shorten_profile,
+                                                              file_path)
             # remove every second timestamp and value to match the definition of values representing
             # the mean/sum of the following time step
             deleteat!(values, 1:2:(length(values) - 1))
@@ -974,14 +994,16 @@ function convert_profile(values::Vector{Float64},
                                                             original_time_step,
                                                             new_time_step,
                                                             sim_params,
-                                                            do_not_shorten_profile)
+                                                            do_not_shorten_profile,
+                                                            file_path)
             if !time_is_aligned   # do time shift if not aligned
                 values, timestamps = profile_linear_interpolation(values,
                                                                   timestamps,
                                                                   new_time_step,
                                                                   new_time_step,
                                                                   sim_params,
-                                                                  do_not_shorten_profile)
+                                                                  do_not_shorten_profile,
+                                                                  file_path)
             end
         end
 
@@ -1222,8 +1244,9 @@ function profile_linear_interpolation(values::Vector{Float64},
                                       original_time_step::Period,
                                       new_time_step::Period,
                                       sim_params::Dict{String,Any},
-                                      do_not_shorten_profile::Bool)
-    end_date = get_end_date(timestamps, do_not_shorten_profile, sim_params)
+                                      do_not_shorten_profile::Bool,
+                                      file_path::String)
+    end_date = get_end_date(timestamps, do_not_shorten_profile, file_path, sim_params)
     ref_time = sim_params["start_date"]
     numeric_timestamps = [Dates.value(Millisecond(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
     interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
@@ -1254,8 +1277,9 @@ function profile_spread_to_segments(values::Vector{Float64},
                                     original_time_step::Period,
                                     new_time_step::Period,
                                     sim_params::Dict{String,Any},
-                                    do_not_shorten_profile::Bool)
-    end_date = get_end_date(timestamps, do_not_shorten_profile, sim_params)
+                                    do_not_shorten_profile::Bool,
+                                    file_path::String)
+    end_date = get_end_date(timestamps, do_not_shorten_profile, file_path, sim_params)
     segmentation_factor = Int(original_time_step / new_time_step)   # is always > 1 and of type {Int} as only full 
     #                                                                 dividers are allowed
 
@@ -1292,8 +1316,9 @@ function profile_calculate_means(values::Vector{Float64},
                                  original_time_step::Period,
                                  new_time_step::Period,
                                  sim_params::Dict{String,Any},
-                                 do_not_shorten_profile::Bool)
-    end_date = get_end_date(timestamps, do_not_shorten_profile, sim_params)
+                                 do_not_shorten_profile::Bool,
+                                 file_path::String)
+    end_date = get_end_date(timestamps, do_not_shorten_profile, file_path, sim_params)
     aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full 
     #                                                                dividers are allowed
     old_length = length(timestamps)
