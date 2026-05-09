@@ -794,14 +794,27 @@ function get_end_date(timestamps::Vector{DateTime}, do_not_shorten_profile::Bool
                       sim_params::Dict{String,Any})
     if do_not_shorten_profile
         # trim to multiples of the simulation time
-        sim_period = sim_params["end_date"] - sim_params["start_date"]
+        sim_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date"]) +
+                     Millisecond(Int(round(1000 * sim_params["time_step_seconds"])))
+
         end_date = sim_params["start_date"]
-        while end_date + sim_period <= timestamps[end]
-            end_date += sim_period
+
+        while true
+            next_end_date = add_ignoring_leap_days(end_date, sim_period)
+
+            if next_end_date > add_ignoring_leap_days(timestamps[end], Second(sim_params["time_step_seconds"]))
+                break
+            end
+
+            end_date = next_end_date
         end
-        if end_date + Second(sim_params["time_step_seconds"]) < timestamps[end]
+
+        # subtract one timestep as the last time step is seen as inclusive value
+        end_date = sub_ignoring_leap_days(end_date, Second(sim_params["time_step_seconds"]))
+
+        if end_date < timestamps[end]
             @info "The profile at $(file_path) was shortened to a multiple of the simulation time " *
-                  "(from $(Dates.format(end_date, "yyyy-mm-dd HH:MM")) (exclusive) to " *
+                  "(from $(Dates.format(end_date, "yyyy-mm-dd HH:MM")) to " *
                   "$(Dates.format(timestamps[end], "yyyy-mm-dd HH:MM")))"
         end
         return end_date
