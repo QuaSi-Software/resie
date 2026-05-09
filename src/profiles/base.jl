@@ -563,19 +563,34 @@ Calculates all differences of consecutive elements of the timestep vector
 while considering removed leap days. Returns the differences as vector.
 """
 function diff_ignore_leap_days(timestamps::Vector{DateTime})
-    number_of_timesteps = length(timestamps)
-    diffs = Vector{Period}(undef, number_of_timesteps - 1)
+    # Remove timestamps that are located on Feb 29.
+    # This makes profiles with explicit leap-day values comparable to profiles without them.
+    timestamps_without_leap_days = filter(t -> !(month(t) == 2 && day(t) == 29), timestamps)
 
-    for i in 2:number_of_timesteps
-        diff = timestamps[i] - timestamps[i - 1]
+    number_of_timestamps = length(timestamps_without_leap_days)
+    number_of_timestamps >= 2 || return Millisecond[]
 
-        # Check if the range includes a leap day and adjust the difference
-        if isleapyear(timestamps[i]) &&
-           timestamps[i - 1] <= DateTime(year(timestamps[i - 1]), 02, 28, 23, 59, 59, 999) &&
-           timestamps[i] >= DateTime(year(timestamps[i]), 03, 01, 00, 00, 00, 000)
-            diff = diff - Millisecond(86400000)  # equals 1 day
+    diffs = Vector{Millisecond}(undef, number_of_timestamps - 1)
+    one_day_ms = 24 * 60 * 60 * 1000
+
+    for i in 2:number_of_timestamps
+        t_start = timestamps_without_leap_days[i - 1]
+        t_end = timestamps_without_leap_days[i]
+        diff_ms = Dates.value(t_end - t_start)
+
+        # If the interval crosses a leap day, subtract the skipped Feb 29.
+        for y in year(t_start):year(t_end)
+            isleapyear(y) || continue
+
+            leap_day_start = DateTime(y, 2, 29, 0, 0, 0)
+            leap_day_end = DateTime(y, 3, 1, 0, 0, 0)
+
+            if t_start < leap_day_start && leap_day_end <= t_end
+                diff_ms -= one_day_ms
+            end
         end
-        diffs[i - 1] = diff
+
+        diffs[i - 1] = Millisecond(diff_ms)
     end
 
     return diffs
