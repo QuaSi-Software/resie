@@ -82,24 +82,35 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         emissions_profile_energy = component.emissions_parameters[param_name * "_profile_scale"] .*
                                    [component.emissions_parameters[param_name * "_profile"].data[t] for t in times]
+
+        # Deal with cases where the price profile is longer than the simulation period.
+        if (sub_ignoring_leap_days(profile_end_date, sim_params["start_date"]) >
+            sim_params["emissions_parameters"]["repeat_period"]) &&
+           sim_params["emissions_parameters"]["repeat_method"] === "all"
+            emissions_repeat_period = sub_ignoring_leap_days(profile_end_date, sim_params["start_date_output"])
+        else
+            emissions_repeat_period = sim_params["emissions_parameters"]["repeat_period"]
+        end
     else
         # create profile from constant emissions
         emissions_profile_energy = fill(component.emissions_parameters["constant_" * param_name],
                                         sim_params["number_of_time_steps_output"])
+        emissions_repeat_period = sim_params["emissions_parameters"]["repeat_period"]
     end
-    emissions_profile_energy = extend_profile(emissions_profile_energy, observation_period,
-                                              sim_params["emissions_parameters"]["repeat_period"], sim_params)
+    emissions_profile_energy = extend_profile(emissions_profile_energy, observation_period, emissions_repeat_period,
+                                              sim_params)
 
-    # factors
-    r_energy_emissions = 1.0 + component.emissions_parameters[param_name * "_change_rate_per_year"]  # change factor of energy emissions
+    emissions_profile_energy_effective = apply_yearly_emissions_change_to_profile(emissions_profile_energy,
+                                                                                  observation_period,
+                                                                                  component.emissions_parameters[param_name * "_change_rate_per_year"])
 
     # calculate yearly emissions of energies
     energy_emissions_per_year = zeros(Float64, observation_period)
-    energy_emissions_per_timestep = energy_profile .* emissions_profile_energy
+    energy_emissions_per_timestep = energy_profile .* emissions_profile_energy_effective
     timesteps_per_year = Int(floor(length(energy_emissions_per_timestep) / observation_period))
     for y in 1:observation_period
         energy_emissions_per_year[y] = sum(energy_emissions_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
-                                           init=0.0) * r_energy_emissions^(y - 1)
+                                           init=0.0)
     end
 
     if type == :source
@@ -107,11 +118,23 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
         energy_emissions_per_year_result = energy_emissions_per_year
         emissions_name = "emissions_energy"
         emissions_name_per_year = "energy_emissions_per_year"
+
+        # save profile for later use
+        store_extended_emissions_profile!(breakdown,
+                                          component,
+                                          "energy_emissions_profile_effective",
+                                          emissions_profile_energy_effective)
     elseif type == :sink
         # emissions will be negative
         energy_emissions_per_year_result = .-energy_emissions_per_year
         emissions_name = "emission_credits_energy"
         emissions_name_per_year = "energy_emission_credits_per_year"
+
+        # save profile for later use
+        store_extended_emissions_profile!(breakdown,
+                                          component,
+                                          "energy_emission_credits_profile_effective",
+                                          .-emissions_profile_energy_effective)
     end
 
     # calculate annuity
@@ -180,6 +203,47 @@ function get_embodied_emissions_from_component(component::EnergySystems.Componen
     emissions_per_year[observation_period] -= (emissions_first_year * r^t_last) * remaining_fraction
 
     return emissions_per_year
+end
+
+function store_extended_emissions_profile!(breakdown::Dict{String,Any},
+                                           component::EnergySystems.Component,
+                                           profile_name::String,
+                                           profile::AbstractVector{<:Real})
+    component_results = get!(breakdown, component.uac, Dict{String,Any}())
+
+    profiles_any = get!(component_results,
+                        "extended_emissions_profiles",
+                        Dict{String,Vector{Float64}}())
+
+    profiles = profiles_any::Dict{String,Vector{Float64}}
+    profiles[profile_name] = Float64.(profile)
+
+    return nothing
+end
+
+function apply_yearly_emissions_change_to_profile(profile::AbstractVector{<:Real},
+                                                  observation_period::Int,
+                                                  change_rate_per_year::Real)
+    effective_profile = Float64.(profile)
+
+    observation_period <= 0 && return effective_profile
+
+    r = 1.0 + Float64(change_rate_per_year)
+    timesteps_per_year = Int(floor(length(effective_profile) / observation_period))
+
+    timesteps_per_year <= 0 && return effective_profile
+
+    for y in 1:observation_period
+        idx_start = (y - 1) * timesteps_per_year + 1
+        idx_end = y * timesteps_per_year
+
+        idx_start > length(effective_profile) && break
+        idx_end = min(idx_end, length(effective_profile))
+
+        effective_profile[idx_start:idx_end] .*= r^(y - 1)
+    end
+
+    return effective_profile
 end
 
 function plot_emissions_results(result::EmissionsResult,

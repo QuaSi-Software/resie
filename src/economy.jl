@@ -224,27 +224,43 @@ function calculate_annuity_of_energies(energy_profile::Vector{Float64}, componen
         times = filter(t -> !(month(t) == 2 && day(t) == 29), times)  # skip leap days
         price_profile_energy = component.economic_parameters["energy_price_profile_scale"] .*
                                [component.economic_parameters["energy_price_profile"].data[t] for t in times]
+        # Deal with cases where the price profile is longer than the simulation period.
+        if (sub_ignoring_leap_days(profile_end_date, sim_params["start_date"]) >
+            sim_params["economic_parameters"]["repeat_period"]) &&
+           sim_params["economic_parameters"]["repeat_method"] === "all"
+            price_repeat_period = sub_ignoring_leap_days(profile_end_date, sim_params["start_date_output"])
+        else
+            price_repeat_period = sim_params["economic_parameters"]["repeat_period"]
+        end
     else
         # create profile from constant energy price
         price_profile_energy = fill(component.economic_parameters["constant_energy_price"],
                                     sim_params["number_of_time_steps_output"])
+        price_repeat_period = sim_params["economic_parameters"]["repeat_period"]
     end
-    price_profile_energy = extend_profile(price_profile_energy, observation_period,
-                                          sim_params["economic_parameters"]["repeat_period"], sim_params)
+    price_profile_energy = extend_profile(price_profile_energy, observation_period, price_repeat_period, sim_params)
+
+    price_profile_energy_effective = apply_yearly_price_change_to_profile(price_profile_energy,
+                                                                          observation_period,
+                                                                          energy_price_change_rate_per_year)
+
+    store_extended_price_profile!(breakdown,
+                                  component,
+                                  "energy_price_profile_effective",
+                                  price_profile_energy_effective)
 
     # factors
-    r_energy_costs = 1.0 + energy_price_change_rate_per_year  # price change factor of energy costs/revenues
     r_base_costs = 1.0 + base_cost_change_rate_per_year   # price change factor of base costs
 
     # calculate yearly costs / revenues of energies
     energy_costs_per_year = zeros(Float64, observation_period)
     energy_base_costs_per_year = zeros(Float64, observation_period)
-    energy_costs_per_timestep = energy_profile .* price_profile_energy
+    energy_costs_per_timestep = energy_profile .* price_profile_energy_effective
     timesteps_per_year = Int(floor(length(energy_costs_per_timestep) / observation_period))
     for y in 1:observation_period
         energy_base_costs_per_year[y] = base_cost_per_year * r_base_costs^(y - 1)
         energy_costs_per_year[y] = sum(energy_costs_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
-                                       init=0.0) * r_energy_costs^(y - 1)
+                                       init=0.0)
     end
 
     if type == :source
@@ -309,16 +325,22 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     price_profile_unmet_energy = extend_profile(price_profile_unmet_energy, observation_period,
                                                 sim_params["economic_parameters"]["repeat_period"], sim_params)
 
-    # factors
-    r_unmet_energy_costs = 1.0 + unmet_energy_price_change_rate_per_year  # price change factor of unmet energy costs/revenues
+    price_profile_unmet_energy_effective = apply_yearly_price_change_to_profile(price_profile_unmet_energy,
+                                                                                observation_period,
+                                                                                unmet_energy_price_change_rate_per_year)
+
+    store_extended_price_profile!(breakdown,
+                                  component,
+                                  "unmet_energy_price_profile_effective",
+                                  price_profile_unmet_energy_effective)
 
     # calculate yearly costs / revenues of unmet energies
     unmet_energy_costs_per_year = zeros(Float64, observation_period)
-    unmet_energy_costs_per_timestep = unmet_energy_profile .* price_profile_unmet_energy
+    unmet_energy_costs_per_timestep = unmet_energy_profile .* price_profile_unmet_energy_effective
     timesteps_per_year = Int(floor(length(unmet_energy_costs_per_timestep) / observation_period))
     for y in 1:observation_period
         unmet_energy_costs_per_year[y] = sum(unmet_energy_costs_per_timestep[((y - 1) * timesteps_per_year + 1):(y * timesteps_per_year)];
-                                             init=0.0) * r_unmet_energy_costs^(y - 1)
+                                             init=0.0)
     end
 
     # calculate annuity
@@ -702,5 +724,149 @@ function write_economic_results_to_CSV(economic_result::EconomicResult, filepath
             end
         end
     end
+    return true
+end
+
+function store_extended_price_profile!(breakdown::Dict{String,Any},
+                                       component::EnergySystems.Component,
+                                       profile_name::String,
+                                       profile::AbstractVector{<:Real})
+    component_results = get!(breakdown, component.uac, Dict{String,Any}())
+
+    profiles_any = get!(component_results,
+                        "extended_price_profiles",
+                        Dict{String,Vector{Float64}}())
+
+    profiles = profiles_any::Dict{String,Vector{Float64}}
+    profiles[profile_name] = collect(Float64, profile)
+
+    return nothing
+end
+
+function apply_yearly_price_change_to_profile(price_profile::Vector{Float64},
+                                              observation_period::Int,
+                                              change_rate_per_year::Float64)
+    profile_with_change = copy(price_profile)
+    r = 1.0 + change_rate_per_year
+
+    timesteps_per_year = Int(floor(length(profile_with_change) / observation_period))
+
+    for y in 1:observation_period
+        idx_start = (y - 1) * timesteps_per_year + 1
+        idx_end = y * timesteps_per_year
+
+        idx_start > length(profile_with_change) && break
+        idx_end = min(idx_end, length(profile_with_change))
+
+        profile_with_change[idx_start:idx_end] .*= r^(y - 1)
+    end
+
+    return profile_with_change
+end
+
+function plot_extended_price_and_emissions_profiles(economic_result::Any,
+                                                    emissions_result::Any,
+                                                    output_file_path::String,
+                                                    sim_params::Dict{String,Any})
+    emissions_factor = 1000.0
+    emissions_unit = "g CO₂e/kWh"
+
+    price_factor = 1000.0
+    price_unit = "€/kWh"
+
+    traces = PlotlyJS.AbstractTrace[]
+
+    function timestep_axis(n::Int)
+        step_ms = round(Int, sim_params["time_step_seconds"] * 1000)
+        return [sim_params["start_date_output"] + Millisecond((i - 1) * step_ms) for i in 1:n]
+    end
+
+    # Price profiles: left y-axis
+    if economic_result !== nothing
+        for (uac, component_results) in sort(collect(economic_result.breakdown); by=first)
+            component_results isa AbstractDict || continue
+            haskey(component_results, "extended_price_profiles") || continue
+
+            profiles = component_results["extended_price_profiles"]
+            profiles isa AbstractDict || continue
+
+            for (profile_name, profile) in sort(collect(profiles); by=first)
+                profile isa AbstractVector{<:Real} || continue
+                isempty(profile) && continue
+
+                profile_name_string = String(profile_name)
+
+                line_attr = attr()
+
+                push!(traces,
+                      scatter(;
+                              x=timestep_axis(length(profile)),
+                              y=price_factor .* Float64.(profile),
+                              mode="lines",
+                              name="$(uac) | $(profile_name_string)",
+                              yaxis="y",
+                              line=line_attr))
+            end
+        end
+    end
+
+    # Emissions profiles: right y-axis
+    if emissions_result !== nothing
+        for (uac, component_results) in sort(collect(emissions_result.breakdown); by=first)
+            component_results isa AbstractDict || continue
+            haskey(component_results, "extended_emissions_profiles") || continue
+
+            profiles = component_results["extended_emissions_profiles"]
+            profiles isa AbstractDict || continue
+
+            for (profile_name, profile) in sort(collect(profiles); by=first)
+                profile isa AbstractVector{<:Real} || continue
+                isempty(profile) && continue
+
+                profile_name_string = String(profile_name)
+
+                line_attr = attr()
+
+                push!(traces,
+                      scatter(;
+                              x=timestep_axis(length(profile)),
+                              y=emissions_factor .* Float64.(profile),
+                              mode="lines",
+                              name="$(uac) | $(profile_name_string)",
+                              yaxis="y2",
+                              line=line_attr))
+            end
+        end
+    end
+
+    isempty(traces) && return false
+
+    title_suffix = if economic_result !== nothing && emissions_result !== nothing
+        "energy price and emissions profiles"
+    elseif economic_result !== nothing
+        "energy price profiles"
+    else
+        "emissions profiles"
+    end
+
+    layout = Layout(;
+                    title=attr(;
+                               text="Extended $(title_suffix)" *
+                                    "<br><sup>Profiles utilized in calculation, including annual change rates.</sup>"),
+                    xaxis_title_text="Time",
+                    yaxis=attr(;
+                               title="Energy price / revenue [$(price_unit)]",
+                               zeroline=true),
+                    yaxis2=attr(;
+                                title="Emissions / credits [$(emissions_unit)]",
+                                overlaying="y",
+                                side="right",
+                                zeroline=true),
+                    hovermode="closest",
+                    legend=attr(; x=1.05, y=1.0, xanchor="left", yanchor="top"))
+
+    p = plot(traces, layout)
+    savefig(p, output_file_path)
+
     return true
 end

@@ -340,31 +340,48 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     # output economic results
     if do_calculate_economy
-        filepath = io_settings["economic_plot_file_cashflows"]
-        success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
-        success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_economic_cashflows"]
+            filepath = io_settings["economic_plot_cashflows_file_path"]
+            success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
+            success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        end
 
-        filepath = io_settings["economic_plot_file_present_values"]
-        success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
-        success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_economic_present_values"]
+            filepath = io_settings["economic_plot_present_values_file_path"]
+            success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
+            success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        end
 
         # export economic results to CSV
-        filepath = io_settings["economic_CSV_file_path"]
-        success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
-        success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
+        if io_settings["output_economic_CSV"]
+            filepath = io_settings["economic_CSV_file_path"]
+            success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+            success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
+        end
     end
 
     # output emissions results
     if do_calculate_emissions
         # plot figure with yearly emissions
-        filepath = io_settings["emissions_plot_file_path"]
-        success = plot_emissions_results(emissions_result, filepath, sim_params)
-        success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_emission_results"]
+            filepath = io_settings["emissions_plot_file_path"]
+            success = plot_emissions_results(emissions_result, filepath, sim_params)
+            success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
+        end
 
-        # export emissions results to CSV
-        filepath = io_settings["emissions_CSV_file_path"]
-        success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
-        success && @info "Emissions results exported to $(sim_params["run_path"](filepath))"
+        if io_settings["output_emissions_CSV"]
+            # export emissions results to CSV
+            filepath = io_settings["emissions_CSV_file_path"]
+            success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+            success && @info "Emissions results exported to $(sim_params["run_path"](filepath))"
+        end
+    end
+
+    # plot utilized price and emission profiles
+    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
+        filepath = io_settings["price_and_emission_profile_file_path"]
+        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params) # TODO
+        success && @info "Utilized price and emission profiles exported as plot to $(sim_params["run_path"](filepath))"
     end
 end
 
