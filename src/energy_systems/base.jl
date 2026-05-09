@@ -1649,7 +1649,8 @@ function extract_parameter(x::Type{Component}, config::AbstractDict{String,Any},
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name in ["energy_price_profile_file_path",
                       "unmet_energy_price_profile_file_path",
-                      "energy_emissions_profile_file_path"]
+                      "energy_emissions_profile_file_path",
+                      "energy_emission_credits_profile_file_path"]
         return load_optional_profile(config, param_name, sim_params)
     end
 
