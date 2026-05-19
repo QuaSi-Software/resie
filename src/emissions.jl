@@ -252,7 +252,7 @@ function plot_emissions_results(result::EmissionsResult,
                                 fixed_output_precision::Int)
     suffix = "_per_year"
     # unit and factor for output. Note that internally, everything is based on [g/W] or [g/Wh]
-    emissions_unit = "kgCO₂e"
+    emissions_unit = "kg CO₂e"
     emissions_factor = 1e-3
     # Convention:
     #   positive values  -> emissions
@@ -338,7 +338,7 @@ function write_emissions_results_to_CSV(emissions_result::EmissionsResult,
                                         filepath::String,
                                         sim_params::Dict{String,Any})
     # unit and factor for output. Note that internally, everything is based on [g/W] or [g/Wh]
-    emissions_unit = "kgCO₂e"
+    emissions_unit = "kg CO₂e"
     emissions_factor = 1e-3
 
     observation_period_in_years = Int(sim_params["emissions_parameters"]["observation_period_in_years"])
