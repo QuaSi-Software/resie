@@ -54,7 +54,7 @@ const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fi
         "subsidy_max" => nothing
     ),
     Dict{String,Any}(            
-        "capex_specific" => "€/scaling_factor"
+        "capex_specific" => "€/scale"
     ),
 )
 
@@ -70,7 +70,7 @@ const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "g CO2/scaling_factor"
+        "embodied_emissions_specific" => "g CO2/scale"
     )
 )
 #! format: on

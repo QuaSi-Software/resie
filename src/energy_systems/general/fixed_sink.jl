@@ -145,7 +145,7 @@ const FIXED_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_
         "subsidy_max" => nothing
     ),
     Dict{String,Any}(            
-        "capex_specific" => "€/(constant_demand or scaling_factor)"
+        "capex_specific" => "€/(constant_demand or scale)"
     ),
 )
 
@@ -161,7 +161,7 @@ const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connectio
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "g CO2/(constant_demand or scaling_factor)"
+        "embodied_emissions_specific" => "g CO2/(constant_demand or scale)"
     )
 )
 #! format: on

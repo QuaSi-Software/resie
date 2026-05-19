@@ -107,7 +107,7 @@ const FLEXIBLE_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connec
         "subsidy_max" => nothing
     ),
     Dict{String,Any}(            
-        "capex_specific" => "€/(constant_power or scaling_factor)"
+        "capex_specific" => "€/(constant_power or scale)"
     ),
 )
 
@@ -123,7 +123,7 @@ const FLEXIBLE_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("conn
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "g CO2/(constant_power or scaling_factor)"
+        "embodied_emissions_specific" => "g CO2/(constant_power or scale)"
     )
 )
 #! format: on
