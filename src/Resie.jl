@@ -342,13 +342,15 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     if do_calculate_economy
         if io_settings["plot_economic_cashflows"]
             filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
-            success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "cashflows")
             success && @info "Economy plot created and saved to $filepath"
         end
 
         if io_settings["plot_economic_present_values"]
             filepath = sim_params["run_path"](io_settings["economic_plot_present_values_file_path"])
-            success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "present_values")
             success && @info "Economy plot created and saved to $filepath"
         end
 
@@ -365,7 +367,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         # plot figure with yearly emissions
         if io_settings["plot_emission_results"]
             filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
-            success = plot_emissions_results(emissions_result, filepath, sim_params)
+            success = plot_emissions_results(emissions_result, filepath, sim_params,
+                                             io_settings["fixed_output_precision"])
             success && @info "Emissions plot created and saved to $filepath"
         end
 
@@ -380,7 +383,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     # plot utilized price and emission profiles
     if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
         filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
-        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params)
+        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
+                                                             io_settings["fixed_output_precision"])
         success && @info "Utilized price and emission profiles exported as plot to $filepath"
     end
 end

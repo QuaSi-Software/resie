@@ -563,7 +563,7 @@ function get_opex_from_component(component::EnergySystems.Component, investment_
 end
 
 function plot_economic_results(result::EconomicResult, output_file_path::String, sim_params::Dict{String,Any},
-                               cost_type::String)
+                               fixed_output_precision::Int, cost_type::String)
     # Note: costs are positive and revenues are negative at this point! 
     # We will keep this in the figure for now...
 
@@ -589,6 +589,9 @@ function plot_economic_results(result::EconomicResult, output_file_path::String,
         end
     end
     isempty(series) && return false
+
+    # Optional fixed output precision for plotted values.
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
 
     # parameter 
     observation_period_in_years = Int(sim_params["economic_parameters"]["observation_period_in_years"])
@@ -628,16 +631,17 @@ function plot_economic_results(result::EconomicResult, output_file_path::String,
 
     # stacked bars
     for (name, v) in sort(collect(series); by=first)
-        push!(traces, bar(; x=years, y=v, name=name))
+        push!(traces, bar(; x=years, y=round_for_plot(v), name=name))
     end
 
     # net line
-    push!(traces, scatter(; x=years, y=net, mode="lines+markers",
-                          name="Net per year", line=attr(; width=3)))
+    push!(traces,
+          scatter(; x=years, y=round_for_plot(net), mode="lines+markers",
+                  name="Net per year", line=attr(; width=3)))
 
     # cumulative line on secondary axis
     push!(traces,
-          scatter(; x=years, y=cum, mode="lines",
+          scatter(; x=years, y=round_for_plot(cum), mode="lines",
                   name="Cumulative net", yaxis="y2",
                   line=attr(; width=3, dash="dot")))
 
@@ -767,12 +771,17 @@ end
 function plot_extended_price_and_emissions_profiles(economic_result::Any,
                                                     emissions_result::Any,
                                                     output_file_path::String,
-                                                    sim_params::Dict{String,Any})
+                                                    sim_params::Dict{String,Any},
+                                                    fixed_output_precision::Int)
     emissions_factor = 1000.0
     emissions_unit = "g CO₂e/kWh"
 
     price_factor = 1000.0
     price_unit = "€/kWh"
+
+    # Optional fixed output precision for plotted values.
+    # Round after unit conversion so precision applies to displayed units.
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
 
     traces = PlotlyJS.AbstractTrace[]
 
@@ -801,7 +810,7 @@ function plot_extended_price_and_emissions_profiles(economic_result::Any,
                 push!(traces,
                       scatter(;
                               x=timestep_axis(length(profile)),
-                              y=price_factor .* Float64.(profile),
+                              y=round_for_plot(price_factor .* Float64.(profile)),
                               mode="lines",
                               name="$(uac) | $(profile_name_string)",
                               yaxis="y",
@@ -830,7 +839,7 @@ function plot_extended_price_and_emissions_profiles(economic_result::Any,
                 push!(traces,
                       scatter(;
                               x=timestep_axis(length(profile)),
-                              y=emissions_factor .* Float64.(profile),
+                              y=round_for_plot(emissions_factor .* Float64.(profile)),
                               mode="lines",
                               name="$(uac) | $(profile_name_string)",
                               yaxis="y2",

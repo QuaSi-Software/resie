@@ -248,7 +248,8 @@ end
 
 function plot_emissions_results(result::EmissionsResult,
                                 output_file_path::String,
-                                sim_params::Dict{String,Any})
+                                sim_params::Dict{String,Any},
+                                fixed_output_precision::Int)
     suffix = "_per_year"
     # unit and factor for output. Note that internally, everything is based on [g/W] or [g/Wh]
     emissions_unit = "kgCO₂e"
@@ -281,6 +282,9 @@ function plot_emissions_results(result::EmissionsResult,
 
     isempty(series) && return false
 
+    # Optional fixed output precision for plotted values.
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
+
     # net and cumulative emissions
     net = zeros(observation_period_in_years)
     for v in values(series)
@@ -293,18 +297,18 @@ function plot_emissions_results(result::EmissionsResult,
 
     # stacked bars
     for (name, v) in sort(collect(series); by=first)
-        push!(traces, bar(; x=years, y=v, name=name))
+        push!(traces, bar(; x=years, y=round_for_plot(v), name=name))
     end
 
     # net line
     push!(traces,
-          scatter(; x=years, y=net, mode="lines+markers",
+          scatter(; x=years, y=round_for_plot(net), mode="lines+markers",
                   name="Net emissions per year",
                   line=attr(; width=3)))
 
     # cumulative line on secondary axis
     push!(traces,
-          scatter(; x=years, y=cum, mode="lines",
+          scatter(; x=years, y=round_for_plot(cum), mode="lines",
                   name="Cumulative net emissions", yaxis="y2",
                   line=attr(; width=3, dash="dot")))
 
