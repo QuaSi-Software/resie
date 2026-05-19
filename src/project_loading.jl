@@ -224,7 +224,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         unit="-"
     ),
     "emissions_plot_file_path" => (
-        default="./output/emissions_result.html",
+        default="./output/emissions_plot.html",
         description="File path to where the emissions plot file is written",
         display_name="Emissions plot file path",
         required=false,
