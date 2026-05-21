@@ -454,8 +454,8 @@ const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params(
             "repair_rate_per_year" => 0.005,
             "repair_price_change_rate_per_year" =>  0.005,
             "operational_labour_hours_per_year" =>  5,
-            "subsidy_rate_of_capex" =>  nothing,
-            "subsidy_max" =>  nothing
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
     ),
     Dict{String,Any}(
             "capex_specific" => "€/m^2"
