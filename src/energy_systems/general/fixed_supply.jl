@@ -131,7 +131,7 @@ const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connectio
         "unmet_energy_price_profile_file_path" => nothing,
         "unmet_energy_price_profile_scale" => 1.0,
         "constant_unmet_energy_price" => 0.0,
-        "unmet_energy_price_change_rate_per_year" =>  0.00,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
@@ -141,8 +141,8 @@ const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connectio
         "repair_rate_per_year" => 0.0,
         "repair_price_change_rate_per_year" =>  0.0,
         "operational_labour_hours_per_year" =>  0.0,
-        "subsidy_rate_of_capex" => nothing,
-        "subsidy_max" => nothing
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
     ),
     Dict{String,Any}(            
         "capex_specific" => "€/(constant_supply or scale)"

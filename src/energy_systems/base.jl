@@ -2308,7 +2308,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 display_name="subsidy rate of capex",
                 required=false,
                 validations=[("self", "value_lte_num_or_nothing", 1.0)],
-                type=Floathing,
+                type=Float64,
                 json_type="number",
                 unit="-"
             ),
@@ -2317,7 +2317,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 description="Maximum of subsidy for this component",
                 display_name="subsidy max",
                 required=false,
-                type=Floathing,
+                type=Float64,
                 json_type="number",
                 unit="€"
             )
