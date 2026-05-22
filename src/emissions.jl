@@ -71,7 +71,7 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     if type == :source
         param_name = "energy_emissions"
     elseif type == :sink
-        param_name = "energy_emission_credits"
+        param_name = "energy_emissions_credits"
     end
 
     if isnothing(component.emissions_parameters["constant_" * param_name])
@@ -127,13 +127,13 @@ function calculate_emissions_of_energies(energy_profile::Vector{Float64}, compon
     elseif type == :sink
         # emissions will be negative
         energy_emissions_per_year_result = .-energy_emissions_per_year
-        emissions_name = "emission_credits_energy"
-        emissions_name_per_year = "energy_emission_credits_per_year"
+        emissions_name = "emissions_credits_energy"
+        emissions_name_per_year = "energy_emissions_credits_per_year"
 
         # save profile for later use
         store_extended_emissions_profile!(breakdown,
                                           component,
-                                          "energy_emission_credits_profile_effective",
+                                          "energy_emissions_credits_profile_effective",
                                           .-emissions_profile_energy_effective)
     end
 
