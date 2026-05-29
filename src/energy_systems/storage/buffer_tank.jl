@@ -142,7 +142,7 @@ const BUFFER_TANK_COMPONENT_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="kJ/(kg*K)"
+        unit="J/(kg*K)"
     ),
     "high_temperature" => (
         default=75.0,

@@ -1909,7 +1909,7 @@ convert_mass_in_energy(mass, temp_low, temp_high, cp)
 - `mass::Float64`: mass to convert [kg]
 - `temp_low::Temperature`: lower temperature [°C]
 - `temp_high::Temperature`: upper temperature [°C]
-- `cp::Float64`: specific heat capacity [kJ/KgK]
+- `cp::Float64`: specific heat capacity [J/KgK]
 
 """
 function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
