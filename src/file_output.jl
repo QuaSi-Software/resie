@@ -880,7 +880,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
             ||
             (medium_of_interfaces[interface_new] == "hide_medium"
              &&
-             output_all_value_sum[interface_new] == output_all_value_sum[interface_new - 1]))
+             (abs(output_all_value_sum[interface_new] - output_all_value_sum[interface_new - 1])) <
+             sim_params["epsilon"]))
             # end of condition 
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
