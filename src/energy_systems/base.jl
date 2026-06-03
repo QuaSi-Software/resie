@@ -1649,7 +1649,8 @@ function extract_parameter(x::Type{Component}, config::AbstractDict{String,Any},
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name in ["energy_price_profile_file_path",
                       "unmet_energy_price_profile_file_path",
-                      "energy_emissions_profile_file_path"]
+                      "energy_emissions_profile_file_path",
+                      "energy_emissions_credits_profile_file_path"]
         return load_optional_profile(config, param_name, sim_params)
     end
 
@@ -2259,7 +2260,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "maintenance_inspection_price_change_rate_per_year" => (
                 default=defaults["maintenance_inspection_price_change_rate_per_year"],
@@ -2279,7 +2280,7 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 validations=[("self", "value_lte_num", 1.0)],
                 type=Float64,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "repair_price_change_rate_per_year" => (
                 default=defaults["repair_price_change_rate_per_year"],
@@ -2307,16 +2308,16 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 display_name="subsidy rate of capex",
                 required=false,
                 validations=[("self", "value_lte_num_or_nothing", 1.0)],
-                type=Floathing,
+                type=Float64,
                 json_type="number",
-                unit="1/capex"
+                unit="-"
             ),
             "subsidy_max" => (
                 default=defaults["subsidy_max"],
                 description="Maximum of subsidy for this component",
                 display_name="subsidy max",
                 required=false,
-                type=Floathing,
+                type=Float64,
                 json_type="number",
                 unit="€"
             )
@@ -2492,7 +2493,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         ),
     )
 
-    if type in ["connection"]
+    if type in ["connection_source"]
         connection_params = Dict{String,Any}(
             "energy_emissions_profile_file_path" => (
                 default=defaults["energy_emissions_profile_file_path"],
@@ -2516,7 +2517,7 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             ),
             "constant_energy_emissions" => (
                 default=defaults["constant_energy_emissions"],
-                description="Constant specific emissions for the grid connection",
+                description="Constant specific emissions for the source connection",
                 display_name="constant energy emissions",
                 required=false,
                 conditionals=[("energy_emissions_profile_file_path", "mutex")],
@@ -2537,10 +2538,54 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
         )
     end
 
+    if type in ["connection_sink"]
+        connection_params = Dict{String,Any}(
+            "energy_emissions_credits_profile_file_path" => (
+                default=defaults["energy_emissions_credits_profile_file_path"],
+                description="Path to a specific emissions credits profile file",
+                display_name="Emissions credits profile file",
+                required=false,
+                conditionals=[("constant_energy_emissions_credits", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions_credits", "energy_emissions_credits_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_credits_profile_scale" => (
+                default=defaults["energy_emissions_credits_profile_scale"],
+                description="Scale factor for energy emissions credits profile",
+                display_name="Scale factor energy emissions credits profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_energy_emissions_credits" => (
+                default=defaults["constant_energy_emissions_credits"],
+                description="Constant specific emissions credits for the sink component",
+                display_name="constant energy emissions credits",
+                required=false,
+                conditionals=[("energy_emissions_credits_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions_credits", "energy_emissions_credits_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_credits_change_rate_per_year" => (
+                default=defaults["energy_emissions_credits_change_rate_per_year"],
+                description="Yearly change rate of specific energy emissions credits",
+                display_name="energy emissions credits change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            )
+        )
+    end
 
     if type in ["transformer", "storage"]
         return base_params 
-    elseif type in ["connection"]
+    elseif type in ["connection_source", "connection_sink"]
         return Base.merge(base_params, connection_params)
     else
         @error "Unknown type in function get_economic_defaults."
@@ -3095,7 +3140,7 @@ function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
                                sim_params::Dict{String,Any})
     if haskey(config, parameter_name) && config[parameter_name] !== nothing
         path = config[parameter_name]
-        return Profile(path, sim_params)
+        return Profile(path, sim_params; do_not_shorten_profile=true)
     end
 
     return nothing

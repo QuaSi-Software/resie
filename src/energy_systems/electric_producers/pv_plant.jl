@@ -40,7 +40,7 @@ const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fi
         "unmet_energy_price_profile_file_path" => nothing,
         "unmet_energy_price_profile_scale" => 1.0,
         "constant_unmet_energy_price" => 0.0,
-        "unmet_energy_price_change_rate_per_year" =>  0.00,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
@@ -50,15 +50,15 @@ const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fi
         "repair_rate_per_year" => 0.0,
         "repair_price_change_rate_per_year" =>  0.0,
         "operational_labour_hours_per_year" =>  0.0,
-        "subsidy_rate_of_capex" => nothing,
-        "subsidy_max" => nothing
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
     ),
     Dict{String,Any}(            
-        "capex_specific" => "€/scaling_factor"
+        "capex_specific" => "€/scale"
     ),
 )
 
-const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
+const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -70,7 +70,7 @@ const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection"
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "g CO2/scaling_factor"
+        "embodied_emissions_specific" => "g CO2/scale"
     )
 )
 #! format: on

@@ -301,8 +301,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                   weather_data_keys,
                                   io_settings,
                                   sim_params)
-        filepath = io_settings["output_plot_file"]
-        @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
+        filepath = sim_params["run_path"](io_settings["output_plot_file"])
+        @info "Line plot created and saved to $filepath"
     end
 
     # create Sankey diagram
@@ -314,18 +314,18 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                       nr_of_interfaces,
                       io_settings,
                       sim_params)
-        filepath = io_settings["sankey_plot_file"]
-        @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
+        filepath = sim_params["run_path"](io_settings["sankey_plot_file"])
+        @info "Sankey created and saved to $filepath"
     end
 
     if do_write_CSV
-        @info "CSV-file with outputs written to $(sim_params["run_path"](csv_output_file_path))"
+        @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
 
     # plot additional figures potentially available from components after simulation
     if io_settings["auxiliary_plots"]
         component_list = []
-        output_path = io_settings["auxiliary_plots_path"]
+        output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
                 push!(component_list, component[2].uac)
@@ -333,38 +333,59 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         end
         if length(component_list) > 0
             @info "(Further) auxiliary plots are saved to folder " *
-                  "$(sim_params["run_path"](output_path)) for the following components: " *
+                  "$(output_path) for the following components: " *
                   "$(join(component_list, ", "))"
         end
     end
 
     # output economic results
     if do_calculate_economy
-        filepath = io_settings["economic_plot_file_cashflows"]
-        success = plot_economic_results(economic_result, filepath, sim_params, "cashflows")
-        success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_economic_cashflows"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "cashflows")
+            success && @info "Economy plot created and saved to $filepath"
+        end
 
-        filepath = io_settings["economic_plot_file_present_values"]
-        success = plot_economic_results(economic_result, filepath, sim_params, "present_values")
-        success && @info "Economy plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_economic_present_values"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_present_values_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "present_values")
+            success && @info "Economy plot created and saved to $filepath"
+        end
 
         # export economic results to CSV
-        filepath = io_settings["economic_CSV_file_path"]
-        success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
-        success && @info "Economic results exported to $(sim_params["run_path"](filepath))"
+        if io_settings["output_economic_CSV"]
+            filepath = sim_params["run_path"](io_settings["economic_CSV_file_path"])
+            success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+            success && @info "Economic results exported to $filepath"
+        end
     end
 
     # output emissions results
     if do_calculate_emissions
         # plot figure with yearly emissions
-        filepath = io_settings["emissions_plot_file_path"]
-        success = plot_emissions_results(emissions_result, filepath, sim_params)
-        success && @info "Emissions plot created and saved to $(sim_params["run_path"](filepath))"
+        if io_settings["plot_emission_results"]
+            filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
+            success = plot_emissions_results(emissions_result, filepath, sim_params,
+                                             io_settings["fixed_output_precision"])
+            success && @info "Emissions plot created and saved to $filepath"
+        end
 
-        # export emissions results to CSV
-        filepath = io_settings["emissions_CSV_file_path"]
-        success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
-        success && @info "Emissions results exported to $(sim_params["run_path"](filepath))"
+        if io_settings["output_emissions_CSV"]
+            # export emissions results to CSV
+            filepath = sim_params["run_path"](io_settings["emissions_CSV_file_path"])
+            success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+            success && @info "Emissions results exported to $filepath"
+        end
+    end
+
+    # plot utilized price and emission profiles
+    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
+        filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
+        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
+                                                             io_settings["fixed_output_precision"])
+        success && @info "Utilized price and emission profiles exported as plot to $filepath"
     end
 end
 

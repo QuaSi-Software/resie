@@ -160,46 +160,109 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="list",
         unit="-"
     ),
-    "economic_plot_file_cashflows" => (
+    "plot_economic_cashflows" => (
+        default=true,
+        description="Toggle if the economic results (as cashflows) should be plotted",
+        display_name="Plot economic cashflows?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "economic_plot_cashflows_file_path" => (
         default="./output/economic_results_cashflows.html",
         description="File path to where the economic cashflow plots are written",
-        display_name="Economic cashflows plot file",
+        display_name="Economic cashflows plot file path",
         required=false,
         type=String,
         json_type="string",
         unit="-"
     ),
-    "economic_plot_file_present_values" => (
+    "plot_economic_present_values" => (
+        default=true,
+        description="Toggle if the economic results (as present values) should be plotted",
+        display_name="Plot economic present values?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "economic_plot_present_values_file_path" => (
         default="./output/economic_results_present_values.html",
         description="File path to where the economic present value plots are written",
-        display_name="Economic present value plot file",
+        display_name="Economic present value plot file path",
         required=false,
         type=String,
         json_type="string",
+        unit="-"
+    ),
+    "output_economic_CSV" => (
+        default=true,
+        description="Toggle if a CSV with the economic results should be created",
+        display_name="Output economic CSV?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
         unit="-"
     ),
     "economic_CSV_file_path" => (
         default="./output/economic_results.csv",
         description="File path to where the economic results are written to CSV",
-        display_name="Economic results CSV file",
+        display_name="Economic results CSV file path",
         required=false,
         type=String,
         json_type="string",
         unit="-"
     ),
+    "plot_emission_results" => (
+        default=true,
+        description="Toggle if the emission results should be plotted",
+        display_name="Plot emission results?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
     "emissions_plot_file_path" => (
-        default="./output/emissions_result.html",
+        default="./output/emissions_plot.html",
         description="File path to where the emissions plot file is written",
-        display_name="Emissions plot file",
+        display_name="Emissions plot file path",
         required=false,
         type=String,
         json_type="string",
+        unit="-"
+    ),
+    "output_emissions_CSV" => (
+        default=true,
+        description="Toggle if a CSV with the emission results should be created",
+        display_name="Output emissions CSV?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
         unit="-"
     ),
     "emissions_CSV_file_path" => (
         default="./output/emissions_results.csv",
         description="File path to where the emissions are written to CSV",
-        display_name="Emissions CSV file",
+        display_name="Emissions CSV file path",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "plot_price_and_emission_profiles" => (
+        default=false,
+        description="Toggle if a plot with the utilized price and emission profiles should be created",
+        display_name="Plot price and emission profiles?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "price_and_emission_profile_file_path" => (
+        default="./output/price_and_emissions_profiles.html",
+        description="File path to where the plot with price and emissions profiles should be written",
+        display_name="Price and Emissions profiles plot file path",
         required=false,
         type=String,
         json_type="string",
@@ -1078,8 +1141,9 @@ function get_economic_parameters(project_config::AbstractDict{String,Any},
     EnergySystems.validate_config(EnergySystems.Component, economic_parameters, "Economic parameters",
                                   sim_params, ECONOMIC_PARAMETERS_DEF)
 
-    economic_parameters["repeat_period"] = get_repeat_period(economic_parameters["repeat_method"],
-                                                             sim_params, "economic")
+    economic_parameters["repeat_period"], economic_parameters["repeat_method"] = get_repeat_period(economic_parameters["repeat_method"],
+                                                                                                   sim_params,
+                                                                                                   "economic")
 
     return economic_parameters
 end
@@ -1111,12 +1175,13 @@ function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, 
     end
     if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
        Second(sim_params["time_step_seconds"]) < repeat_period
-        @warn "In $type calculation, the repeat_method was set to 'all' as the given period is longer " *
-              "than the simulation period."
+        @warn "In $type calculation, the repeat_method that defines the method for energy and price profile repetitions " *
+              "was set to 'all' as the given repeat_method is longer than the simulation period."
         repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
                         Millisecond(Second(sim_params["time_step_seconds"]))
+        repeat_method = "all"
     end
-    return repeat_period
+    return repeat_period, repeat_method
 end
 
 """
@@ -1152,8 +1217,9 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
     EnergySystems.validate_config(EnergySystems.Component, emissions_parameters, "Emissions parameters",
                                   sim_params, EMISSIONS_PARAMATERS_DEF)
 
-    emissions_parameters["repeat_period"] = get_repeat_period(emissions_parameters["repeat_method"],
-                                                              sim_params, "emissions")
+    emissions_parameters["repeat_period"], emissions_parameters["repeat_method"] = get_repeat_period(emissions_parameters["repeat_method"],
+                                                                                                     sim_params,
+                                                                                                     "emissions")
 
     return emissions_parameters
 end

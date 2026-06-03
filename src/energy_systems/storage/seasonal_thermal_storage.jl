@@ -550,12 +550,12 @@ const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_param
             "capex_specific" => nothing,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.01,
-            "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
             "repair_rate_per_year" => 0.02,
-            "repair_price_change_rate_per_year" =>  0.005,
+            "repair_price_change_rate_per_year" =>  0.0,
             "operational_labour_hours_per_year" =>  0.0,
-            "subsidy_rate_of_capex" =>  nothing,
-            "subsidy_max" =>  nothing
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
     ),
     Dict{String,Any}(
             "capex_specific" => "€/m^3"
@@ -564,7 +564,7 @@ const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_param
 
 const SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
     Dict{String,Any}(
-        "lifetime_years" => 20,
+        "lifetime_years" => 50,
         "embodied_emissions_specific" => "const:0.0",
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
@@ -1909,7 +1909,7 @@ convert_mass_in_energy(mass, temp_low, temp_high, cp)
 - `mass::Float64`: mass to convert [kg]
 - `temp_low::Temperature`: lower temperature [°C]
 - `temp_high::Temperature`: upper temperature [°C]
-- `cp::Float64`: specific heat capacity [kJ/KgK]
+- `cp::Float64`: specific heat capacity [J/KgK]
 
 """
 function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64

@@ -160,15 +160,15 @@ const GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS = get_economic_standard_params("co
         "repair_rate_per_year" => 0.0,
         "repair_price_change_rate_per_year" =>  0.0,
         "operational_labour_hours_per_year" =>  0.0,
-        "subsidy_rate_of_capex" => nothing,
-        "subsidy_max" => nothing
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
     ),
     Dict{String,Any}(            
-        "capex_specific" => "€/(constant_power or scaling_factor)"
+        "capex_specific" => "€/(constant_power or scale)"
     ),
 )
 
-const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection", 
+const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
     Dict{String,Any}(
         "energy_emissions_profile_file_path" => nothing,
         "energy_emissions_profile_scale" => 1.0,
@@ -180,7 +180,7 @@ const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
-        "embodied_emissions_specific" => "g CO2/(constant_power or scaling_factor)"
+        "embodied_emissions_specific" => "g CO2/(constant_power or scale)"
     )
 )
 #! format: on

@@ -239,12 +239,12 @@ const ELECTROLYSER_ECONOMIC_PARAMETERS = Base.merge(get_economic_standard_params
         "capex_specific" => nothing,
         "capex_price_change_rate_per_year" => -0.02,
         "maintenance_inspection_rate_per_year" => 0.025,
-        "maintenance_inspection_price_change_rate_per_year" =>  0.005,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
         "repair_rate_per_year" => 0.01,
-        "repair_price_change_rate_per_year" =>  0.005,
+        "repair_price_change_rate_per_year" =>  0.0,
         "operational_labour_hours_per_year" =>  50,
-        "subsidy_rate_of_capex" =>  nothing,
-        "subsidy_max" =>  nothing
+        "subsidy_rate_of_capex" =>  0.0,
+        "subsidy_max" =>  -1.0
         ),
     Dict{String,Any}(
         "capex_specific" => "€/W"
@@ -798,9 +798,11 @@ function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict
     # prices only on yearly basis here as simplification
     observation_period_in_years = sim_params["economic_parameters"]["observation_period_in_years"]
     # liter water in each time step as Vector
-    water_demand_profile = extend_profile(unit.water_demand, observation_period_in_years, sim_params)
+    water_demand_profile = extend_profile(unit.water_demand, observation_period_in_years,
+                                          sim_params["economic_parameters"]["repeat_period"], sim_params)
     # kg oxygen in each time step as Vector
-    oxygen_production_profile = extend_profile(unit.oxygen_production, observation_period_in_years, sim_params)
+    oxygen_production_profile = extend_profile(unit.oxygen_production, observation_period_in_years,
+                                               sim_params["economic_parameters"]["repeat_period"], sim_params)
 
     timesteps_per_year = Int(floor(length(water_demand_profile) / observation_period_in_years))
     r_water = 1.0 + unit.economic_parameters["water_price_change_rate_per_year"]
