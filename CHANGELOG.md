@@ -4,6 +4,26 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.0
+* Add optional economic and GHG emissions calculations
+  * Includes component-specific investment costs, operating costs, energy prices, subsidies, embodied emissions, emission factors, emissions credits and unmet-energy costs
+  * Add CSV and plot outputs for economic and GHG emissions results
+  * Add different repetition methods of price and emission profiles using the parameter `repeat_method` 
+* Refactor simulation parameters, IO settings, economic parameters, emissions parameters, control parameters and control modules to use SSOT parameter definitions
+* Rework IO settings for CSV output, output plots and Sankey plots by splitting output mode and custom output specification
+  * This changes the project file syntax for custom output definitions
+  * Update default Sankey colours and improve handling of incomplete custom colour specifications
+* Change handling of unmet demands and surplus supplies so they are assigned to sinks and sources and no longer to busses
+  * Improve handling of unmet energies in single and connected busses
+  * Change output of balance warnings to a new format: Balance warnings are now separated into interface balance warnings and component balance errors; proxy busses no longer create duplicate balance warnings
+  * Update Sankey plotting to display unmet energies more reliably and consistently
+* Add IO setting `fixed_output_precision` to make CSV, plot, Sankey, economic and emissions outputs reproducible for testing
+* Remove legacy component type GridConnection
+  * Use GridInput and GridOutput instead
+* Improve scenario tooling and update scenario reference files
+  * The scenario command `compare_ooo` is replaced by `compare`, which compares all relevant output files
+* Fix multiple issues in profile repetition, profile trimming, output paths, line plot ordering, optional parameter validation and unit descriptions
+
 ### Version 0.13.12
 * Simplify internal use of COP functions with constant value
 * Simplify internal loading of optional profiles and constant values for all components
