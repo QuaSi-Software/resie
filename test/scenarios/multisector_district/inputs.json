@@ -2,9 +2,11 @@
     "io_settings": {
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/multisector_district/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot": "default",
         "sankey_plot_file": "./test/scenarios/multisector_district/sankey_plot.html",
         "csv_output_file": "./test/scenarios/multisector_district/out.csv",
+        "csv_output": "custom",
         "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1:IN"],
             "TST_BFT_TH_01": ["Load"],
@@ -24,7 +26,8 @@
                           "TST_HTP_02->TST_DEM_TH_02"]
         },
         "output_plot_file": "./test/scenarios/multisector_district/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_DEM_TH_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",
@@ -175,35 +178,29 @@
             "scale": 15000
         }, 
         "TST_GRI_EL_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
-            "output_refs": ["TST_BUS_EL_01"],
-            "is_source": true
+            "output_refs": ["TST_BUS_EL_01"]
         },
         "TST_GRI_EL_01_out": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_e_ac_230v",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         },
         "TST_GRI_H2_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_c_g_h2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         },
         "TST_GRI_O2_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_c_g_o2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         },
         "TST_GRI_EG_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_g_natgas",
-            "output_refs": [
-                "TST_BUS_GAS_01"],
-            "is_source": true
+            "output_refs": ["TST_BUS_GAS_01"]
         },
         "TST_PVP_EL_01": {
             "type": "PVPlant",

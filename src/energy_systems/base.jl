@@ -20,11 +20,12 @@ to the simulation as a whole as well as provide functionality on groups of compo
 """
 module EnergySystems
 
-export check_balances, Component, each, Grouping, link_output_with, perform_operations,
-       output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
-       default, plot_optional_figures_begin, plot_optional_figures_end,
+export check_balances_of_components, check_balances_of_interfaces, Component, each, Grouping,
+       link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
+       calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
-       create_secondary_name
+       create_secondary_name, get_reference_for_capex_and_embodied_emissions, get_additional_opex_from_component,
+       handle_profiles
 
 using ..Profiles
 using UUIDs
@@ -343,7 +344,8 @@ function add!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
               temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
               temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
-              purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
+              purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing;
+              final::Bool=false)
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
@@ -369,16 +371,19 @@ function add!(interface::SystemInterface,
         end
         @warn warn_message
     end
-
-    if interface.source.sys_function == sf_bus
-        add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
-    elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
-                     interface.is_secondary_interface)
-    elseif interface.sum_abs_change == 0.0
-        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
-        # it cannot be reliably detected that the balance has already been written.
-        interface.max_energy = MaxEnergy()
+    if !final
+        if interface.source.sys_function == sf_bus
+            add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max,
+                         purpose_uac)
+        elseif interface.target.sys_function == sf_bus
+            add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max,
+                         purpose_uac,
+                         interface.is_secondary_interface)
+        elseif interface.sum_abs_change == 0.0
+            # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+            # it cannot be reliably detected that the balance has already been written.
+            interface.max_energy = MaxEnergy()
+        end
     end
 end
 
@@ -393,7 +398,8 @@ function sub!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
               temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
               temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
-              purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
+              purpose_uac::Union{Stringing,Vector{Stringing}}=nothing;
+              final::Bool=false)
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
@@ -415,15 +421,19 @@ function sub!(interface::SystemInterface,
                "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
     end
 
-    if interface.source.sys_function == sf_bus
-        sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
-    elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
-                     interface.is_secondary_interface)
-    elseif interface.sum_abs_change == 0.0
-        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
-        # it cannot be reliably detected that the balance has already been written.
-        interface.max_energy = MaxEnergy()
+    if !final
+        if interface.source.sys_function == sf_bus
+            sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max,
+                         purpose_uac)
+        elseif interface.target.sys_function == sf_bus
+            sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max,
+                         purpose_uac,
+                         interface.is_secondary_interface)
+        elseif interface.sum_abs_change == 0.0
+            # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+            # it cannot be reliably detected that the balance has already been written.
+            interface.max_energy = MaxEnergy()
+        end
     end
 end
 
@@ -1336,29 +1346,16 @@ end
 """
     balance(unit)
 
-Calculate the energy balance of the given unit as a whole.
-
-This is expected to start at zero at the beginning of a time step and return to zero at
-the end of it. If it is not zero, either the simulation failed to correctly calculate the
-energy balance of the energy system or the simulated network was not able to ensure the
-balance on the current time step. In either case, something went wrong.
+Get the energy balance of the given unit as a whole. The balance is calculated within transformers 
+during their process step. Note that some transformer calculate their losses from a balance,
+therefore their energy balance is always zero.
 """
 function balance(unit::Component)::Float64
-    balance = 0.0
-
-    for inface in values(unit.input_interfaces)
-        if inface !== nothing
-            balance += inface.balance
-        end
+    if unit.sys_function == EnergySystems.sf_transformer && hasfield(typeof(unit), :balance)
+        return unit.balance
+    else
+        return 0.0
     end
-
-    for outface in values(unit.output_interfaces)
-        if outface !== nothing
-            balance += outface.balance
-        end
-    end
-
-    return balance
 end
 
 """
@@ -1553,18 +1550,87 @@ given type.
 # Args
 -`x::Type{Component}`: The subtype of Component
 # Returns
--`Dict{String,NamedTuple}`: Definition of the parameters where keys are parameter names and
+-`Dict{String,Any}`: Definition of the parameters where keys are parameter names and
     values contain metadata about each parameter (default value, description, type, required
     status, unit and any conditionals with other parameters).
 """
-function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
+function component_parameters(x::Type{Component})::Dict{String,Any}
     # the abstract base type of all components doesn't accept any parameters, but also this
     # base method of the function shouldn't be called on the abstract type
-    return Dict{String,NamedTuple}()
+    return Dict{String,Any}()
 end
 
 """
-    extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
+    economic_parameters(x::Type{Component})::Dict{String,Any}
+
+Lists all economic parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,Any}`: Definition of the economic parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function economic_parameters(x::Type{<:Component})::Dict{String,Any}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,Any}()
+end
+
+"""
+    emissions_parameters(x::Type{Component})::Dict{String,Any}
+
+Lists all emissions parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,Any}`: Definition of the emissions parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function emissions_parameters(x::Type{<:Component})::Dict{String,Any}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,Any}()
+end
+
+"""
+    get_reference_for_capex_and_embodied_emissions(unit)
+
+Returns the reference value to calculate the capex from the specific capex and
+to calculate the embodied emissions from the specific embodied emissions for each component.
+E.g. a heat pump returns its thermal design power that is reference for the specific capex and 
+embodied emissions.
+"""
+function get_reference_for_capex_and_embodied_emissions(unit::Component)
+    @error "No function `get_reference_for_capex_and_embodied_emissions` specified for component $(typeof(unit))."
+    throw(MethodError)
+    # base implementation should not be called as the function has to be specified in every component.
+end
+
+"""
+    get_additional_opex_from_component(unit)
+
+Component-specific function that returns special additional opex costs for different categories 
+for each year. This can be used to include costs that are not represented by any interfaces 
+or the other opex of all components. Used e.g. for oxygen production of electrolyser.
+
+Returns:
+- `names::Vector{String}`: The name of the additional opex cost(s)
+- `yearly_costs::Vector[Vector{Float64}]`: Yearly opex values for each name in names
+
+"""
+function get_additional_opex_from_component(component::Component, sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return String[], Float64[]
+end
+
+"""
+    extract_parameter(config::AbstractDict{String,Any}, param_name::String, param_def::NamedTuple)
 
 Helper to extract and process a parameter from config using its definition.
 Handles special processing like function parsing where needed.
@@ -1572,15 +1638,22 @@ Handles special processing like function parsing where needed.
 # Args
 - `x::Type{Component}`: Not a required input, instead used for leveraging multiple
     dispatch for type-specific methods that may invoke the base method.
-- `config::Dict{String,Any}`: The component config
+- `config::AbstractDict{String,Any}`: The component config
 - `param_name::String`: Name of the parameter. Has to be an exact match, this is not checked
     in this function.
 - `param_def::NamedTuple`: The parameter definition with its metadata
 - `sim_params::Dict{String,Any}`: Simulation parameters
 - `uac::String`: UAC of the component, typically used for error messages
 """
-function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
+function extract_parameter(x::Type{Component}, config::AbstractDict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name in ["energy_price_profile_file_path",
+                      "unmet_energy_price_profile_file_path",
+                      "energy_emissions_profile_file_path",
+                      "energy_emissions_credits_profile_file_path"]
+        return load_optional_profile(config, param_name, sim_params)
+    end
+
     if isdefined(param_def, :default)
         value = default(config, param_name, param_def.default)
     elseif param_name in keys(config)
@@ -1698,6 +1771,14 @@ function check_validation(validation::Tuple, name::String, value::Any,
         if !(value <= validation[3])
             throw(InputError("Value of `$name` in component `$uac` must be less than or equal to $(validation[3])"))
         end
+    elseif validation[2] == "value_lt_num_or_nothing"
+        if !(value === nothing || value < validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_lte_num_or_nothing"
+        if !(value === nothing || value <= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater or equal than $(validation[3])"))
+        end
     elseif validation[2] == "value_gt_num"
         if !(value > validation[3])
             throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
@@ -1809,7 +1890,7 @@ function evaluate_conditional(conditional::T, extracted::Dict{String,Any})::Bool
 end
 
 """
-    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,Any})::Bool
 
 Returns if the conditionals for the given parameter apply.
 
@@ -1823,11 +1904,11 @@ evaluated.
 # Args
 - `name::String`: The name of the parameter to check
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 # Returns
 - `Bool`: True if the parameter is active, false if not
 """
-function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,Any})::Bool
     if !(name in keys(type_def) && isdefined(type_def[name], :conditionals))
         return true
     end
@@ -1850,7 +1931,7 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
         end
 
         # add AND if this and the next is also a conditional
-        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx+1] : nothing
+        next = idx < length(type_def[name].conditionals) ? type_def[name].conditionals[idx + 1] : nothing
         if typeof(conditional) <: Tuple && typeof(next) <: Tuple
             push!(conditionals, "AND")
         end
@@ -1878,7 +1959,7 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
 end
 
 """
-    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
 
 Validates the given component parameter config for mutex conditionals.
 
@@ -1887,9 +1968,9 @@ If a mutex conditional is triggered, throws an InputError.
 # Arguments
 - `config::Dict{String,Any}`: The component parameter config
 - `uac::String`: The UAC of the component, mostly used in error messages
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 """
-function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
     for (name, value) in pairs(config)
         if name in keys(type_def) && isdefined(type_def[name], :conditionals)
             for cond in type_def[name].conditionals
@@ -1911,7 +1992,7 @@ function validate_mutex_params(config::Dict{String,Any}, uac::String, type_def::
 end
 
 """
-    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
+    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,Any})
 
 Validates the given configuration for interdependencies and consistency.
 
@@ -1923,14 +2004,13 @@ Throws `InputError` if validation fails.
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
 - `uac::String`: The UAC of the component, mostly used in error messages
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+- `type_def::Dict{String,Any}`: Parameter definitions for the type
 """
 function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
+                         sim_params::Dict{String,Any}, type_def::Dict{String,Any})
     for (name, value) in pairs(extracted)
-        # skip control_parameters, as they have their own validation. also skip is_source
-        # from GridConnection as it is an internal parameter
-        if name == "control_parameters" || name == "is_source"
+        # skip control, economic and emissions parameters, as they have their own validation
+        if name in ["control_parameters", "economic_parameters", "emissions_parameters"]
             continue
         end
 
@@ -2006,19 +2086,46 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
                                     sim_params::Dict{String,Any})::Tuple
     constructor_errored = false
 
-    # extract all parameters using the parameter dictionary as the source of truth
+    # extract component parameters using the parameter dictionary as the source of truth
     extracted_params = Dict{String,Any}()
-    type_def = component_parameters(T)
-    for (param_name, param_def) in type_def
+    type_def_component = component_parameters(T)
+    for (param_name, param_def) in type_def_component
         try
             extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
         catch e
-            io = IOBuffer()
-            showerror(io, e)
-            print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
-            msg = String(take!(io))
-            @error msg
-            constructor_errored = true
+            constructor_errored = handle_extraction_error(e, sim_params)
+        end
+    end
+
+    # extract economic parameters using the economic parameter dictionary as the source of truth
+    extracted_economic_params = Dict{String,Any}()
+    economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
+    if sim_params["economic_parameters"]["calculate_economy"]
+        type_def_economy = economic_parameters(T)
+        for (param_name, param_def) in type_def_economy
+            try
+                extracted_economic_params[param_name] = extract_parameter(T, economic_parameters_config, param_name,
+                                                                          param_def, sim_params,
+                                                                          (uac * " - economic_parameters"))
+            catch e
+                constructor_errored = handle_extraction_error(e, sim_params)
+            end
+        end
+    end
+
+    # extract emissions parameters using the emissions parameter dictionary as the source of truth
+    extracted_emissions_params = Dict{String,Any}()
+    emissions_parameters_config = get(config, "emissions_parameters", Dict{String,Any}())
+    if sim_params["emissions_parameters"]["calculate_emissions"]
+        type_def_emissions = emissions_parameters(T)
+        for (param_name, param_def) in type_def_emissions
+            try
+                extracted_emissions_params[param_name] = extract_parameter(T, emissions_parameters_config, param_name,
+                                                                           param_def, sim_params,
+                                                                           (uac * " - emissions_parameters"))
+            catch e
+                constructor_errored = handle_extraction_error(e, sim_params)
+            end
         end
     end
 
@@ -2028,17 +2135,25 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
 
         # check mutex conditionals, based on given parameter values, not extracted (as they
         # include the default values)
-        validate_mutex_params(config, uac, type_def)
+        validate_mutex_params(config, uac, type_def_component)
 
         # validate configuration, e.g. for interdependencies and allowed values
-        validate_config(T, config, extracted_params, uac, sim_params)
+        validate_config(T, config, extracted_params, uac, sim_params, "component")
+
+        # do the same for economy
+        if sim_params["economic_parameters"]["calculate_economy"]
+            validate_mutex_params(economic_parameters_config, uac, type_def_economy)
+            validate_config(T, economic_parameters_config, extracted_economic_params, uac, sim_params, "economy")
+        end
+
+        # do the same for emissions
+        if sim_params["emissions_parameters"]["calculate_emissions"]
+            validate_mutex_params(emissions_parameters_config, uac, type_def_emissions)
+            validate_config(T, emissions_parameters_config, extracted_emissions_params, uac, sim_params, "emissions")
+        end
+
     catch e
-        io = IOBuffer()
-        showerror(io, e)
-        print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
-        msg = String(take!(io))
-        @error msg
-        constructor_errored = true
+        constructor_errored = handle_extraction_error(e, sim_params)
     end
 
     # we delayed throwing the errors upwards so that many errors are caught at once
@@ -2049,7 +2164,433 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     end
 
     # initialize the parameters ready for feeding into new()
+    extracted_params["economic_parameters"] = handle_profiles(extracted_economic_params)
+    extracted_params["emissions_parameters"] = handle_profiles(extracted_emissions_params)
     return init_from_params(T, uac, extracted_params, config, sim_params)
+end
+
+# copy profiles that are stored in "xxx_profile_file_path" to new key "xxx_profile"
+function handle_profiles(extracted_params::Dict{String,Any})
+    new_dict = copy(extracted_params)
+    for (key, value) in extracted_params
+        if endswith(key, "_profile_file_path")
+            new_key = key[1:(end - 10)]
+            new_dict[new_key] = value
+            new_dict[key] = nothing
+        end
+    end
+    return new_dict
+end
+
+"""
+    handle_extraction_error(e, sim_params)
+
+Handles the error messages that occur during parameter construction.
+
+Args:
+-`e::ErrorHandler`: The error that should be handled
+-`sim_params::Dict{String,Any}`: Simulation parameters
+Returns:
+- `Bool`: Returns always true
+Throws:
+- `Error`: The error message as error
+"""
+function handle_extraction_error(e, sim_params)
+    io = IOBuffer()
+    showerror(io, e)
+    print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
+    msg = String(take!(io))
+    @error msg
+    return true
+end
+
+"""
+    get_economic_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+
+Returns the standard parameter definition of the SSOT for economic parameters, differently for
+Storages/Transformer and Connection components.
+Defaults have to be passed using the "defaults" dict.
+
+Args:
+-`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
+-`defaults::Dict{String,Any}`: Defaults for the standard economic parameter
+-`units::Dict{String,Any}`: Units for some of the standard economic parameter
+Returns:
+- `Dict{String,Any}`: A Dict with the economic standard parameter settings for the SSOT
+"""
+function get_economic_standard_params(type::String, defaults::Dict{String,Any},
+                                      units::Dict{String,Any})::Dict{String,Any}
+    #! format: off
+    if type in ["transformer", "storage", "connection", "connection_fixed"]
+        capex_parameter = Dict{String,Any}(
+            "lifetime_years" => (
+                default=defaults["lifetime_years"],
+                description="Lifetime of the component until replacement is required",
+                display_name="lifetime",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="years"
+            ),
+            "capex_specific" => (
+                default=defaults["capex_specific"],
+                description="Function for specific invest costs",
+                display_name="capex function",
+                required=true,
+                type=String,
+                json_type="string",
+                function_type="1dim",
+                unit=units["capex_specific"]
+            ),
+            "capex_price_change_rate_per_year" => (
+                default=defaults["capex_price_change_rate_per_year"],
+                description="Yearly price change rate of the capex",
+                display_name="Capex price change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+            "maintenance_inspection_rate_per_year" => (
+                default=defaults["maintenance_inspection_rate_per_year"],
+                description="Yearly rate of maintenance and inspection costs with respect to the initial capex",
+                display_name="maintenance/inspection rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "maintenance_inspection_price_change_rate_per_year" => (
+                default=defaults["maintenance_inspection_price_change_rate_per_year"],
+                description="Yearly change rate of the maintenance and inspection costs",
+                display_name="maintenance/inspection change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+            "repair_rate_per_year" => (
+                default=defaults["repair_rate_per_year"],
+                description="Yearly rate of repair costs with respect to the initial capex",
+                display_name="repair rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "repair_price_change_rate_per_year" => (
+                default=defaults["repair_price_change_rate_per_year"],
+                description="Yearly change rate of the repair costs",
+                display_name="repair change rate per year",
+                required=false,
+                validations=[("self", "value_lte_num", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+            "operational_labour_hours_per_year" => (
+                default=defaults["operational_labour_hours_per_year"],
+                description="Hours of labour per year for operation",
+                display_name="operational labour per year",
+                required=false,
+                validations=[("self", "value_gte_num", 0.0)],
+                type=Float64,
+                json_type="number",
+                unit="h/year"
+            ),
+            "subsidy_rate_of_capex" => (
+                default=defaults["subsidy_rate_of_capex"],
+                description="Subsidy rate of initial capex",
+                display_name="subsidy rate of capex",
+                required=false,
+                validations=[("self", "value_lte_num_or_nothing", 1.0)],
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "subsidy_max" => (
+                default=defaults["subsidy_max"],
+                description="Maximum of subsidy for this component",
+                display_name="subsidy max",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="€"
+            )
+        )
+    end
+
+    if type in ["connection", "connection_fixed"]
+        energy_opex_parameter = Dict{String,Any}(
+            "energy_price_profile_file_path" => (
+                default=defaults["energy_price_profile_file_path"],
+                description="Path to an energy price profile file",
+                display_name="Energy price profile file",
+                required=false,
+                conditionals=[("constant_energy_price", "mutex")],
+                validations=[("at_least_one", "constant_energy_price", "energy_price_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="€/Wh"
+            ),
+            "energy_price_profile_scale" => (
+                default=defaults["energy_price_profile_scale"],
+                description="Scale factor for energy price profile",
+                display_name="Scale factor energy price profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_energy_price" => (
+                default=defaults["constant_energy_price"],
+                description="Constant energy price",
+                display_name="Constant energy price",
+                required=false,
+                conditionals=[("energy_price_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_energy_price", "energy_price_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="€/Wh"
+            ),
+            "energy_price_change_rate_per_year" => (
+                default=defaults["energy_price_change_rate_per_year"],
+                description="Yearly change rate of the energy price",
+                display_name="energy price change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+            "base_cost_per_year" => (
+                default=defaults["base_cost_per_year"],
+                description="Yearly base cost (independent of energies)",
+                display_name="base cost per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="€"
+            ),
+            "base_cost_change_rate_per_year" => (
+                default=defaults["base_cost_change_rate_per_year"],
+                description="Yearly change rate of the base cost)",
+                display_name="base cost change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+        )
+    end
+
+    if type == "connection_fixed"
+        # additional economic parameter for pricing of unmet energies
+        energy_unmet_parameter = Dict{String,Any}(
+            "unmet_energy_price_profile_file_path" => (
+                default=defaults["unmet_energy_price_profile_file_path"],
+                description="Path to an price profile file for unmet energies",
+                display_name="Unmet energy price profile file",
+                required=false,
+                conditionals=[("constant_unmet_energy_price", "mutex")],
+                validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="€/Wh"
+            ),
+            "unmet_energy_price_profile_scale" => (
+                default=defaults["unmet_energy_price_profile_scale"],
+                description="Scale factor for unmet energy price profile",
+                display_name="Scale factor unmet energy price profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_unmet_energy_price" => (
+                default=defaults["constant_unmet_energy_price"],
+                description="Constant unmet energy price",
+                display_name="Constant unmet energy price",
+                required=false,
+                conditionals=[("unmet_energy_price_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_unmet_energy_price", "unmet_energy_price_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="€/Wh"
+            ),
+            "unmet_energy_price_change_rate_per_year" => (
+                default=defaults["unmet_energy_price_change_rate_per_year"],
+                description="Yearly change rate of the unmet energy price",
+                display_name="unmet energy price change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            ),
+        )
+    end
+    #! format: on
+
+    if type in ["transformer", "storage"]
+        return capex_parameter
+    elseif type == "connection"
+        return Base.merge(capex_parameter, energy_opex_parameter)
+    elseif type == "connection_fixed"
+        return Base.merge(capex_parameter, energy_opex_parameter, energy_unmet_parameter)
+    else
+        @error "Unknown type $type in function get_economic_defaults."
+    end
+end
+
+"""
+    get_emissions_standard_params(type::String, defaults::Dict{String,Any}, units::Dict{String,Any})
+
+Returns the standard parameter definition of the SSOT for emissions parameters, differently for
+Storages/Transformer and Connection components.
+Defaults have to be passed using the "defaults" dict.
+
+Args:
+-`type::String`: The type of component that is calling. Either "storage", "transformer" or "connection".
+-`defaults::Dict{String,Any}`: Defaults for the standard emissions parameter
+-`units::Dict{String,Any}`: Units for some of the standard emissions parameter
+Returns:
+- `Dict{String,Any}`: A Dict with the emissions standard parameter settings for the SSOT
+"""
+function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
+                                       units::Dict{String,Any})::Dict{String,Any}
+    #! format: off
+    base_params = Dict{String,Any}(
+        "lifetime_years" => (
+            default=defaults["lifetime_years"],
+            description="Lifetime of the component until replacement is required",
+            display_name="lifetime",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="years"
+        ),
+        "embodied_emissions_specific" => (
+            default=defaults["embodied_emissions_specific"],
+            description="Function for specific embodies emissions",
+            display_name="embodied emissions function",
+            required=false,
+            type=String,
+            json_type="string",
+            function_type="1dim",
+            unit=units["embodied_emissions_specific"]
+        ),
+        "embodied_emissions_change_rate_per_year" => (
+            default=defaults["embodied_emissions_change_rate_per_year"],
+            description="Yearly change rate of embodied emissions)",
+            display_name="Embodied emissions change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+    )
+
+    if type in ["connection_source"]
+        connection_params = Dict{String,Any}(
+            "energy_emissions_profile_file_path" => (
+                default=defaults["energy_emissions_profile_file_path"],
+                description="Path to a specific emissions profile file",
+                display_name="Emissions profile file",
+                required=false,
+                conditionals=[("constant_energy_emissions", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions", "energy_emissions_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_profile_scale" => (
+                default=defaults["energy_emissions_profile_scale"],
+                description="Scale factor for energy emissions profile",
+                display_name="Scale factor energy emissions profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_energy_emissions" => (
+                default=defaults["constant_energy_emissions"],
+                description="Constant specific emissions for the source connection",
+                display_name="constant energy emissions",
+                required=false,
+                conditionals=[("energy_emissions_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions", "energy_emissions_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_change_rate_per_year" => (
+                default=defaults["energy_emissions_change_rate_per_year"],
+                description="Yearly change rate of specific energy emissions",
+                display_name="energy emissions change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            )
+        )
+    end
+
+    if type in ["connection_sink"]
+        connection_params = Dict{String,Any}(
+            "energy_emissions_credits_profile_file_path" => (
+                default=defaults["energy_emissions_credits_profile_file_path"],
+                description="Path to a specific emissions credits profile file",
+                display_name="Emissions credits profile file",
+                required=false,
+                conditionals=[("constant_energy_emissions_credits", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions_credits", "energy_emissions_credits_profile_file_path")],
+                type=String,
+                json_type="string",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_credits_profile_scale" => (
+                default=defaults["energy_emissions_credits_profile_scale"],
+                description="Scale factor for energy emissions credits profile",
+                display_name="Scale factor energy emissions credits profile",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="-"
+            ),
+            "constant_energy_emissions_credits" => (
+                default=defaults["constant_energy_emissions_credits"],
+                description="Constant specific emissions credits for the sink component",
+                display_name="constant energy emissions credits",
+                required=false,
+                conditionals=[("energy_emissions_credits_profile_file_path", "mutex")],
+                validations=[("at_least_one", "constant_energy_emissions_credits", "energy_emissions_credits_profile_file_path")],
+                type=Float64,
+                json_type="number",
+                unit="g CO2/Wh"
+            ),
+            "energy_emissions_credits_change_rate_per_year" => (
+                default=defaults["energy_emissions_credits_change_rate_per_year"],
+                description="Yearly change rate of specific energy emissions credits",
+                display_name="energy emissions credits change rate per year",
+                required=false,
+                type=Float64,
+                json_type="number",
+                unit="1/year"
+            )
+        )
+    end
+
+    if type in ["transformer", "storage"]
+        return base_params 
+    elseif type in ["connection_source", "connection_sink"]
+        return Base.merge(base_params, connection_params)
+    else
+        @error "Unknown type in function get_economic_defaults."
+    end
+    #! format: on
 end
 
 """
@@ -2091,7 +2632,8 @@ include("general/fixed_supply.jl")
 include("general/flexible_supply.jl")
 include("general/flexible_sink.jl")
 include("general/storage.jl")
-include("connections/grid_connection.jl")
+include("connections/grid_input.jl")
+include("connections/grid_output.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
 include("storage/buffer_tank.jl")
@@ -2339,9 +2881,10 @@ function merge_bus_chains(chains::Vector{Set{Component}},
 end
 
 """
-    check_balances(components, epsilon)
+    check_balances_of_components(components, epsilon, io_settings)
 
 Check the energy balance of the given components and return warnings of any violations.
+Only transformer are checked for their energy balance in the current time step.
 
 # Arguments
 - `component::Grouping`: The components to check
@@ -2352,17 +2895,54 @@ Check the energy balance of the given components and return warnings of any viol
 - `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the key of the
     component that has a non-zero energy balance and the value of that balance.
 """
-function check_balances(components::Grouping,
-                        epsilon::Float64)::Vector{Tuple{String,Float64}}
+function check_balances_of_components(components::Grouping,
+                                      epsilon::Float64)::Vector{Tuple{String,Float64}}
     warnings = []
-
     for (key, unit) in pairs(components)
-        unit_balance = balance(unit)
-        if unit_balance > epsilon || unit_balance < -epsilon
-            push!(warnings, (key, unit_balance))
+        if unit.sys_function == EnergySystems.sf_transformer
+            unit_balance = balance(unit)
+            if unit_balance > epsilon || unit_balance < -epsilon
+                push!(warnings, (key, unit_balance))
+            end
         end
     end
+    return warnings
+end
 
+"""
+    check_balances_of_interfaces(components, epsilon, io_settings)
+
+Check the energy balance of all interfaces returning warnings of any violations.
+
+# Arguments
+- `component::Grouping`: All components of the energy systems
+- `epsilon::Float64`: A balance is only considered violated if the absolute value of the
+    sum is larger than this value. This helps with spurious floating point issues
+
+# Returns
+- `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the String of the 
+    source and target uac of the components of the interface that has a non-zero energy balance
+    and the value of that balance.
+"""
+function check_balances_of_interfaces(components::Grouping,
+                                      epsilon::Float64)::Vector{Tuple{String,Float64}}
+    warnings = []
+    for (key, component) in pairs(components)
+        if startswith(component.uac, "Proxy-") && component.sys_function === EnergySystems.sf_bus
+            # ignore proxy busses
+            continue
+        else
+            for outface in component.output_interfaces
+                outface = isa(outface, Pair) ? outface[2] : outface # some interfaces are wrapped in a Tuple
+                outface === nothing && continue
+                interface_balance = outface.balance
+                if interface_balance > epsilon || interface_balance < -epsilon
+                    interface_name = outface.source.uac * " -> " * outface.target.uac
+                    push!(warnings, (interface_name, interface_balance))
+                end
+            end
+        end
+    end
     return warnings
 end
 
@@ -2558,9 +3138,9 @@ the key does not occur in the config.
 """
 function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
                                sim_params::Dict{String,Any})
-    if haskey(config, parameter_name)
+    if haskey(config, parameter_name) && config[parameter_name] !== nothing
         path = config[parameter_name]
-        return Profile(path, sim_params)
+        return Profile(path, sim_params; do_not_shorten_profile=true)
     end
 
     return nothing
@@ -2663,7 +3243,33 @@ end
 """
     all_component_parameters()::Dict{String,Any}
 
-Returns a dictionary, with type names as keys, of the parameters of all components.
+Returns a dictionary, with type names as keys, of the parameters of all component types.
+
+Parameters for economic and emissions calculation are placed in sub-dictionaries. Control
+parameters, which are the same for all component types, are placed in top-level sub-
+dictionaries. An example in JSON notation might look like this:
+```
+{
+    "control": {...},
+    "types": {
+        "BufferTank": {
+            "parameters": {
+                "medium": {...},
+                ...
+            },
+            "economic": {
+                "lifetime_years": {...},
+                ...
+            },
+            "emissions": {
+                "constant_energy_emissions: {...},
+                ...
+            }
+        },
+        ...
+    }
+}
+```
 
 # Returns
 - `Dict{String,Any}`: The parameter definition for all components, indexed by type names.
@@ -2674,14 +3280,28 @@ function all_component_parameters()::Dict{String,Any}
              GeothermalProbes, GridInput, GridOutput, HeatPump, PVPlant, SeasonalThermalStorage,
              SolarthermalCollector, Storage, ThermalBooster, UTIR]
 
-    all_parameters = Dict{String,Any}()
+    all_parameters = Dict{String,Any}(
+        "control" => CONTROL_PARAMS_DEF,
+        "control_modules" => Dict{String,Any}(),
+        "types" => Dict{String,Any}(),
+    )
+
     for cmp_type in types
         # turning the Type into a Symbol gives the fully qualified name including modules,
         # but we care only about the last part, the actual type name
         name = String(Symbol(cmp_type))
-        splitted = split(name, ".")
-        all_parameters[last(splitted)] = component_parameters(cmp_type)
+        type_name = last(split(name, "."))
+        all_parameters["types"][type_name] = Dict{String,Any}(
+            "parameters" => component_parameters(cmp_type),
+            "economic" => economic_parameters(cmp_type),
+            "emissions" => emissions_parameters(cmp_type),
+        )
     end
+
+    for (name, cm_type) in pairs(Resie.load_control_module_class_mapping())
+        all_parameters["control_modules"][name] = control_module_parameters(cm_type)
+    end
+
     return all_parameters
 end
 

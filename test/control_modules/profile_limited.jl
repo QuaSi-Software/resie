@@ -7,9 +7,8 @@ include("../test_util.jl")
 function get_energy_system_fuel_boiler_direct()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_FB_01"],
-            "is_source" => true,
             "medium" => "m_c_g_natgas",
         ),
         "TST_FB_01" => Dict{String,Any}(
@@ -107,21 +106,18 @@ function get_energy_system_heat_pump_cascade()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "FlexibleSupply",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
             "medium" => "m_h_w_lt1",
             "constant_temperature" => 10,
             "constant_power" => 40000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
             "medium" => "m_e_ac_230v",
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_HP_02"],
-            "is_source" => true,
             "medium" => "m_e_ac_230v",
         ),
         "TST_HP_01" => Dict{String,Any}(
@@ -153,10 +149,9 @@ function get_energy_system_heat_pump_cascade()
             "fudge_factor" => 1.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "output_refs" => [],
             "medium" => "m_h_w_ht1",
-            "is_source" => false,
             "output_temperature" => 90,
         ),
     )

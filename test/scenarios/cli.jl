@@ -12,7 +12,7 @@ Several commands exist for the script, which are:
     * `generate_output`: Generate the output for a scenario by running the simulation.
     * `set_reference`: Set the reference outputs for a scenario. Please note that this will
         not automatically commit the changes to the repository.
-    * `compare_ooo`: Compare the order of operations between the reference and output.
+    * `compare`: Compare the content of output files between the reference and actual.
     * `rebuild_overview`: Rebuild the overview page for scenario outputs
 
 Each of the commands can be given, as second argument, the name of a scenario.
@@ -29,7 +29,7 @@ using Logging
 
 KNOWN_COMMANDS = Set(["generate_output",
                       "set_reference",
-                      "compare_ooo",
+                      "compare",
                       "rebuild_overview"])
 
 """
@@ -74,11 +74,14 @@ of the shorter of the two files.
 # Arguments
 -`file_1::String`: Filepath to the first file
 -`file_2::String`: Filepath to the first file
+-`exception_pattern::String`: Pattern for regex matching against lines in file 1. If a line
+    matches, any difference in this line is ignored. Defaults to empty string, which means
+    that no line is ignored.
 # Returns
 -`List{Tuple{Integer,String}}`: A list of differences with the line number and a
     concatenation of the two lines, each surrounded by ' and seperated with |
 """
-function compare_files(file_1, file_2)
+function compare_files(file_1, file_2, exception_pattern="")
     lines_1 = split(replace(read(file_1, String), "\r" => ""), "\n")
     lines_2 = split(replace(read(file_2, String), "\r" => ""), "\n")
     differences = []
@@ -89,11 +92,59 @@ function compare_files(file_1, file_2)
 
     for i in 1:min(length(lines_1), length(lines_2))
         if lines_1[i] != lines_2[i]
+            if exception_pattern != "" && !isnothing(match(exception_pattern, lines_1[i]))
+                continue
+            end
             push!(differences, (i, "'" * lines_1[i] * "' | '" * lines_2[i] * "'"))
         end
     end
 
     return differences
+end
+
+"""
+    rename_paths_and_dates(subdir)
+
+Renames absolute paths and creation dates in the simulation output files of a scenario run.
+
+Also replaces the randomly created IDs of plot files with a fixed value. All these
+replacements serve the purpose of making the output deterministic and consistent, to allow
+for automatic checking between output and references.
+
+# Arguments
+- `subdir::String`: The subdir of the scenario in which to change the output files
+"""
+function rename_paths_and_dates(subdir::String)
+    files_to_adjust = ["output_plot.html",
+                       "sankey_plot.html",
+                       "balanceWarn.log",
+                       "general.log"]
+
+    path_prefix = abspath(joinpath(dirname(@__FILE__), "..", ".."))
+
+    for filename in files_to_adjust
+        filepath = joinpath(subdir, filename)
+        if !isfile(filepath)
+            continue
+        end
+
+        content = read(filepath, String)
+
+        # replace the absolute paths with relative
+        content = replace(content, path_prefix => ".\\")
+
+        # replace dates of log files
+        content = replace(content, r"started at: .+\n" => "started at: 2000-01-01 00:00:00\n")
+
+        # replace IDs of plots
+        id_match = match(r"id=([0-9a-f-]+)\s", content)
+        if !isnothing(id_match)
+            old_id = id_match.captures[1]
+            content = replace(content, old_id => "12345678-1234-1234-1234-123456789123")
+        end
+
+        write(filepath, content)
+    end
 end
 
 """
@@ -107,7 +158,7 @@ Generate the output for the given scenario.
 """
 function generate_output(name::String, subdir::String)
     println("Generating scenario $name in dir $subdir")
-    println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|")
+    println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|Renme|")
 
     logger = setup_logger(subdir)
     print("|  ✓  ")
@@ -122,9 +173,11 @@ function generate_output(name::String, subdir::String)
     end
 
     sim_params = nothing
+    io_settings = nothing
     try
         if project_config !== nothing
-            sim_params = Resie.get_simulation_params(project_config)
+            io_settings = Resie.get_io_settings(project_config)
+            sim_params = Resie.get_simulation_params(project_config, io_settings)
             print("|  ✓  ")
         else
             print("|     ")
@@ -170,19 +223,22 @@ function generate_output(name::String, subdir::String)
         print("|  X  ")
     end
 
-    if (project_config !== nothing
-        && sim_params !== nothing
+    if (sim_params !== nothing
+        && io_settings !== nothing
         && components !== nothing
         && step_order !== nothing)
         # end of condition
-        Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, components, step_order)
-        Resie.run_simulation_loop(project_config, sim_params, components, step_order)
+        Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, io_settings, components, step_order)
+        Resie.run_simulation_loop(sim_params, io_settings, components, step_order)
         print("|  ✓  ")
     else
         print("|     ")
     end
 
     Resie_Logger.close_logger(logger)
+    print("|  ✓  ")
+
+    rename_paths_and_dates(subdir)
     print("|  ✓  ")
 
     println("|")
@@ -218,27 +274,57 @@ function set_reference(name, subdir)
 end
 
 """
-    compare_ooo(name, subdir)
+    compare(name, subdir)
 
-Compare the order of operations between the reference and output files.
+Compare the output files between reference and actual file content.
 
 # Arguments
 -`name::String`: The name of the scenario
 -`subdir::String`: Full path of the subdir for the scenario
 """
-function compare_ooo(name, subdir)
-    print("Comparing order of operations for scenario $name: ")
+function compare(name, subdir)
+    output_files = ["auxiliary_info.md",
+                    "balanceWarn.log",
+                    "general.log",
+                    "out.csv",
+                    "output_plot.html",
+                    "sankey_plot.html"]
 
-    differences = compare_files(joinpath(subdir, "auxiliary_info.md"),
-                                joinpath(subdir, "ref_auxiliary_info.md"))
+    print("Comparing output file content for scenario $name: ")
 
-    if length(differences) == 0
+    files_with_diff = []
+    for name in output_files
+        file_actual = joinpath(subdir, name)
+        file_ref = joinpath(subdir, "ref_" * name)
+
+        if !isfile(file_ref)
+            # not all scenarios have all outputs
+            continue
+        end
+
+        if isfile(file_actual)
+            if name == "general.log"
+                # the general log needs to ignore progress reports in the general log as
+                # these will always vary due to different host performance and current
+                # resource loads
+                diffs = compare_files(file_actual, file_ref, r"\[Info\] Progress:.+")
+                if length(diffs) > 0
+                    push!(files_with_diff, name)
+                end
+            elseif replace(read(file_actual, String), "\r" => "") != replace(read(file_ref, String), "\r" => "")
+                push!(files_with_diff, name)
+            end
+        else
+            push!(files_with_diff, name)
+        end
+    end
+
+    if length(files_with_diff) == 0
         print("✓\n")
     else
         print("X\n")
-        println("Left: Output | Right: Reference")
-        for diff_line in differences
-            println("Line $(diff_line[1]): $(diff_line[2])")
+        for name in files_with_diff
+            println("-- Difference in file $name")
         end
     end
 end
@@ -359,8 +445,8 @@ function main()
             generate_output(name, subdir)
         elseif command == "set_reference"
             set_reference(name, subdir)
-        elseif command == "compare_ooo"
-            compare_ooo(name, subdir)
+        elseif command == "compare"
+            compare(name, subdir)
         end
     end
 end

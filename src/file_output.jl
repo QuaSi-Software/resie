@@ -1,162 +1,190 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
+using Random
 
 """
-get_output_keys(config[io_settings], components)
+    get_output_keys(io_settings, components)
 
-This function determines both for the lineplot and the csv output if
-they should be created:
-    - if not, "nothing" will be returned as key list
-    - if yes, the key lists of the outputs will be returned, either containing
-        - all possible keys (in-/excluding flows) if this is requested in the input file or
-        - only the requested keys as requested in the input file
+Determines output keys for:
+  - lineplot
+  - csv export
+  - economic output (filtered to value_key containing "OUT" or "IN")
+
+For each output channel:
+  - if not requested, returns `nothing`
+  - if requested, returns either:
+      - all possible keys (in-/excluding flows), or
+      - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
+                         economic_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
-    # determine if lineplot and csv should be created
-    do_plot_all_outputs_excl_flows = false
-    do_plot_all_outputs_incl_flows = false
-    do_create_plot = false
-    if haskey(io_settings, "output_plot")
-        do_create_plot = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["output_plot"] == "all_excl_flows"
-            do_plot_all_outputs_excl_flows = true
-        elseif io_settings["output_plot"] == "all_incl_flows"
-            do_plot_all_outputs_incl_flows = true
-        elseif io_settings["output_plot"] == "nothing"
-            do_create_plot = false
-        elseif io_settings["output_plot"] == "all"
-            @error "For \"output_plot\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError())
+    function parse_all_mode(io_settings, setting_name::String)
+        do_create = false
+        do_all_excl = false
+        do_all_incl = false
+
+        if haskey(io_settings, setting_name)
+            do_create = true
+            v = io_settings[setting_name]
+            if v == "all_excl_flows"
+                do_all_excl = true
+            elseif v == "all_incl_flows"
+                do_all_incl = true
+            elseif v == "nothing"
+                do_create = false
+            elseif v == "all"
+                @error "For \"$(setting_name)\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
+                throw(InputError())
+            end
         end
+
+        return do_create, do_all_excl, do_all_incl
     end
 
-    do_write_all_CSV_outputs_excl_flows = false
-    do_write_all_CSV_outputs_incl_flows = false
-    do_write_CSV = false
-    if haskey(io_settings, "csv_output_keys")
-        do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["csv_output_keys"] == "all_excl_flows"
-            do_write_all_CSV_outputs_excl_flows = true
-        elseif io_settings["csv_output_keys"] == "all_incl_flows"
-            do_write_all_CSV_outputs_incl_flows = true
-        elseif io_settings["csv_output_keys"] == "nothing"
-            do_write_CSV = false
-        elseif io_settings["csv_output_keys"] == "all"
-            @error "For \"csv_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError())
-        end
+    # Sorting the keys
+    function sort_by(output_key)
+        any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
+        # flows after others: primary = medium (always present), secondary
+        lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
+        # default: primary = unit.uac, secondary = medium (if present), tertiary
+        lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
     end
 
-    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || do_write_all_CSV_outputs_excl_flows
-    plot_all_including_flows = do_write_all_CSV_outputs_incl_flows || do_plot_all_outputs_incl_flows
+    # Build "all outputs" once per include/exclude flows
+    function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
+        all_keys = Vector{EnergySystems.OutputKey}()
 
-    # collect all possible outputs of all units if needed
-    if plot_all_excluding_flows || plot_all_including_flows
-        if plot_all_excluding_flows
-            all_output_keys_excl_flows = Vector{EnergySystems.OutputKey}()
-        end
-        if plot_all_including_flows
-            all_output_keys_incl_flows = Vector{EnergySystems.OutputKey}()
-        end
         for unit in components
             output_vals = output_values(unit[2])
-            if plot_all_including_flows
-                temp_dict_incl_flows = Dict{String,Any}()
-                for output_val in output_vals
-                    if startswith(output_val, "EnergyFlow")
-                        if startswith(output_val, create_secondary_name("EnergyFlow"))
-                            key = adjust_name_if_secondary(String(unit[2].medium), true)
-                            nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
-                        else
-                            key = String(unit[2].medium)
-                            nr_skip = 12
-                        end
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val[nr_skip:end])
-                        else
-                            temp_dict_incl_flows[key] = [output_val[nr_skip:end]]
-                        end
-                    elseif startswith(output_val, "TemperatureFlow")
-                        # do nothing, temperature are added in output_keys()
+            temp_dict = Dict{String,Any}()
+
+            for output_val in output_vals
+                if startswith(output_val, "TemperatureFlow")
+                    # do nothing, temperature are added in output_keys()
+                    continue
+                end
+
+                if startswith(output_val, "EnergyFlow")
+                    if !include_flows
                         continue
+                    end
+
+                    # handle secondary interfaces
+                    if startswith(output_val, create_secondary_name("EnergyFlow"))
+                        key = adjust_name_if_secondary(String(unit[2].medium), true)
+                        nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
                     else
-                        key = unit[2].uac
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val)
-                        else
-                            temp_dict_incl_flows[key] = [output_val]
-                        end
+                        key = String(unit[2].medium)
+                        nr_skip = 12
+                    end
+
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val[nr_skip:end])
+                    else
+                        temp_dict[key] = [output_val[nr_skip:end]]
+                    end
+                else
+                    # Non-flow output => keyed by unit.uac
+                    key = unit[2].uac
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val)
+                    else
+                        temp_dict[key] = [output_val]
                     end
                 end
-                append!(all_output_keys_incl_flows, output_keys(components, temp_dict_incl_flows))
             end
-            if plot_all_excluding_flows
-                temp_dict_excl_flows = Dict{String,Any}()
-                for output_val in output_vals
-                    if startswith(output_val, "EnergyFlow")
-                        continue
-                    elseif startswith(output_val, "TemperatureFlow")
-                        continue
-                    else
-                        key = unit[2].uac
-                        if haskey(temp_dict_excl_flows, key)
-                            push!(temp_dict_excl_flows[key], output_val)
-                        else
-                            temp_dict_excl_flows[key] = [output_val]
-                        end
-                    end
-                end
-                append!(all_output_keys_excl_flows, output_keys(components, temp_dict_excl_flows))
-            end
+            append!(all_keys, output_keys(components, temp_dict))
         end
-        # sort keys
-        function sort_by(output_key)
-            any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
-            # flows after others: primary = medium (always present), secondary
-            lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
-            # default: primary = unit.uac, secondary = medium (if present), tertiary
-            lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
+
+        sort!(all_keys; by=sort_by)
+        return all_keys
+    end
+
+    # Select keys for a channel, given its parsed mode and custom inputs
+    function select_keys_for_channel(do_create::Bool,
+                                     mode::Symbol,
+                                     setting_name::String,
+                                     all_excl::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                     all_incl::Union{Nothing,Vector{EnergySystems.OutputKey}};
+                                     custom_extractor::Function)
+        if !do_create
+            return nothing
         end
-        if plot_all_excluding_flows
-            sort!(all_output_keys_excl_flows; by=sort_by)
-        end
-        if plot_all_including_flows
-            sort!(all_output_keys_incl_flows; by=sort_by)
+
+        if mode == :all_incl_flows
+            return all_incl
+        elseif mode == :all_excl_flows
+            return all_excl
+        else
+            return custom_extractor(io_settings[setting_name])
         end
     end
 
-    # collect output keys for lineplot and csv output
-    if do_create_plot  # line plot
-        if do_plot_all_outputs_incl_flows
+    # Economy and emissions filter
+    function is_economic_emissions_key(ok::EnergySystems.OutputKey)
+        occursin("OUT", ok.value_key) ||
+            occursin("IN", ok.value_key) ||
+            occursin("Supply", ok.value_key) ||
+            occursin("Demand", ok.value_key)
+    end
+
+    # get requirements
+    do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
+    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
+    do_economy = economic_parameters["calculate_economy"]
+    do_emissions = emissions_parameters["calculate_emissions"]
+
+    # Decide if we need all-keys lists
+    need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy || do_emissions
+    need_all_incl = do_plot_all_incl || do_csv_all_incl
+
+    all_output_keys_excl_flows = need_all_excl ? collect_all_output_keys(components; include_flows=false) : nothing
+    all_output_keys_incl_flows = need_all_incl ? collect_all_output_keys(components; include_flows=true) : nothing
+
+    # Lineplot keys
+    if do_create_plot
+        if do_plot_all_incl
             output_keys_lineplot = all_output_keys_incl_flows
-        elseif do_plot_all_outputs_excl_flows
+        elseif do_plot_all_excl
             output_keys_lineplot = all_output_keys_excl_flows
         else
             output_keys_lineplot = Vector{EnergySystems.OutputKey}()
-            for plot in io_settings["output_plot"]
-                key = plot[2]["key"]
-                append!(output_keys_lineplot, output_keys(components, key))
+            for (_, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                append!(output_keys_lineplot, output_keys(components, plot["key"]))
             end
         end
     else
         output_keys_lineplot = nothing
     end
 
-    if do_write_CSV  # csv export
-        if do_write_all_CSV_outputs_incl_flows
+    # CSV keys
+    if do_write_CSV
+        if do_csv_all_incl
             output_keys_to_csv = all_output_keys_incl_flows
-        elseif do_write_all_CSV_outputs_excl_flows
+        elseif do_csv_all_excl
             output_keys_to_csv = all_output_keys_excl_flows
-        else  # get only requested output keys from input file for CSV-export
+        else
             output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
         end
     else
         output_keys_to_csv = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv
+    # Economy or emissions keys
+    if do_economy || do_emissions
+        # Use excl_flows "all" as base
+        output_keys_economic_emissions = copy(all_output_keys_excl_flows)
+        filter!(is_economic_emissions_key, output_keys_economic_emissions)
+        # keep stable ordering (all_output_keys_excl_flows is already sorted)
+    else
+        output_keys_economic_emissions = nothing
+    end
+
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions
 end
 
 """
@@ -310,12 +338,12 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
     end
     all_current_media = unique(all_current_media)
 
-    for key in keys(from_config)
+    for (key, _) in sort(collect(from_config); by=k -> k[1])
         if key in keys(components)
             unit_key = key
             unit = components[unit_key]
 
-            for entry in from_config[unit_key]
+            for entry in sort(from_config[unit_key])
                 splitted = split(String(entry), ":")
                 if length(splitted) > 1
                     medium_key = splitted[1]
@@ -343,7 +371,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
         elseif key in all_current_media
             media_key = key
             medium = Symbol(String(media_key))
-            for value_key in from_config[media_key]
+            for value_key in sort(from_config[media_key])
                 success = false
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
@@ -439,6 +467,7 @@ function write_to_CSV_file(filepath::String,
                            output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                            weather_data_keys::Union{Nothing,Vector{String}},
                            sim_params::Dict{String,Any},
+                           io_settings::Dict{String,Any},
                            csv_time_unit::String;
                            do_return::Bool=false,
                            output_rows::Union{Nothing,Matrix}=nothing)
@@ -465,17 +494,22 @@ function write_to_CSV_file(filepath::String,
 
     push!(line, "$time")
 
+    interpolator = v -> "$v"
+    if io_settings["fixed_output_precision"] > 0
+        interpolator = v -> "$(round(v; digits=io_settings["fixed_output_precision"]))"
+    end
+
     if output_keys !== nothing
         for outkey in output_keys
             value = output_value(outkey.unit, outkey)
-            value = replace("$value", "." => ",")
+            value = replace(interpolator(value), "." => ",")
             push!(line, value)
         end
     end
     if weather_data_keys !== nothing
         for key in weather_data_keys
             value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-            value = replace("$value", "." => ",")
+            value = replace(interpolator(value), "." => ",")
             push!(line, value)
         end
     end
@@ -513,20 +547,20 @@ function listify_operations(operations::OrderOfOperations)::String
 end
 
 """
-    dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
+function dump_auxiliary_outputs(io_settings::Dict{String,Any},
                                 components::Grouping,
                                 order_of_operations::OrderOfOperations,
                                 sim_params::Dict{String,Any})
     # export order of operations
-    if default(project_config["io_settings"], "auxiliary_info", false)
-        aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
+    if io_settings["auxiliary_info"]
+        aux_info_file_path = io_settings["auxiliary_info_file"]
         open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
@@ -554,11 +588,9 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     end
 
     # plot additional figures potentially available from components after initialisation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
-        aux_plots_output_path = sim_params["run_path"](default(project_config["io_settings"],
-                                                               "auxiliary_plots_path",
-                                                               "./output/"))
-        aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+    if io_settings["auxiliary_plots"]
+        aux_plots_output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        aux_plots_formats = io_settings["auxiliary_plots_formats"]
         aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
@@ -589,18 +621,18 @@ function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::
 end
 
 """
-create_profile_line_plots(data, keys, user_input)
+    create_profile_line_plots(data, keys, weather_data, weather_keys, io_settings, sim_params)
 
-create a line plot with data and label. user_input is dict from input file
+Creates the line plots for the given output configuration.
 """
 function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                                    outputs_plot_weather::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_weather_keys::Union{Nothing,Vector{String}},
-                                   project_config::AbstractDict{AbstractString,Any},
+                                   io_settings::Dict{String,Any},
                                    sim_params::Dict{String,Any})
-    plot_all = isa(project_config["io_settings"]["output_plot"], String) &&
-               project_config["io_settings"]["output_plot"][1:3] == "all"
+    plot_all = isa(io_settings["output_plot"], String) &&
+               io_settings["output_plot"][1:3] == "all"
     plot_data = outputs_plot_data !== nothing
     plot_weather = outputs_plot_weather !== nothing
 
@@ -628,40 +660,40 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         unit = String[]
         scale_fact = Float64[]
         if plot_data
-            for plot in project_config["io_settings"]["output_plot"]
-                if occursin("->", first(plot[2]["key"])[2][1])
+            for (nr, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                if occursin("->", first(plot["key"])[2][1])
                     # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
                     # temperature should be plotted
-                    if !isa(plot[2]["axis"], AbstractVector) || length(plot[2]["axis"]) !== 2 ||
-                       !isa(plot[2]["unit"], AbstractVector) || length(plot[2]["unit"]) !== 2 ||
-                       !isa(plot[2]["scale_factor"], AbstractVector) || length(plot[2]["scale_factor"]) !== 2
+                    if !isa(plot["axis"], AbstractVector) || length(plot["axis"]) !== 2 ||
+                       !isa(plot["unit"], AbstractVector) || length(plot["unit"]) !== 2 ||
+                       !isa(plot["scale_factor"], AbstractVector) || length(plot["scale_factor"]) !== 2
                         # only one set of meta information given. Use the given one both for energy and temperature flow
-                        push!(axis, isa(plot[2]["axis"], AbstractVector) ? plot[2]["axis"][1] : plot[2]["axis"])
-                        push!(unit, isa(plot[2]["unit"], AbstractVector) ? plot[2]["unit"][1] : plot[2]["unit"])
+                        push!(axis, isa(plot["axis"], AbstractVector) ? plot["axis"][1] : plot["axis"])
+                        push!(unit, isa(plot["unit"], AbstractVector) ? plot["unit"][1] : plot["unit"])
                         push!(scale_fact,
-                              isa(plot[2]["scale_factor"], AbstractVector) ? plot[2]["scale_factor"][1] :
-                              plot[2]["scale_factor"])
+                              isa(plot["scale_factor"], AbstractVector) ? plot["scale_factor"][1] :
+                              plot["scale_factor"])
 
                         push!(axis, "nothing")
                         push!(unit, "nothing")
                         push!(scale_fact, NaN)
-                        @info "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
+                        @info "For the generation of the output plot, the meta information for entry $nr " *
                               "do not contain two values. Therefore, only energy values will be output. If you want " *
                               "to output also a corresponding temperature, provide two meta information: " *
                               "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
                     else
-                        push!(axis, string(plot[2]["axis"][1]))
-                        push!(unit, string(plot[2]["unit"][1]))
-                        push!(scale_fact, plot[2]["scale_factor"][1])
+                        push!(axis, string(plot["axis"][1]))
+                        push!(unit, string(plot["unit"][1]))
+                        push!(scale_fact, plot["scale_factor"][1])
 
-                        push!(axis, string(plot[2]["axis"][2]))
-                        push!(unit, string(plot[2]["unit"][2]))
-                        push!(scale_fact, plot[2]["scale_factor"][2])
+                        push!(axis, string(plot["axis"][2]))
+                        push!(unit, string(plot["unit"][2]))
+                        push!(scale_fact, plot["scale_factor"][2])
                     end
                 else
-                    push!(axis, string(plot[2]["axis"]))
-                    push!(unit, string(plot[2]["unit"]))
-                    push!(scale_fact, plot[2]["scale_factor"])
+                    push!(axis, string(plot["axis"]))
+                    push!(unit, string(plot["unit"]))
+                    push!(scale_fact, plot["scale_factor"])
                 end
             end
         end
@@ -728,13 +760,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             end
         end
     end
-    output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
-                            project_config["io_settings"]["output_plot_time_unit"] : "date"
-    if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
-        @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
-              "It will be set to `date` as default."
-        output_plot_time_unit = "date"
-    end
+    output_plot_time_unit = io_settings["output_plot_time_unit"]
     if output_plot_time_unit == "seconds"
         x = time_x
     elseif output_plot_time_unit == "minutes"
@@ -753,6 +779,11 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     y = hcat(plot_data ? outputs_plot_data[:, 2:end] : zeros(Float64, size(outputs_plot_weather, 1), 0),
              plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
+
+    if io_settings["fixed_output_precision"] > 0
+        y = round.(y; digits=io_settings["fixed_output_precision"])
+    end
+
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
@@ -793,14 +824,13 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     p = plot(traces, layout)
 
-    file_path = sim_params["run_path"](default(project_config["io_settings"],
-                                               "output_plot_file",
-                                               "./output/output_plot.html"))
+    file_path = sim_params["run_path"](io_settings["output_plot_file"])
     savefig(p, file_path)
 end
 
 """
-create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
+    create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values,
+                  medium_of_interfaces, nr_of_interfaces, io_settings, sim_params)
 
 create a sankey plot. 
 Inputs:
@@ -814,7 +844,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::AbstractDict{String,Any},
+                       io_settings::Dict{String,Any},
                        sim_params::Dict{String,Any})
 
     # sum up data of each interface
@@ -850,7 +880,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
             ||
             (medium_of_interfaces[interface_new] == "hide_medium"
              &&
-             output_all_value_sum[interface_new] == output_all_value_sum[interface_new - 1]))
+             (abs(output_all_value_sum[interface_new] - output_all_value_sum[interface_new - 1])) <
+             sim_params["epsilon"]))
             # end of condition 
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
@@ -862,6 +893,11 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         interface_new += 1
     end
     interface_new -= 1
+
+    # apply fixed precision before adding for non-zero as it may otherwise be rounded to zero again
+    if io_settings["fixed_output_precision"] > 0
+        output_all_value_sum = round.(output_all_value_sum; digits=io_settings["fixed_output_precision"])
+    end
 
     # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
     output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
@@ -877,34 +913,41 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
 
-    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], AbstractDict{})
-        if length(unique_medium_labels) > 1
-            colors = get(ColorSchemes.roma,
-                         (0:(length(unique_medium_labels) - 1)) ./ (length(unique_medium_labels) - 1))
-            color_map = Dict(zip(unique_medium_labels, colors))
-        else
-            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
-        end
-    else
-        color_map = Dict{String,Any}(io_settings["sankey_plot"])
-        for (medium, color) in color_map
+    if io_settings["sankey_plot"] == "default" || io_settings["sankey_plot"] == "custom"
+        # in both cases of "default" or "custom", the setting sankey_plot_spec already
+        # contains a color map definition, but it may not cover all media, thus we randomly
+        # assign colors to the missing media
+        color_map = Dict{String,Any}()
+        for label in unique_medium_labels
+            color = RGB(0, 0, 0)
             try
-                color_entry = Colors.color_names[color]
-                color_map[medium] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
-            catch e
-                @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
-                       "The following error occurred: $e\n" *
-                       "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                if haskey(io_settings["sankey_plot_spec"], label)
+                    color_entry = Colors.color_names[io_settings["sankey_plot_spec"][label]]
+                    color = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
+                else
+                    # use deterministic random color based on label hash. colors are drawn
+                    # from the roma color scheme
+                    rng = Random.MersenneTwister(hash(label))
+                    color = get(ColorSchemes.roma, rand(rng))
+                end
+            catch
+                @error "The given color '$(io_settings["sankey_plot_spec"][label])' of " *
+                       "medium '$label' for the sankey plot is not one of the available " *
+                       "colors in `Colors.color_names`"
                 throw(InputError())
             end
+            color_map[label] = color
         end
+
         for medium in unique_medium_labels
             if medium in keys(color_map)
                 continue
             elseif medium == "hide_medium"
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
-                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                @error "The color for the medium '$medium' for the sankey could not be " *
+                       "found in the input file. Please add the medium and its color in " *
+                       "IO setting 'sankey_plot_spec'."
                 throw(InputError())
             end
         end
@@ -953,6 +996,6 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
+    file_path = sim_params["run_path"](io_settings["sankey_plot_file"])
     savefig(p, file_path)
 end

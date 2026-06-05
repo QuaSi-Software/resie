@@ -12,7 +12,6 @@ function test_ooo_one_bus_to_many_with_storage()
             "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
-            "is_source" => true,
             "constant_power" => 400,
         ),
         "TST_BUS_01" => Dict{String,Any}(

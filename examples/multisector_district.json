@@ -2,18 +2,10 @@
     "io_settings": {
         "csv_output_file": "./output/out.csv",
         "auxiliary_info": true,
-        "auxiliary_plots": true,
+        "auxiliary_plots": false,
         "auxiliary_info_file": "./output/auxiliary_info.md",
-        "sankey_plot": {
-            "m_h_w_lt1": "lightblue",
-            "m_h_w_ht1": "red",
-            "m_e_ac_230v": "darkgoldenrod1",
-            "m_c_g_natgas": "grey",
-            "m_c_g_h2": "lime",
-            "m_c_g_o2": "firebrick1",
-            "Losses": "black",
-            "Gains": "black"
-        },
+        "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1:IN"],
             "TST_BFT_TH_01": ["Load"],
@@ -28,86 +20,99 @@
             "TST_BUS_TH_00": ["Balance"],
             "TST_PVP_EL_01": ["m_e_ac_230v:OUT"]
         },
-        "output_plot": {
-            "1": {
+        "output_plot": "custom",
+        "output_plot_spec": {
+            "10": {
                 "key": {"TST_DEM_TH_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "3": {
-                "key": {"TST_BFT_TH_01": ["Load"]},
-                "axis": "right",
+            "20": {
+                "key": {"TST_DEM_TH_01": ["Demand"]},
+                "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "2": {
+            "30": {
                 "key": {"TST_DEM_TH_02": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "4": {
+            "40": {
+                "key": {"TST_DEM_TH_02": ["Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "50": {
+                "key": {"TST_BFT_TH_01": ["Load"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "60": {
                 "key": {"TST_BFT_TH_02": ["Load"]},
                 "axis": "right",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "5": {
+            "70": {
                 "key": {"TST_STES_TH_01": ["Load"]},
                 "axis": "right",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "6": {
+            "80": {
                 "key": {"TST_ELY_01": ["m_h_w_lt1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "7": {
+            "90": {
                 "key": {"TST_CHP_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "8": {
+            "100": {
                 "key": {"TST_GBO_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "9": {
+            "110": {
                 "key": {"TST_HTP_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "10": {
+            "120": {
                 "key": {"TST_HTP_02": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "11": {
+            "130": {
                 "key": {"TST_BUS_TH_00": ["Balance"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "12": {
+            "140": {
                 "key": {"TST_PVP_EL_01": ["m_e_ac_230v:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "13": {
+            "150": {
                 "key": {"TST_STES_TH_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": -0.001
             },
-            "14": {
+            "160": {
                 "key": {"TST_STES_TH_01": ["m_h_w_lt1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
@@ -294,7 +299,7 @@
                     "profile_path": "profiles/examples/district/4000hours_with_least_CO2_2022.prf"
                 }
             ],
-            "power_el": 600000,
+            "power_el": 1000000,
             "output_temperature_ht": 50.0,
             "m_heat_ht_out": "m_h_w_lt1",
             "m_heat_lt_out": "m_h_w_lt2",
@@ -305,10 +310,10 @@
             "min_power_fraction_total": 0.2,
             "linear_interface": "el_in",
             "efficiency_el_in": "const:1.0",
-            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out": "const:0.56",
             "efficiency_h2_out_lossless": "const:0.6",
             "efficiency_o2_out": "const:0.6",
-            "efficiency_heat_ht_out": "const:0.4"
+            "efficiency_heat_ht_out": "const:0.23"
         },
         "TST_CHP_01": {
             "type": "CHPP",
@@ -316,19 +321,16 @@
                 "m_heat_out": "TST_BUS_TH_00",
                 "m_el_out": "TST_BUS_EL_01"
             },
-            "control_parameters": {
-                "load_storages m_h_w_ht1": true,
-                "load_storages m_e_ac_230v": true
-            },
             "m_heat_out": "m_h_w_ht1",
             "m_el_out": "m_e_ac_230v",
-            "power_el": 60000,
+            "power_el": 100000,
             "linear_interface": "fuel_in",
             "efficiency_fuel_in": "const:1.0",
-            "efficiency_el_out": "const:0.4",
-            "efficiency_heat_out": "const:0.6",
-            "output_temperature": 60,
-            "min_power_fraction": 1.0
+            "efficiency_el_out": "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38",
+            "efficiency_heat_out": "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49",
+            "nr_discretization_steps": 8,
+            "output_temperature": 60.0,
+            "min_power_fraction": 0.1
         },
         "TST_GBO_01": {
             "type": "FuelBoiler",
@@ -345,9 +347,10 @@
                 }
             ],
             "power_th": 400000,
-            "output_temperature": 60,
-            "min_power_fraction": 0.0,
-            "efficiency_fuel_in": "const:1.0"
+            "output_temperature": 60.0,
+            "min_power_fraction": 0.05,
+            "efficiency_fuel_in": "const:1.07",
+            "linear_interface": "heat_out"
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",
@@ -357,7 +360,18 @@
             "model_type": "ideally_stratified",
             "capacity": 500000,
             "initial_load": 0,
-            "high_temperature": 60.0
+            "high_temperature": 60.0,
+            "rho_medium": 1000,
+            "low_temperature": 15.0,
+            "max_load_rate": 1.0,
+            "max_unload_rate": 1.5,
+            "consider_losses": true,
+            "h_to_r": 3,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 15,
+            "thermal_transmission_lid": 0.04,
+            "thermal_transmission_barrel": 0.04,
+            "thermal_transmission_bottom": 0.09
         },
         "TST_BFT_TH_02": {
             "type": "BufferTank",
@@ -367,7 +381,18 @@
             "model_type": "ideally_stratified",
             "capacity": 500000,
             "initial_load": 0.3,
-            "high_temperature": 60.0
+            "high_temperature": 60.0,
+            "rho_medium": 1000,
+            "low_temperature": 15.0,
+            "max_load_rate": 1.0,
+            "max_unload_rate": 1.5,
+            "consider_losses": true,
+            "h_to_r": 3,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 15,
+            "thermal_transmission_lid": 0.04,
+            "thermal_transmission_barrel": 0.04,
+            "thermal_transmission_bottom": 0.09
         },
         "TST_STES_TH_01": {
             "type": "SeasonalThermalStorage",
@@ -407,8 +432,8 @@
             "m_heat_out": "m_h_w_ht1",
             "power_th": 550000,
             "cop_function": "carnot:0.4",
-            "power_losses_factor": 1.0,
-            "heat_losses_factor": 1.0
+            "power_losses_factor": 0.97,
+            "heat_losses_factor": 0.95
         },
         "TST_HTP_02": {
             "type": "HeatPump",
@@ -417,8 +442,8 @@
             ],
             "power_th": 300000,
             "cop_function": "carnot:0.4",
-            "power_losses_factor": 1.0,
-            "heat_losses_factor": 1.0
+            "power_losses_factor": 0.97,
+            "heat_losses_factor": 0.95
         }
     }
 }

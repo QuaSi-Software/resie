@@ -1,5 +1,19 @@
 using Dates
 
+#! format: off
+CONMOD_PROFILE_LIMITED_PARAMS = Dict(
+    "profile_path" => (
+        default=nothing,
+        description="File path to the profile being used as limiting PLR.",
+        display_name="Profile file path",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Control module for setting limits to the PLR of a component according to a profile.
 """
@@ -48,6 +62,9 @@ end
 
 # method for control module name on type-level
 control_module_name(x::Type{CM_ProfileLimited})::String = "profile_limited"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_ProfileLimited})::Dict{String,NamedTuple} = CONMOD_PROFILE_LIMITED_PARAMS
 
 function has_method_for(mod::CM_ProfileLimited, func::ControlModuleFunction)::Bool
     return func == cmf_upper_plr_limit

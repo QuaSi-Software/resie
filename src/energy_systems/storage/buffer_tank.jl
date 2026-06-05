@@ -1,5 +1,5 @@
 #! format: off
-const BUFFER_TANK_PARAMETERS = Dict(
+const BUFFER_TANK_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         default="m_h_w_ht1",
         description="Heat medium of the buffer tank",
@@ -142,7 +142,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
-        unit="kJ/(kg*K)"
+        unit="J/(kg*K)"
     ),
     "high_temperature" => (
         default=75.0,
@@ -255,6 +255,35 @@ const BUFFER_TANK_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const BUFFER_TANK_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m^3"
+    )
+)
+
+const BUFFER_TANK_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/m^3"
+    ),
+)
 #! format: on
 
 """
@@ -282,10 +311,12 @@ mutable struct BufferTank <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
-
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     medium::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     model_type::Symbol
 
@@ -338,8 +369,16 @@ mutable struct BufferTank <: Component
     end
 end
 
-function component_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
-    return deepcopy(BUFFER_TANK_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{BufferTank})::Dict{String,Any}
+    return deepcopy(BUFFER_TANK_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{BufferTank})::Dict{String,Any}
+    return deepcopy(BUFFER_TANK_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{BufferTank})::Dict{String,Any}
+    return deepcopy(BUFFER_TANK_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -356,8 +395,17 @@ function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_
 end
 
 function validate_config(x::Type{BufferTank}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(BufferTank))
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(BufferTank)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(BufferTank)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(BufferTank)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,Any},
@@ -370,6 +418,8 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
             medium,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             Symbol(params["model_type"]),
             params["capacity"],
             params["volume"],
@@ -417,10 +467,8 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         unit.capacity = unit.volume * unit.rho_medium * unit.cp_medium / 3600 *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
-        if unit.consider_losses
-            unit.volume = unit.capacity /
-                          (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
-        end
+        unit.volume = unit.capacity /
+                      (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
         throw(InputError())
@@ -641,6 +689,10 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     handle_component_update!(unit, "load", sim_params)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::BufferTank)
+    return unit.volume # [m^3]
 end
 
 function output_values(unit::BufferTank)::Vector{String}

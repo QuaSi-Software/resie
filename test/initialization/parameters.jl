@@ -317,7 +317,7 @@ end
 end
 
 function test_conditionals_with_or()
-    parameter_def = Dict{String,NamedTuple}(
+    parameter_def = Dict{String,Any}(
         "test_param" => (default=1.0,
                          description="",
                          display_name="",

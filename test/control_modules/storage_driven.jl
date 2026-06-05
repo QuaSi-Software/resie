@@ -7,15 +7,13 @@ include("../test_util.jl")
 function setup_control_tests()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
             "medium" => "m_h_w_lt1",
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
             "medium" => "m_e_ac_230v",
         ),
         "TST_HP_01" => Dict{String,Any}(

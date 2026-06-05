@@ -9,16 +9,14 @@ include("../test_util.jl")
 function test_primary_producer_can_load_storage()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_01"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_02"],
-            "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "FuelBoiler",

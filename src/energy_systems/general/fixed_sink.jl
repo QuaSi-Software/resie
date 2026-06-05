@@ -1,5 +1,5 @@
 #! format: off
-const FIXED_SINK_PARAMETERS = Dict(
+const FIXED_SINK_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         description="Medium of the sink (e.g. electricity, heat, gas, etc.)",
         display_name="Medium",
@@ -118,6 +118,52 @@ const FIXED_SINK_PARAMETERS = Dict(
         unit="J/(kg*K)"
     ),
 )
+
+const FIXED_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fixed", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "unmet_energy_price_profile_file_path" => nothing,
+        "unmet_energy_price_profile_scale" => 1.0,
+        "constant_unmet_energy_price" => 0.0,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
+    ),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_demand or scale)"
+    ),
+)
+
+const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_sink", 
+    Dict{String,Any}(
+        "energy_emissions_credits_profile_file_path" => nothing,
+        "energy_emissions_credits_profile_scale" => 1.0,
+        "constant_energy_emissions_credits" => nothing,
+        "energy_emissions_credits_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_demand or scale)"
+    )
+)
 #! format: on
 
 """
@@ -138,6 +184,9 @@ mutable struct FixedSink <: Component
 
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
@@ -170,8 +219,16 @@ This is an alias to the generic implementation of a fixed sink.
 """
 const Demand = FixedSink
 
-function component_parameters(x::Type{FixedSink})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SINK_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -188,8 +245,17 @@ function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_n
 end
 
 function validate_config(x::Type{FixedSink}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(FixedSink))
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(FixedSink)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FixedSink)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FixedSink)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{FixedSink}, uac::String, params::Dict{String,Any},
@@ -207,6 +273,8 @@ function init_from_params(x::Type{FixedSink}, uac::String, params::Dict{String,A
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
+            params["economic_parameters"],
+            params["emissions_parameters"],
             energy_profile,                          # energy_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor
@@ -266,6 +334,14 @@ end
 function process(unit::FixedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.demand, unit.temperature, nothing)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::FixedSink)
+    if unit.constant_demand !== nothing
+        return unit.demand
+    else
+        return unit.scaling_factor
+    end
 end
 
 function output_values(unit::FixedSink)::Vector{String}

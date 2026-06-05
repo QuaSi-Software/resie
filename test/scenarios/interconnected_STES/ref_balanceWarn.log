@@ -1,127 +1,152 @@
-ReSiE balanceWarn log file of simulation started at: 2026-02-23 18:09:00
+ReSiE balanceWarn log file of simulation started at: 2000-01-01 00:00:00
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 194400: -341460.72681911755
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 201600: -57626.972583099036
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 280800: -1.1128595764279114e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 284400: -456768.47569313087
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 288000: -938633.7201310867
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 291600: -188502.8303995675
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1836000: -8403.26897312235
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1839600: -550626.2012750013
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1843200: -1.3637398227652623e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1846800: -1.3906610530936853e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1850400: -706663.5217021052
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1854000: -38249.757935790345
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1922400: -2.3916914527242677e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1926000: -1.8063125337628936e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1929600: -2.1767204312257897e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1933200: -1.627857767626842e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1936800: -1.3615980370376324e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1940400: -506808.67012789473
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1962000: -8170.873939701356
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2005200: -702024.8638647012
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2008800: -3.161418094275526e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2012400: -2.424003104472894e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2016000: -2.682835579630265e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2019600: -1.6069105093563674e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2095200: -1.203842481758912e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2098800: -841776.1690078955
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2102400: -1.3142894826728934e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2106000: -451908.5176453842
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2181600: -2.2512277184983147e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2185200: -1.7022473451378932e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2188800: -2.0239095222228942e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2192400: -842308.5832677931
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2221200: -23355.300799702294
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2268000: -463145.9398917891
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2275200: -355750.2003907701
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2451600: -6750.452356263995
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2527200: -2.3950090892881593e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2530800: -1.946081151170773e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2534400: -2.2165544204020873e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2538000: -1.3773186995315612e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2541600: -835249.4347878769
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2610000: -74500.25973757822
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2613600: -2.5706510817934046e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2617200: -2.7982816712848637e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2620800: -3.331744667643157e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2624400: -2.4551322169528953e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2628000: -1.7532058190684216e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2631600: -726905.3955852641
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2635200: -133089.16289052553
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2696400: -62061.78142757807
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2700000: -2.5643739941984024e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2703600: -1.9322020329557704e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2707200: -2.151419474346299e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2710800: -1.362238789248405e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2714400: -332060.6030417979
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2782800: -243274.60639257822
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2786400: -2.778946764453403e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2790000: -2.1250045934357736e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2793600: -2.3999817234128774e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2797200: -1.4361901528649684e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2826000: -212071.3304647021
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2829600: -233481.48881763313
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2833200: -358013.45693657734
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2869200: -1.262093528499702e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2872800: -3.7581482501605256e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2876400: -3.010474024917895e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2880000: -3.4494086179465773e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2883600: -2.137450971221301e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2912400: -2.144213699400842e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2916000: -1.3076908765326333e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2919600: -1.1031973990765791e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2923200: -243110.25547105353
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2926800: -506307.92534342036
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2959200: -43357.59512073826
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2962800: -418479.48546340317
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2966400: -1.2554820420055087e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2970000: -405362.6809587283
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3052800: -185287.61443652585
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3056400: -690653.5537005104
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3060000: -132629.4379810365
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3132000: -1.0346945791617888e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3135600: -638079.4783857716
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3139200: -990331.6031957711
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3142800: -538453.0553831402
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3146400: -432912.85683261603
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3391200: -101176.53383678943
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3477600: -1.3871337414739132e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3481200: -1.0636756075878935e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3484800: -1.5345830800828924e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3488400: -759240.5454418315
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3650400: -338507.76195312105
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3654000: -860489.1576500013
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3657600: -1.6931927904942092e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3661200: -780730.4420155091
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3664800: -136582.44980287552
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3736800: -1.2246935437867874e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3740400: -975898.6831902475
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3744000: -1.3441173489260357e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3747600: -601981.0144080073
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3823200: -777667.4674767889
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3826800: -340349.9800207736
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3830400: -696173.90833735
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3909600: -541230.1596539123
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3913200: -218098.44349289406
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3916800: -658994.3630928961
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3920400: -19593.06100526359
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5810400: -384445.71023470256
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5814000: -199268.44178263005
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5817600: -534023.120731316
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5896800: -1.282058936829703e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5900400: -596820.867276317
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6156000: -136946.88687257888
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6933600: -887494.9019331224
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6937200: -655702.8856499991
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6940800: -232327.86434368463
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7106400: -508550.5271723345
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7110000: -484049.16631552624
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7113600: -298581.7211410529
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7196400: -135706.09297215287
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7279200: -42543.7523220689
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29484000: -300967.73885858315
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29491200: -173550.71724183438
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29743200: -233788.8625072937
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29750400: -98014.28486585547
+[BalanceWarning] In timestep 2024-01-03T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -341460.7268191171
+[BalanceWarning] In timestep 2024-01-03T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -57626.97258310113
+[BalanceWarning] In timestep 2024-01-04T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.1128595764279107e6
+[BalanceWarning] In timestep 2024-01-04T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -456768.4756931304
+[BalanceWarning] In timestep 2024-01-04T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -938633.7201310878
+[BalanceWarning] In timestep 2024-01-04T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -188502.83039956773
+[BalanceWarning] In timestep 2024-01-22T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -8403.268973122584
+[BalanceWarning] In timestep 2024-01-22T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -550626.2012750013
+[BalanceWarning] In timestep 2024-01-22T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3637398227652635e6
+[BalanceWarning] In timestep 2024-01-22T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3906610530936855e6
+[BalanceWarning] In timestep 2024-01-22T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -706663.521702107
+[BalanceWarning] In timestep 2024-01-22T11:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -38249.75793579011
+[BalanceWarning] In timestep 2024-01-23T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -543006.880410526
+[BalanceWarning] In timestep 2024-01-23T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.848684572313741e6
+[BalanceWarning] In timestep 2024-01-23T07:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -50958.694107893854
+[BalanceWarning] In timestep 2024-01-23T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.7553538396549998e6
+[BalanceWarning] In timestep 2024-01-23T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -333751.54606578965
+[BalanceWarning] In timestep 2024-01-23T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.84296888516e6
+[BalanceWarning] In timestep 2024-01-23T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.6278577676268425e6
+[BalanceWarning] In timestep 2024-01-23T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3615980370376324e6
+[BalanceWarning] In timestep 2024-01-23T11:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -506808.67012789554
+[BalanceWarning] In timestep 2024-01-23T17:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -8170.873939701123
+[BalanceWarning] In timestep 2024-01-24T05:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -702024.8638647019
+[BalanceWarning] In timestep 2024-01-24T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -1.079222659410526e6
+[BalanceWarning] In timestep 2024-01-24T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.082195434865e6
+[BalanceWarning] In timestep 2024-01-24T07:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -517140.2569078943
+[BalanceWarning] In timestep 2024-01-24T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.906862847565e6
+[BalanceWarning] In timestep 2024-01-24T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -715714.8919552639
+[BalanceWarning] In timestep 2024-01-24T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.9671206876750004e6
+[BalanceWarning] In timestep 2024-01-24T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.606910509356366e6
+[BalanceWarning] In timestep 2024-01-25T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.2038424817589112e6
+[BalanceWarning] In timestep 2024-01-25T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -841776.1690078953
+[BalanceWarning] In timestep 2024-01-25T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3142894826728948e6
+[BalanceWarning] In timestep 2024-01-25T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -451908.5176453842
+[BalanceWarning] In timestep 2024-01-26T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -487401.53161052614
+[BalanceWarning] In timestep 2024-01-26T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.7638261868877881e6
+[BalanceWarning] In timestep 2024-01-26T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.7022473451378946e6
+[BalanceWarning] In timestep 2024-01-26T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -218000.2156578945
+[BalanceWarning] In timestep 2024-01-26T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.805909306565e6
+[BalanceWarning] In timestep 2024-01-26T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -842308.5832677935
+[BalanceWarning] In timestep 2024-01-26T17:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -23355.30079970113
+[BalanceWarning] In timestep 2024-01-27T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -463145.9398917898
+[BalanceWarning] In timestep 2024-01-27T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -355750.20039077196
+[BalanceWarning] In timestep 2024-01-29T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -6750.4523562649265
+[BalanceWarning] In timestep 2024-01-30T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -335633.92741840426
+[BalanceWarning] In timestep 2024-01-30T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.059375161869754e6
+[BalanceWarning] In timestep 2024-01-30T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.9460811511707727e6
+[BalanceWarning] In timestep 2024-01-30T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -107279.55569208786
+[BalanceWarning] In timestep 2024-01-30T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.10927486471e6
+[BalanceWarning] In timestep 2024-01-30T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3773186995315617e6
+[BalanceWarning] In timestep 2024-01-30T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -835249.434787878
+[BalanceWarning] In timestep 2024-01-31T05:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -74500.25973757962
+[BalanceWarning] In timestep 2024-01-31T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -376926.41261840425
+[BalanceWarning] In timestep 2024-01-31T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.1937246691750004e6
+[BalanceWarning] In timestep 2024-01-31T07:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -735506.0593098644
+[BalanceWarning] In timestep 2024-01-31T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.062775611975e6
+[BalanceWarning] In timestep 2024-01-31T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -1.205447027813158e6
+[BalanceWarning] In timestep 2024-01-31T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.12629763983e6
+[BalanceWarning] In timestep 2024-01-31T09:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -544478.2150078956
+[BalanceWarning] In timestep 2024-01-31T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.9106540019450001e6
+[BalanceWarning] In timestep 2024-01-31T10:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -15252.877668420784
+[BalanceWarning] In timestep 2024-01-31T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.7379529414e6
+[BalanceWarning] In timestep 2024-01-31T11:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -726905.3955852637
+[BalanceWarning] In timestep 2024-01-31T12:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -133089.16289052786
+[BalanceWarning] In timestep 2024-02-01T05:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -62061.781427578535
+[BalanceWarning] In timestep 2024-02-01T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -372188.98801840283
+[BalanceWarning] In timestep 2024-02-01T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.1921850061799996e6
+[BalanceWarning] In timestep 2024-02-01T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.9322020329557715e6
+[BalanceWarning] In timestep 2024-02-01T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -58792.03497629892
+[BalanceWarning] In timestep 2024-02-01T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.0926274393699998e6
+[BalanceWarning] In timestep 2024-02-01T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.362238789248405e6
+[BalanceWarning] In timestep 2024-02-01T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -332060.6030417986
+[BalanceWarning] In timestep 2024-02-02T05:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -243274.6063925787
+[BalanceWarning] In timestep 2024-02-02T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -534130.7014184026
+[BalanceWarning] In timestep 2024-02-02T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.2448160630349996e6
+[BalanceWarning] In timestep 2024-02-02T07:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -35046.65271577332
+[BalanceWarning] In timestep 2024-02-02T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.08995794072e6
+[BalanceWarning] In timestep 2024-02-02T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -245940.45175787713
+[BalanceWarning] In timestep 2024-02-02T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.154041271655e6
+[BalanceWarning] In timestep 2024-02-02T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.4361901528649696e6
+[BalanceWarning] In timestep 2024-02-02T17:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -212071.3304647021
+[BalanceWarning] In timestep 2024-02-02T18:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -233481.4888176315
+[BalanceWarning] In timestep 2024-02-02T19:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -358013.45693657966
+[BalanceWarning] In timestep 2024-02-03T05:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.2620935284997015e6
+[BalanceWarning] In timestep 2024-02-03T06:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -1.5295850412105257e6
+[BalanceWarning] In timestep 2024-02-03T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.22856320895e6
+[BalanceWarning] In timestep 2024-02-03T07:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -959759.819507895
+[BalanceWarning] In timestep 2024-02-03T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.05071420541e6
+[BalanceWarning] In timestep 2024-02-03T08:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -1.2942057758815782e6
+[BalanceWarning] In timestep 2024-02-03T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.1552028420649995e6
+[BalanceWarning] In timestep 2024-02-03T09:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -97817.59394629952
+[BalanceWarning] In timestep 2024-02-03T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -2.0396333772750003e6
+[BalanceWarning] In timestep 2024-02-03T17:00:00, the balance in interface TST_BUS_01 -> TST_DEM_02 was not zero: -383691.09372631554
+[BalanceWarning] In timestep 2024-02-03T17:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.7605226056745264e6
+[BalanceWarning] In timestep 2024-02-03T18:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3076908765326324e6
+[BalanceWarning] In timestep 2024-02-03T19:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.1031973990765798e6
+[BalanceWarning] In timestep 2024-02-03T20:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -243110.25547105377
+[BalanceWarning] In timestep 2024-02-03T21:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -506307.9253434205
+[BalanceWarning] In timestep 2024-02-04T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -43357.595120737096
+[BalanceWarning] In timestep 2024-02-04T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -418479.485463405
+[BalanceWarning] In timestep 2024-02-04T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.2554820420055098e6
+[BalanceWarning] In timestep 2024-02-04T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -405362.6809587274
+[BalanceWarning] In timestep 2024-02-05T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -185287.61443652608
+[BalanceWarning] In timestep 2024-02-05T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -690653.55370051
+[BalanceWarning] In timestep 2024-02-05T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -132629.4379810365
+[BalanceWarning] In timestep 2024-02-06T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.0346945791617893e6
+[BalanceWarning] In timestep 2024-02-06T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -638079.4783857726
+[BalanceWarning] In timestep 2024-02-06T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -990331.6031957723
+[BalanceWarning] In timestep 2024-02-06T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -538453.0553831405
+[BalanceWarning] In timestep 2024-02-06T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -432912.8568326151
+[BalanceWarning] In timestep 2024-02-09T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -101176.53383678873
+[BalanceWarning] In timestep 2024-02-10T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.3871337414739113e6
+[BalanceWarning] In timestep 2024-02-10T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.0636756075878937e6
+[BalanceWarning] In timestep 2024-02-10T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.5345830800828938e6
+[BalanceWarning] In timestep 2024-02-10T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -759240.5454418315
+[BalanceWarning] In timestep 2024-02-12T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -338507.761953122
+[BalanceWarning] In timestep 2024-02-12T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -860489.1576500003
+[BalanceWarning] In timestep 2024-02-12T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.6931927904942099e6
+[BalanceWarning] In timestep 2024-02-12T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -780730.4420155096
+[BalanceWarning] In timestep 2024-02-12T10:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -136582.4498028776
+[BalanceWarning] In timestep 2024-02-13T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.2246935437867886e6
+[BalanceWarning] In timestep 2024-02-13T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -975898.6831902476
+[BalanceWarning] In timestep 2024-02-13T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.344117348926036e6
+[BalanceWarning] In timestep 2024-02-13T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -601981.014408007
+[BalanceWarning] In timestep 2024-02-14T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -777667.4674767887
+[BalanceWarning] In timestep 2024-02-14T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -340349.98002077267
+[BalanceWarning] In timestep 2024-02-14T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -696173.9083373512
+[BalanceWarning] In timestep 2024-02-15T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -541230.1596539125
+[BalanceWarning] In timestep 2024-02-15T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -218098.44349289453
+[BalanceWarning] In timestep 2024-02-15T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -658994.3630928964
+[BalanceWarning] In timestep 2024-02-15T09:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -19593.061005263822
+[BalanceWarning] In timestep 2024-03-09T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -384445.7102347014
+[BalanceWarning] In timestep 2024-03-09T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -199268.44178263145
+[BalanceWarning] In timestep 2024-03-09T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -534023.1207313163
+[BalanceWarning] In timestep 2024-03-10T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -1.282058936829702e6
+[BalanceWarning] In timestep 2024-03-10T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -596820.8672763159
+[BalanceWarning] In timestep 2024-03-13T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -136946.88687257865
+[BalanceWarning] In timestep 2024-03-22T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -887494.9019331223
+[BalanceWarning] In timestep 2024-03-22T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -655702.8856499995
+[BalanceWarning] In timestep 2024-03-22T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -232327.86434368417
+[BalanceWarning] In timestep 2024-03-24T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -508550.52717233426
+[BalanceWarning] In timestep 2024-03-24T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -484049.1663155268
+[BalanceWarning] In timestep 2024-03-24T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -298581.7211410529
+[BalanceWarning] In timestep 2024-03-25T07:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -135706.0929721545
+[BalanceWarning] In timestep 2024-03-26T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -42543.752322069835
+[BalanceWarning] In timestep 2024-12-08T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -300967.7388585836
+[BalanceWarning] In timestep 2024-12-08T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -173550.71724183368
+[BalanceWarning] In timestep 2024-12-11T06:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -233788.86250729347
+[BalanceWarning] In timestep 2024-12-11T08:00:00, the balance in interface TST_BUS_03 -> TST_DEM_01 was not zero: -98014.28486585733

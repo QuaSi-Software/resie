@@ -9,7 +9,7 @@ The calculation is based on EN ISO 9806:2017 for quasi-dynamic models.
 """
 
 #! format: off
-const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
+const SOLARTHERMAL_COLLECTOR_COMPONENT_PARAMETERS = Dict(
     "m_heat_out" => (
         default="m_h_w_ht1",
         description="Heat output medium",
@@ -443,6 +443,35 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         unit="K"
     )
 )
+
+const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 18,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.005,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  5,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m^2"
+    )
+)
+
+const SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 18,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/m^2"
+    ),
+)
 #! format: on
 
 mutable struct SolarthermalCollector <: Component
@@ -453,6 +482,9 @@ mutable struct SolarthermalCollector <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     m_heat_out::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ## collector installation
     collector_gross_area::Float64
@@ -538,8 +570,16 @@ mutable struct SolarthermalCollector <: Component
     end
 end
 
-function component_parameters(x::Type{SolarthermalCollector})::Dict{String,NamedTuple}
-    return deepcopy(SOLARTHERMAL_COLLECTOR_PARAMETERS)
+function component_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{SolarthermalCollector})::Dict{String,Any}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{SolarthermalCollector}, config::Dict{String,Any}, param_name::String,
@@ -565,8 +605,17 @@ function extract_parameter(x::Type{SolarthermalCollector}, config::Dict{String,A
 end
 
 function validate_config(x::Type{SolarthermalCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(SolarthermalCollector))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(SolarthermalCollector)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(SolarthermalCollector)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(SolarthermalCollector)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::Dict{String,Any},
@@ -586,6 +635,8 @@ function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::D
             InterfaceMap(),
             InterfaceMap(m_heat_out => nothing),
             m_heat_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             params["collector_gross_area"],
             params["tilt_angle"],
             params["azimuth_angle"],
@@ -1265,6 +1316,10 @@ function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::Solarther
     unit.a_params[5] * 1 / time_step -
     unit.a_params[8] * 4 * (t_avg - unit.ambient_temperature)^3 +
     spec_flow_rate * 2 * unit.vol_heat_cap * independent_target_temp
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::SolarthermalCollector)
+    return unit.collector_gross_area # [m^2]
 end
 
 function output_values(unit::SolarthermalCollector)::Vector{String}
