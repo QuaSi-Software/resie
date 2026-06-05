@@ -1,3 +1,142 @@
+#! format: off
+CONTROL_PARAMS_DEF = Dict(
+    "aggregation_plr_limit" => (
+        default="max",
+        description="Aggregation method for how multiple control modules with callback " *
+                    "upper_plr_limit are handled.",
+        display_name="Agg. PLR limit",
+        required=false,
+        options=["max", "min"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "aggregation_charge" => (
+        default="all",
+        description="Aggregation method for how multiple control modules with callback " *
+                    "charge_is_allowed are handled.",
+        display_name="Agg. charge allowed",
+        required=false,
+        options=["all", "any"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "aggregation_discharge" => (
+        default="all",
+        description="Aggregation method for how multiple control modules with callback " *
+                    "discharge_is_allowed are handled.",
+        display_name="Agg. discharge allowed",
+        required=false,
+        options=["all", "any"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "aggregation_check_src_to_snk" => (
+        default="all",
+        description="Aggregation method for how multiple control modules with callback " *
+                    "check_src_to_snk are handled.",
+        display_name="Agg. check src->snk",
+        required=false,
+        options=["all", "any"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "consider_m_el_in" => (
+        default=true,
+        description="Toggle if electricity input is considered during limit calculations.",
+        display_name="Consider el_in?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_el_out" => (
+        default=true,
+        description="Toggle if electricity output is considered during limit calculations.",
+        display_name="Consider el_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_gas_in" => (
+        default=true,
+        description="Toggle if gas input is considered during limit calculations.",
+        display_name="Consider gas_in?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_fuel_in" => (
+        default=true,
+        description="Toggle if fuel input is considered during limit calculations.",
+        display_name="Consider fuel_in?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_h2_out" => (
+        default=true,
+        description="Toggle if hydrogen output is considered during limit calculations.",
+        display_name="Consider h2_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_o2_out" => (
+        default=true,
+        description="Toggle if oxygen output is considered during limit calculations.",
+        display_name="Consider o2_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_heat_out" => (
+        default=true,
+        description="Toggle if heat output is considered during limit calculations.",
+        display_name="Consider heat_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_heat_ht_out" => (
+        default=true,
+        description="Toggle if HT heat output is considered during limit calculations.",
+        display_name="Consider heat_ht_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_heat_lt_out" => (
+        default=true,
+        description="Toggle if LT heat output is considered during limit calculations.",
+        display_name="Consider heat_lt_out?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "consider_m_heat_in" => (
+        default=true,
+        description="Toggle if heat input is considered during limit calculations.",
+        display_name="Consider heat_in?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Maps a vector of boolean values to integers.
 

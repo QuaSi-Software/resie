@@ -1,195 +1,99 @@
-ReSiE balanceWarn log file of simulation started at: 2025-09-01 10:30:28
+ReSiE balanceWarn log file of simulation started at: 2000-01-01 00:00:00
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 0: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 0: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 900: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 900: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 1800: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 1800: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 2700: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 2700: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 3600: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 3600: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 4500: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 4500: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 5400: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 5400: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 6300: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 6300: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 7200: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 7200: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 8100: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 8100: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 9000: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 9000: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 9900: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 9900: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 10800: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 10800: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 11700: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 11700: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 12600: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 12600: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 13500: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 13500: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 14400: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 14400: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 15300: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 15300: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 16200: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 16200: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 17100: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 17100: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 18000: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 18000: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 18900: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 18900: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 19800: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 19800: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 20700: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 20700: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 21600: -1125.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 21600: -1125.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 22500: -1125.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 22500: -1125.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 23400: -1125.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 23400: -1125.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 24300: -1125.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 24300: -1125.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 25200: -1125.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 25200: -1125.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 26100: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 26100: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 27000: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 27000: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 27900: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 27900: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 28800: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 28800: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 29700: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 29700: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 30600: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 30600: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 31500: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 31500: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 32400: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 32400: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 33300: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 33300: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 34200: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 34200: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 35100: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 35100: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 36000: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 36000: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 36900: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 36900: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 37800: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 37800: -900.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 38700: -900.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 38700: -900.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 39600: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 39600: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 40500: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 40500: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 41400: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 41400: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 42300: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 42300: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 43200: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 43200: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 44100: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 44100: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 45000: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 45000: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 45900: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 45900: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 46800: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 46800: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 47700: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 47700: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 48600: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 48600: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 49500: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 49500: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 50400: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 50400: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 51300: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 51300: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 52200: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 52200: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 53100: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 53100: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 54000: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 54000: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 54900: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 54900: -225.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 55800: -225.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 55800: -225.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 56700: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 56700: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 57600: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 57600: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 58500: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 58500: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 59400: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 59400: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 60300: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 60300: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 61200: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 61200: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 62100: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 62100: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 63000: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 63000: -150.0
-[BalanceWarning] Balance for component TST_DEM_H2_01 was not zero in timestep 63900: -150.0
-[BalanceWarning] Balance for component TST_01_ELT_01_ELY was not zero in timestep 63900: -150.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 64800: -375.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 64800: -375.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 65700: -375.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 65700: -375.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 66600: -375.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 66600: -375.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 67500: -375.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 67500: -375.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 68400: -375.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 68400: -375.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 69300: -750.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 69300: -750.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 70200: -750.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 70200: -750.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 71100: -750.0
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 71100: -750.0
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 72000: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 72000: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 72900: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 72900: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 73800: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 73800: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 74700: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 74700: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 75600: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 75600: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 76500: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 76500: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 77400: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 77400: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 78300: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 78300: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 79200: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 79200: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 80100: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 80100: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 81000: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 81000: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 81900: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 81900: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 82800: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 82800: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 83700: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 83700: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 84600: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 84600: -112.5
-[BalanceWarning] Balance for component TST_DEM_ht_01 was not zero in timestep 85500: -112.5
-[BalanceWarning] Balance for component TST_HP_01 was not zero in timestep 85500: -112.5
+[BalanceWarning] In timestep 2024-01-01T00:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T00:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T00:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T00:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T01:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T01:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T01:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T01:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T02:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T02:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T02:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T02:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T03:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T03:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T03:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T03:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T04:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T04:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T04:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T04:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T05:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T05:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T05:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T05:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T06:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -1125.0
+[BalanceWarning] In timestep 2024-01-01T06:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -1125.0
+[BalanceWarning] In timestep 2024-01-01T06:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -1125.0
+[BalanceWarning] In timestep 2024-01-01T06:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -1125.0
+[BalanceWarning] In timestep 2024-01-01T07:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -1125.0
+[BalanceWarning] In timestep 2024-01-01T07:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T07:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T07:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T08:00:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T08:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T08:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T08:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T09:00:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T09:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T09:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T09:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T10:00:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T10:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T10:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T10:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -900.0
+[BalanceWarning] In timestep 2024-01-01T11:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T11:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T11:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T11:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T12:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T12:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T12:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T12:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T13:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T13:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T13:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T13:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T14:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T14:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T14:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T14:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T15:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T15:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T15:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -225.0
+[BalanceWarning] In timestep 2024-01-01T15:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T16:00:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T16:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T16:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T16:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T17:00:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T17:15:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T17:30:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T17:45:00, the balance in interface TST_01_ELT_01_ELY -> TST_DEM_H2_01 was not zero: -150.0
+[BalanceWarning] In timestep 2024-01-01T18:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -375.0
+[BalanceWarning] In timestep 2024-01-01T18:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -375.0
+[BalanceWarning] In timestep 2024-01-01T18:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -375.0
+[BalanceWarning] In timestep 2024-01-01T18:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -375.0
+[BalanceWarning] In timestep 2024-01-01T19:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -375.0
+[BalanceWarning] In timestep 2024-01-01T19:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -750.0
+[BalanceWarning] In timestep 2024-01-01T19:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -750.0
+[BalanceWarning] In timestep 2024-01-01T19:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -750.0
+[BalanceWarning] In timestep 2024-01-01T20:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T20:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T20:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T20:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T21:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T21:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T21:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T21:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T22:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T22:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T22:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T22:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T23:00:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T23:15:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T23:30:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5
+[BalanceWarning] In timestep 2024-01-01T23:45:00, the balance in interface TST_HP_01 -> TST_DEM_ht_01 was not zero: -112.5

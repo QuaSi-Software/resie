@@ -1,5 +1,5 @@
 #! format: off
-const FIXED_SUPPLY_PARAMETERS = Dict(
+const FIXED_SUPPLY_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         description="Medium of the supply (e.g. electricity, heat, gas, etc.)",
         display_name="Medium",
@@ -118,6 +118,52 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         unit="J/(kg*K)"
     ),
 )
+
+const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fixed", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "unmet_energy_price_profile_file_path" => nothing,
+        "unmet_energy_price_profile_scale" => 1.0,
+        "constant_unmet_energy_price" => 0.0,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
+    ),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_supply or scale)"
+    ),
+)
+
+const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
+    Dict{String,Any}(
+        "energy_emissions_profile_file_path" => nothing,
+        "energy_emissions_profile_scale" => 1.0,
+        "constant_energy_emissions" => nothing,
+        "energy_emissions_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_supply or scale)"
+    )
+)
 #! format: on
 
 """
@@ -139,6 +185,9 @@ mutable struct FixedSupply <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
@@ -158,8 +207,16 @@ mutable struct FixedSupply <: Component
     end
 end
 
-function component_parameters(x::Type{FixedSupply})::Dict{String,NamedTuple}
-    return deepcopy(FIXED_SUPPLY_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{FixedSupply})::Dict{String,Any}
+    return deepcopy(FIXED_SUPPLY_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{FixedSupply})::Dict{String,Any}
+    return deepcopy(FIXED_SUPPLY_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{FixedSupply})::Dict{String,Any}
+    return deepcopy(FIXED_SUPPLY_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -176,8 +233,17 @@ function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param
 end
 
 function validate_config(x::Type{FixedSupply}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(FixedSupply))
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(FixedSupply)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FixedSupply)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FixedSupply)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String,Any},
@@ -195,6 +261,8 @@ function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
+            params["economic_parameters"],
+            params["emissions_parameters"],
             energy_profile,                          # energy_profile
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor
@@ -254,6 +322,14 @@ end
 function process(unit::FixedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     add!(outface, unit.supply, nothing, unit.temperature)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::FixedSupply)
+    if unit.constant_supply !== nothing
+        return unit.supply
+    else
+        return unit.scaling_factor
+    end
 end
 
 function output_values(unit::FixedSupply)::Vector{String}

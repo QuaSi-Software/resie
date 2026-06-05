@@ -5,6 +5,7 @@
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
         "csv_time_unit": "date",
+        "csv_output": "custom",
         "csv_output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1:IN",
@@ -15,7 +16,8 @@
             "TST_DEM_01": ["Temperature"],
             "TST_SRC_01": ["Temperature", "Max_Energy"]
         },
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_HP_01": ["m_h_w_lt1:IN"]},
                 "axis": "left",

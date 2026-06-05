@@ -3,8 +3,10 @@
         "csv_output_file": "./test/scenarios/2_transformer_limited/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/2_transformer_limited/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/2_transformer_limited/sankey_plot.html",
         "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_DEM_ht_01": ["Demand", "m_h_w_ht1:IN"],
             "TST_DEM_H2_01": ["Demand", "m_c_g_h2:IN"],
@@ -12,7 +14,8 @@
             "TST_01_ELT_01_ELY": ["m_h_w_lt1:OUT", "m_c_g_h2:OUT"]
         },
         "output_plot_file": "./test/scenarios/2_transformer_limited/output_plot.html",
-        "output_plot": { 
+        "output_plot": "custom",
+        "output_plot_spec": { 
             "1": {
                 "key": {"TST_DEM_ht_01": ["Demand"]},
                 "axis": "left",
@@ -81,22 +84,19 @@
             "scale": 3000
         },
         "TST_DEM_O2_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_c_g_o2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         },
         "TST_GRI_EL_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
-            "output_refs": ["TST_HP_01"],
-            "is_source": true
+            "output_refs": ["TST_HP_01"]
         },
         "TST_GRI_EL_02": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
-            "output_refs": ["TST_01_ELT_01_ELY"],
-            "is_source": true
+            "output_refs": ["TST_01_ELT_01_ELY"]
         },
         "TST_HP_01": {
             "type": "HeatPump",

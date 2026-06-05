@@ -34,10 +34,9 @@ relevant when the sun is low.
 - 'zenith::Float64': Zenith of the sun in degrees.
 - 'azimuth::Float64': Azimuth of the sun in degrees.
 """
-function sun_position(dt::DateTime, time_step_seconds::Number, longitude::Number, 
-                      latitude::Number, time_zone::Number=0, pressure::Number=1.0, 
+function sun_position(dt::DateTime, time_step_seconds::Number, longitude::Number,
+                      latitude::Number, time_zone::Number=0, pressure::Number=1.0,
                       temperature::Number=10.9)
-
     longitude = deg2rad(longitude)
     latitude = deg2rad(latitude)
 
@@ -142,8 +141,8 @@ All angles are in degrees and irradiances in W/m².
 - 'solar_azimuth::Float64': Azimuth of the sun in degrees.
 """
 function irr_in_plane(sim_params::Dict{String,Any}, tilt_angle::Number, azimuth_angle::Number,
-                      beam_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, 
-                      dni::Union{Float32,Nothing}=nothing, pressure::Number=1.0, temperature::Number=10.9, 
+                      beam_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number,
+                      dni::Union{Float32,Nothing}=nothing, pressure::Number=1.0, temperature::Number=10.9,
                       ground_reflectance::Number=0.2, zenith_threshold_for_zero_dni::Number=89.5)
 
     # get sunrise and senset to adjust time_step length from sunrise to end of time_step and 
@@ -153,7 +152,7 @@ function irr_in_plane(sim_params::Dict{String,Any}, tilt_angle::Number, azimuth_
         ss = sim_params["weather_data"].sunset.data[sim_params["current_date"]]
     else
         sr, ss = get_sunrise_sunset(sim_params["current_date"], sim_params["latitude"],
-                                    sim_params["longitude"], sim_params["timezone"],
+                                    sim_params["longitude"], sim_params["time_zone"],
                                     pressure, temperature)
     end
     sr = convert_decimal_time_to_datetime(sim_params["current_date"], sr)
@@ -170,7 +169,7 @@ function irr_in_plane(sim_params::Dict{String,Any}, tilt_angle::Number, azimuth_
 
     solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], new_time_step,
                                                sim_params["longitude"], sim_params["latitude"],
-                                               sim_params["timezone"], pressure, temperature)
+                                               sim_params["time_zone"], pressure, temperature)
 
     # calculate angle of incidence in degrees on the collector plane
     aoi = acosd(cosd(tilt_angle) * cosd(solar_zenith) +
@@ -263,9 +262,8 @@ location.
 """
 function get_sunrise_sunset(dt::DateTime, latitude::Number, longitude::Number,
                             time_zone::Number, pressure::Number=1.0, temperature::Number=10.9)
-
     sunrise_decimal = try
-        find_zero(time_decimal -> sun_position_itt(dt, time_decimal, longitude, latitude, 
+        find_zero(time_decimal -> sun_position_itt(dt, time_decimal, longitude, latitude,
                                                    time_zone, 90, pressure, temperature),
                   (0, 12),
                   Bisection())
@@ -273,7 +271,7 @@ function get_sunrise_sunset(dt::DateTime, latitude::Number, longitude::Number,
         0.0
     end
     sunset_decimal = try
-        find_zero(time_decimal -> sun_position_itt(dt, time_decimal, longitude, latitude, 
+        find_zero(time_decimal -> sun_position_itt(dt, time_decimal, longitude, latitude,
                                                    time_zone, 90, pressure, temperature),
                   (12, 24),
                   Bisection())
@@ -306,10 +304,9 @@ Can be used to solve for sunrise and sunset.
 # Returns
 - 'Float64': Difference between zenith of the sun and target_zenith in degrees.
 """
-function sun_position_itt(dt::DateTime, time_decimal::Number, longitude::Number, 
-                          latitude::Number, time_zone::Number=0, target_zenith::Number=90, 
+function sun_position_itt(dt::DateTime, time_decimal::Number, longitude::Number,
+                          latitude::Number, time_zone::Number=0, target_zenith::Number=90,
                           pressure::Number=1.0, temperature::Number=10.9)
-
     dt = convert_decimal_time_to_datetime(dt, time_decimal)
     solar_zenith, _ = sun_position(dt, 0, longitude, latitude, time_zone, pressure, temperature)
     return solar_zenith - target_zenith

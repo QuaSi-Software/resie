@@ -1,12 +1,13 @@
 {
     "io_settings": {
+        "fixed_output_precision": 10,
         "sankey_plot": "default",
         "sankey_plot_file": "./test/scenarios/low_ex_district_heating/sankey_plot.html",
         "output_plot": "all_incl_flows",
         "output_plot_file": "./test/scenarios/low_ex_district_heating/output_plot.html",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/low_ex_district_heating/auxiliary_info.md",
-        "csv_output_keys": "nothing"
+        "csv_output": "nothing"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -139,12 +140,11 @@
             }
         },
         "GRI_Power_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "BUS_Power_Houses"
             ],
-            "medium": "electricity",
-            "is_source": true
+            "medium": "electricity"
         },
         "TB_House_01": {
             "type": "ThermalBooster",
@@ -235,20 +235,18 @@
             "nr_optimisation_passes": 10
         },
         "GRI_Power_02": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
-            "medium": "electricity",
-            "is_source": true
+            "medium": "electricity"
         },
         "GRI_Air": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
             "medium": "ambient_air",
-            "is_source": true,
             "temperature_profile_file_path": "./profiles/examples/district/ambient_temperature_TRY2015_Stuttgart.prf"
         },
         "BFT_DistrictHeating_LowEx": {
@@ -323,10 +321,9 @@
             "scale": 350
         },
         "GRO_Power": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "electricity",
-            "is_source": false
+            "medium": "electricity"
         }
     }
 }
