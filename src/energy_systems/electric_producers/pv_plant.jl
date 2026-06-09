@@ -44,6 +44,7 @@ const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fi
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
         "capex_price_change_rate_per_year" => 0.0,
         "maintenance_inspection_rate_per_year" => 0.0,
         "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -67,6 +68,7 @@ const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_
 
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(

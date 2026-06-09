@@ -182,7 +182,8 @@ function get_embodied_emissions_from_component(component::EnergySystems.Componen
     emissions_per_year = zeros(Float64, observation_period)
 
     # calculate initial emissions
-    emissions_first_year = component.emissions_parameters["embodied_emissions_specific"](emissions_reference) # € at time 0
+    emissions_first_year = component.emissions_parameters["embodied_emissions_specific"](component.emissions_parameters["embodied_emissions_specific_scale"] *
+                                                                                         emissions_reference) # € at time 0
     emissions_per_year[1] = emissions_first_year
 
     # calculate emissions of replacements and treat them as credits
