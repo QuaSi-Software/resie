@@ -2017,8 +2017,12 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         # check if it is required but has a value of nothing (meaning both the default is
         # nothing and no value was given). but also check if conditionals would "turn off"
         # the parameter in any case, in which case the value does not matter
-        if type_def[name].required && value === nothing && conditionals_apply(name, extracted, type_def)
-            throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
+        if type_def[name].required && value === nothing 
+            if conditionals_apply(name, extracted, type_def)
+                throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
+            else
+                continue
+            end
         end
 
         # check, for parameters with field options, if the value is one of the options
