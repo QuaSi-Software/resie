@@ -13,7 +13,19 @@
         "output_plot_file": "./output/output_plot.html",
         "output_plot_time_unit": "date",
         "output_plot": "all_incl_flows",
-        "plot_weather_data": false
+        "plot_weather_data": false,
+        "plot_economic_cashflows": true,
+        "economic_plot_cashflows_file_path": "./output/economic_results_cashflows.html",
+        "plot_economic_present_values": true,
+        "economic_plot_present_values_file_path": "./output/economic_results_present_values.html",
+        "output_economic_CSV": true,
+        "economic_CSV_file_path": "./output/economic_results.csv",
+        "plot_emission_results": true,
+        "emissions_plot_file_path": "./output/emissions_plot.html",
+        "output_emissions_CSV": true,
+        "emissions_CSV_file_path": "./output/emissions_results.csv",
+        "plot_price_and_emission_profiles": false,
+        "price_and_emission_profile_file_path":  "./output/price_and_emissions_profiles.html"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -49,6 +61,7 @@
                 "lifetime_years": 20,
                 "constant_energy_price": 0.0,
                 "capex_specific": "power_func:311.0,0.92",
+                "capex_specific_scale": 1.0,
                 "capex_price_change_rate_per_year": -0.02,
                 "maintenance_inspection_rate_per_year": 0.01,
                 "maintenance_inspection_price_change_rate_per_year": 0.0,
@@ -131,6 +144,7 @@
             "economic_parameters": {
                 "lifetime_years": 20,
                 "capex_specific": "power_func:8832,0.59",
+                "capex_specific_scale": 1.0,
                 "capex_price_change_rate_per_year": 0.0,
                 "maintenance_inspection_rate_per_year": 0.0,
                 "maintenance_inspection_price_change_rate_per_year": 0.0,
@@ -169,6 +183,7 @@
             "economic_parameters": {
                 "lifetime_years": 20,
                 "capex_specific": "power_func:8832,0.59",
+                "capex_specific_scale": 1.0,
                 "capex_price_change_rate_per_year": 0.0,
                 "maintenance_inspection_rate_per_year": 0.0,
                 "maintenance_inspection_price_change_rate_per_year": 0.0,
@@ -207,6 +222,7 @@
             "economic_parameters": {
                 "lifetime_years": 20,
                 "capex_specific": "power_func:43.8,0.71",
+                "capex_specific_scale": 1.0,
                 "capex_price_change_rate_per_year": -0.01,
                 "maintenance_inspection_rate_per_year": 0.015,
                 "maintenance_inspection_price_change_rate_per_year": 0.0,
