@@ -82,7 +82,7 @@ const BATTERY_COMPONENT_PARAMETERS = Dict(
             ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
-        type=Float64,
+        type=Floathing,
         json_type="number",
         unit="-"
     ),
@@ -96,7 +96,7 @@ const BATTERY_COMPONENT_PARAMETERS = Dict(
             ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
-        type=Float64,
+        type=Floathing,
         json_type="number",
         unit="-"
     ),
