@@ -324,7 +324,7 @@ function compare(name, subdir)
                 if length(diffs) > 0
                     push!(files_with_diff, name)
                 end
-            elseif read(file_actual) != read(file_ref)
+            elseif replace(read(file_actual, String), "\r" => "") != replace(read(file_ref, String), "\r" => "")
                 push!(files_with_diff, name)
             end
         else

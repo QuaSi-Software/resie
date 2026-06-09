@@ -8,5 +8,5 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\output\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\demand_only\sankey_plot.html
-[Info] CSV-file with outputs written to .\test\scenarios\demand_only\out.csv
+[Info] CSV-file with outputs written to ./test/scenarios/demand_only/out.csv
 [Info] general log saved to .\test\scenarios\demand_only\general.log
