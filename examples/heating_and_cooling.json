@@ -3,9 +3,9 @@
         "csv_output_file": "./output/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
-        "sankey_plot_file": "./output/sankey_plot.html",
+        "sankey_plot_file": "./output/output_sankey.html",
         "sankey_plot": "default",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot_file": "./output/output_plot.html",
         "output_plot": "all_incl_flows"
     },
@@ -118,18 +118,16 @@
             "heat_losses_factor": 1.0
         },
         "TST_EL_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_EL_BUS_01"
-            ],
-            "is_source": true
+            ]
         },
         "TST_TH_GRO_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_h_w_lt2",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         }
     }
 }

@@ -2,9 +2,11 @@
     "io_settings": {
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/chpp_two_hyst//auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/chpp_two_hyst/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_file": "./test/scenarios/chpp_two_hyst/out.csv",
+        "csv_output": "custom",
         "csv_output_keys": {
             "m_h_w_ht1":  ["TST_CHP_01->TST_DEM_01", "TST_CHP_01->TST_BT_01", "TST_CHP_01->TST_GRO_01"]
         },
@@ -35,16 +37,14 @@
             "scale" : 200.0
         },
         "TST_GRI_01" : {
-            "type" : "GridConnection",
+            "type" : "GridInput",
             "medium" : "m_c_g_natgas",
-            "output_refs" : ["TST_CHP_01"],
-            "is_source" : true
+            "output_refs" : ["TST_CHP_01"]
         },
         "TST_GRO_01" : {
-            "type" : "GridConnection",
+            "type" : "GridOutput",
             "medium" : "m_h_w_ht1",
-            "output_refs" : [],
-            "is_source" : false
+            "output_refs" : []
         },
         "TST_BT_01": {
             "type": "BufferTank",
@@ -71,12 +71,15 @@
         },
         "TST_BAT_01": {
             "type": "Battery",
-            "medium": "m_e_ac_230v",
+            "m_el_in": "m_e_ac_230v",
+            "m_el_out": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_02"
             ],
             "capacity": 8000,
-            "load": 4000
+            "initial_load": 0.5,
+            "charge_efficiency": 1.0,
+            "discharge_efficiency": 1.0
         },
         "TST_BUS_01": {
             "type": "Bus",

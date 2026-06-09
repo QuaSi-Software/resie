@@ -1,0 +1,32 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] Successfully calculated g-function for geothermal probe field "TST_TH_GTP_01" with 1 probes.
+[Info] Auxiliary info dumped to file .\test\scenarios\reversible_heat_pump\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 1.049 s. ETA: 20.3125 s
+[Info] Progress: 66/672 in 0.006 s. ETA: 0.1102 s
+[Info] Progress: 99/672 in 0.006 s. ETA: 0.1042 s
+[Info] Progress: 132/672 in 0.009 s. ETA: 0.1473 s
+[Info] Progress: 165/672 in 0.005 s. ETA: 0.0768 s
+[Info] Progress: 198/672 in 0.005 s. ETA: 0.0718 s
+[Info] Progress: 231/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 264/672 in 0.01 s. ETA: 0.1236 s
+[Info] Progress: 297/672 in 0.013 s. ETA: 0.1477 s
+[Info] Progress: 330/672 in 0.003 s. ETA: 0.0311 s
+[Info] Progress: 363/672 in 0.008 s. ETA: 0.0749 s
+[Info] Progress: 396/672 in 0.01 s. ETA: 0.0836 s
+[Info] Progress: 429/672 in 0.006 s. ETA: 0.0442 s
+[Info] Progress: 462/672 in 0.008 s. ETA: 0.0509 s
+[Info] Progress: 495/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 528/672 in 0.009 s. ETA: 0.0393 s
+[Info] Progress: 561/672 in 0.007 s. ETA: 0.0235 s
+[Info] Progress: 594/672 in 0.007 s. ETA: 0.0165 s
+[Info] Progress: 627/672 in 0.006 s. ETA: 0.0082 s
+[Info] Progress: 660/672 in 0.098 s. ETA: 0.0356 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\reversible_heat_pump\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\reversible_heat_pump\sankey_plot.html
+[Info] general log saved to .\test\scenarios\reversible_heat_pump\general.log

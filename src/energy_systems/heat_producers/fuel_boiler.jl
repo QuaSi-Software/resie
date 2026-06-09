@@ -1,3 +1,130 @@
+#! format: off
+const FUEL_BOILER_COMPONENT_PARAMETERS = Dict(
+    "m_fuel_in" => (
+        description="Fuel input medium",
+        display_name="Medium fuel_in",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "linear_interface" => (
+        default="heat_out",
+        description="Which interface is considered linear relative to the part-load-ratio",
+        display_name="Linear interface",
+        options=["fuel_in", "heat_out"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "efficiency_fuel_in" => (
+        default="const:1.1",
+        description="Efficiency function for the fuel input",
+        display_name="Efficiency fuel_in",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_heat_out" => (
+        default="const:1.0",
+        description="Efficiency function for the heat output",
+        display_name="Efficiency heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "power_th" => (
+        default=nothing,
+        description="Design thermal power",
+        display_name="Thermal power",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "min_power_fraction" => (
+        default=0.1,
+        description="Minimum part-load ratio to operate",
+        display_name="Min. power fraction",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "nr_discretization_steps" => (
+        default=30,
+        description="Number of intervals for interpolated efficiency functions",
+        display_name="Nr. discretization steps",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        unit="-"
+    ),
+)
+
+const FUEL_BOILER_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  20,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const FUEL_BOILER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
+#! format: on
+
 """
 Implementation of a boiler producing heat (as hot water) from the chemical energy in a fuel.
 
@@ -23,6 +150,9 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -38,39 +168,73 @@ mutable struct FuelBoiler <: Component
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_fuel_in = Symbol(config["m_fuel_in"])
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        register_media([m_fuel_in, m_heat_out])
-        interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
-
-        linear_interface = Symbol(replace(default(config, "linear_interface", "heat_out"), "m_" => ""))
-        if !(linear_interface in interface_list)
-            @error "Given unknown interface name $linear_interface designated as linear " *
-                   "for component $uac"
-        end
-
-        efficiencies = Dict{Symbol,Function}(
-            Symbol("fuel_in") => parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.1")),
-            Symbol("heat_out") => parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
-        )
-
-        return new(uac,
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,
-                   InterfaceMap(m_fuel_in => nothing),
-                   InterfaceMap(m_heat_out => nothing),
-                   m_fuel_in,
-                   m_heat_out,
-                   config["power_th"] / efficiencies[Symbol("heat_out")](1.0),
-                   linear_interface,
-                   default(config, "min_power_fraction", 0.1),
-                   efficiencies,
-                   interface_list,
-                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
-                   1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
-                   default(config, "output_temperature", nothing),
-                   0.0)  # losses
+        return new(SSOT_parameter_constructor(FuelBoiler, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_EMISSIONS_PARAMETERS)
+end
+
+function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(FuelBoiler)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FuelBoiler)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FuelBoiler)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
+end
+
+function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    m_fuel_in = Symbol(params["m_fuel_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
+    linear_interface = Symbol(params["linear_interface"])
+
+    efficiencies = Dict{Symbol,Function}(
+        Symbol("fuel_in") => params["efficiency_fuel_in"],
+        Symbol("heat_out") => params["efficiency_heat_out"],
+    )
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_fuel_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_fuel_in,
+            m_heat_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
+            params["power_th"] / efficiencies[Symbol("heat_out")](1.0),
+            linear_interface,
+            params["min_power_fraction"],
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / params["nr_discretization_steps"], # discretization_step
+            params["output_temperature"],
+            0.0) # losses
 end
 
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
@@ -92,16 +256,17 @@ end
 """
 Set maximum energies that can be taken in and put out by the unit
 """
-function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
+function set_max_energies!(unit::FuelBoiler, is_transformer_potential::Bool, fuel_in::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature;
+                    is_transformer_potential=is_transformer_potential)
 end
 
 function calculate_energies(unit::FuelBoiler,
                             sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 
@@ -112,9 +277,9 @@ function potential(unit::FuelBoiler, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2])
+        set_max_energies!(unit, true, energies[1], energies[2])
     end
 end
 
@@ -123,7 +288,7 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         unit.losses = 0.0
-        set_max_energies!(unit, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0)
         return
     end
 
@@ -131,10 +296,16 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
     unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::FuelBoiler)
     return unit.min_power_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::FuelBoiler)
+    return unit.power # [W]
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}

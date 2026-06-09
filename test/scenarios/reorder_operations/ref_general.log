@@ -1,0 +1,45 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
+[Info] The timestamp of the profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation (extensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The timestamp of the profile at .\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted by 1800 seconds.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature (intensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The timestamp of the profile at .\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted by 1800 seconds.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed (intensive profile) was shifted to fit the simulation start time and was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_classic interpolation.
+[Info] The profile at sunrise_times (intensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using stepwise interpolation.
+[Info] The profile at sunset_times (intensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using stepwise interpolation.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:DiffuseHorizontalIrradiation (extensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_solar_radiation interpolation.
+[Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:BeamHorizontalIrradiation (extensive profile) was converted from the profile timestep 3600 seconds to the simulation timestep of 900 seconds using linear_solar_radiation interpolation.
+[Info] Auxiliary info dumped to file .\test\scenarios\reorder_operations\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 0.035 s. ETA: 0.6777 s
+[Info] Progress: 66/672 in 0.012 s. ETA: 0.2204 s
+[Info] Progress: 99/672 in 0.017 s. ETA: 0.2952 s
+[Info] Progress: 132/672 in 0.014 s. ETA: 0.2291 s
+[Info] Progress: 165/672 in 0.012 s. ETA: 0.1844 s
+[Info] Progress: 198/672 in 0.011 s. ETA: 0.1580 s
+[Info] Progress: 231/672 in 0.007 s. ETA: 0.0935 s
+[Info] Progress: 264/672 in 0.019 s. ETA: 0.2349 s
+[Info] Progress: 297/672 in 0.02 s. ETA: 0.2273 s
+[Info] Progress: 330/672 in 0.014 s. ETA: 0.1451 s
+[Info] Progress: 363/672 in 0.01 s. ETA: 0.0936 s
+[Info] Progress: 396/672 in 0.006 s. ETA: 0.0502 s
+[Info] Progress: 429/672 in 0.013 s. ETA: 0.0957 s
+[Info] Progress: 462/672 in 0.013 s. ETA: 0.0827 s
+[Info] Progress: 495/672 in 0.124 s. ETA: 0.6651 s
+[Info] Progress: 528/672 in 0.01 s. ETA: 0.0436 s
+[Info] Progress: 561/672 in 0.01 s. ETA: 0.0336 s
+[Info] Progress: 594/672 in 0.015 s. ETA: 0.0355 s
+[Info] Progress: 627/672 in 0.005 s. ETA: 0.0068 s
+[Info] Progress: 660/672 in 0.018 s. ETA: 0.0065 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\reorder_operations\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\reorder_operations\sankey_plot.html
+[Info] general log saved to .\test\scenarios\reorder_operations\general.log

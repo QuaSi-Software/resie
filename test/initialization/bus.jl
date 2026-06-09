@@ -8,10 +8,9 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
-            "is_source" => true,
         ),
         "TST_PVP_01" => Dict{String,Any}(
             "type" => "PVPlant",
@@ -27,13 +26,14 @@ function energy_system()::Dict{String,Any}
             "type" => "Battery",
             "output_refs" => ["TST_BUS_01"],
             "capacity" => 10000,
-            "load" => 5000,
+            "initial_load" => 0.5,
+            "charge_efficiency" => 1.0,
+            "discharge_efficiency" => 1.0,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
             "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "scale" => 1,
             "constant_demand" => 1000,
         ),

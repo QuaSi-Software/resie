@@ -18,6 +18,7 @@ type.
 """
 mutable struct SimulationRun
     parameters::Dict{String,Any}
+    io_settings::Dict{String,Any}
     components::Dict{String,Any}
     order_of_operations::Vector{Any}
 end
@@ -81,6 +82,8 @@ using .EnergySystems
 
 include("project_loading.jl")
 include("file_output.jl")
+include("economy.jl")
+include("emissions.jl")
 
 include("resie_logger.jl")
 using .Resie_Logger
@@ -92,152 +95,45 @@ using Interpolations
 using JSON
 using Dates
 
-const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
-const SECONDS_PER_HOUR::Float64 = 3600.0
-
 """
-    get_simulation_params(project_config)
-
-Constructs the dictionary of simulation parameters.
-
-# Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
-# Returns
--`Dict{String,Any}`: The simulation parameter dictionary
-"""
-function get_simulation_params(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
-
-    sim_params = Dict{String,Any}(
-        "time" => 0,
-        "time_since_output" => 0,
-        "current_date" => start_date,
-        "time_step_seconds" => time_step,
-        "number_of_time_steps" => nr_of_steps,
-        "number_of_time_steps_output" => nr_of_steps_output,
-        "start_date" => start_date,
-        "start_date_output" => start_date_output,
-        "end_date" => end_date,
-        "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
-        "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
-        "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
-        "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
-        "step_info_interval" => default(project_config["io_settings"],
-                                        "step_info_interval",
-                                        Integer(floor(nr_of_steps / 20))),
-        "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
-                                              false),
-    )
-
-    # add helper functions to convert power to work and vice-versa. this uses the time step
-    # of the simulation as the duration required for the conversion.
-    sim_params["watt_to_wh"] = function (watts::Float64)
-        return watts * time_step * HOURS_PER_SECOND
-    end
-    sim_params["wh_to_watts"] = function (wh::Float64)
-        return wh * SECONDS_PER_HOUR / time_step
-    end
-
-    # add helper function for using paths, absolute or relative to the run base path
-    if haskey(project_config["io_settings"], "base_path")
-        run_base_path = abspath(project_config["io_settings"]["base_path"])
-    else
-        run_base_path = abspath(joinpath(dirname(@__FILE__), ".."))
-    end
-    sim_params["run_path"] = function (path)
-        return isabspath(path) ? path : abspath(joinpath(run_base_path, path))
-    end
-
-    # load weather profiles accesible for all components
-    weather_file_path = default(project_config["simulation_parameters"],
-                                "weather_file_path",
-                                nothing)
-
-    if weather_file_path !== nothing
-        weather_interpolation_type_solar = default(project_config["simulation_parameters"],
-                                                   "weather_interpolation_type_solar", "linear_solar_radiation")
-        weather_interpolation_type_general = default(project_config["simulation_parameters"],
-                                                     "weather_interpolation_type_general", "linear_classic")
-        # WeatherData() writes the lat and long to sim_params if they are not given in the input file
-        sim_params["weather_data"] = WeatherData(sim_params["run_path"](weather_file_path),
-                                                 sim_params,
-                                                 guess_file_format(sim_params["run_path"](weather_file_path)),
-                                                 weather_interpolation_type_solar,
-                                                 weather_interpolation_type_general)
-    end
-
-    return sim_params
-end
-
-"""
-    prepare_inputs(project_config)
-
-Construct and prepare parameters, energy system components and the order of operation.
-
-# Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
-# Returns
--`Dict{String,Any}`: Simulation parameters
--`Grouping`: The constructed energy system components
--`OrderOfOperations`: Order of operations
-"""
-function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
-    sim_params = get_simulation_params(project_config)
-    sim_params["run_ID"] = run_ID
-
-    components = load_components(project_config["components"], sim_params)
-
-    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        operations = load_order_of_operations(project_config["order_of_operation"], components)
-        @info "The order of operations was successfully imported from the input file.\n" *
-              "Note that the order of operations has a major impact on the simulation " *
-              "result and should only be changed by experienced users!"
-    else
-        operations = calculate_order_of_operations(components)
-    end
-
-    return sim_params, components, operations
-end
-
-"""
-    run_simulation_loop()
+    run_simulation_loop(sim_params, io_settings, components, operations)
 
 Performs the simulation as loop over time steps and records outputs.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
+-`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
 -`operations::OrderOfOperations`:: Order of operations
 """
-function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
-                             sim_params::Dict{String,Any},
+function run_simulation_loop(sim_params::Dict{String,Any},
+                             io_settings::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
+    output_keys_lineplot,
+    output_keys_to_CSV,
+    output_keys_economic_emissions = get_output_keys(io_settings,
+                                                     sim_params["economic_parameters"],
+                                                     sim_params["emissions_parameters"],
+                                                     components)
+    all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
+                                                                                            String[]),
+                                                                                  something(output_keys_economic_emissions,
+                                                                                            String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
-    do_create_plot_weather = weather_data_keys !== nothing &&
-                             default(project_config["io_settings"], "plot_weather_data", false)
-    do_write_CSV_weather = weather_data_keys !== nothing &&
-                           default(project_config["io_settings"], "csv_output_weather", false)
+    do_create_plot_weather = weather_data_keys !== nothing && io_settings["plot_weather_data"]
+    do_write_CSV_weather = weather_data_keys !== nothing && io_settings["csv_output_weather"]
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
-    do_write_CSV_continuously = default(project_config["io_settings"], "write_csv_continuously", false)
-    csv_output_file_path = default(project_config["io_settings"],
-                                   "csv_output_file",
-                                   "./output/out.csv")
-    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
-    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
-        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(InputError())
-    end
+    do_write_CSV_continuously = io_settings["write_csv_continuously"]
+    csv_output_file_path = io_settings["csv_output_file"]
+    csv_time_unit = io_settings["csv_time_unit"]
+    do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
+    do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
 
     # Initialize the arrays for output
-    output_data_lineplot = do_create_plot_data ?
-                           zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_lineplot)) :
-                           nothing
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
@@ -245,6 +141,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
                                 1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
+    output_data_all_requested = do_create_plot_data || do_calculate_economy || do_calculate_emissions ?
+                                zeros(Float64, sim_params["number_of_time_steps_output"],
+                                      1 + length(all_requested_output_keys)) :
+                                nothing
 
     # write CSV file headers
     if do_write_CSV
@@ -255,8 +155,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # check if sankey should be plotted
-    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
-                       project_config["io_settings"]["sankey_plot"] !== "nothing"
+    do_create_sankey = haskey(io_settings, "sankey_plot") && io_settings["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get information about all interfaces for Sankey
         nr_of_interfaces,
@@ -268,7 +167,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(project_config, components, operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, operations, sim_params)
 
     @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
@@ -291,12 +190,19 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         perform_operations(components, operations_adjusted, sim_params)
 
         if do_output
-            # check if any component was not balanced
-            warnings = check_balances(components, sim_params["epsilon"])
-            if length(warnings) > 0
-                for (key, balance) in warnings
-                    @balanceWarn "Balance for component $key was not zero in timestep " *
-                                 "$(sim_params["time_since_output"]): $balance"
+            # check if any component and/or interface was not balanced
+            interface_warnings = check_balances_of_interfaces(components, sim_params["epsilon"])
+            component_warnings = check_balances_of_components(components, sim_params["epsilon"])
+            if length(interface_warnings) > 0
+                for (key, balance) in interface_warnings
+                    @balanceWarn "In timestep $(sim_params["current_date"]), the balance in interface " *
+                                 "$key was not zero: $balance"
+                end
+            end
+            if length(component_warnings) > 0
+                for (key, balance) in component_warnings
+                    @error "In timestep $(sim_params["current_date"]), the balance for component " *
+                           "$key was not zero: $balance. This is probably caused by a bug in the component."
                 end
             end
 
@@ -307,12 +213,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                                   output_keys_to_CSV,
                                   weather_CSV_keys,
                                   sim_params,
+                                  io_settings,
                                   csv_time_unit)
             elseif do_write_CSV
                 output_csv[output_steps, :] = write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
                                                                 output_keys_to_CSV,
                                                                 weather_CSV_keys,
                                                                 sim_params,
+                                                                io_settings,
                                                                 csv_time_unit;
                                                                 do_return=true)
             end
@@ -321,14 +229,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_sankey
                 output_interface_values[output_steps, :] = collect_interface_energies(components, nr_of_interfaces)
             end
-
-            # gather output data of each component for line plot
-            if do_create_plot_data
-                output_data_lineplot[output_steps, :] = gather_output_data(output_keys_lineplot,
-                                                                           sim_params["time_since_output"])
-            end
+            # gather output data of weather
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
+            end
+            # gather output data of each component for line plot, economy and emissions
+            if do_create_plot_data || do_calculate_economy || do_calculate_emissions
+                output_data_all_requested[output_steps, :] = gather_output_data(all_requested_output_keys,
+                                                                                sim_params["time_since_output"])
             end
 
             # simulation update
@@ -347,11 +255,29 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                    /
                    sim_params["step_info_interval"])
             @info "Progress: $(steps)/$(sim_params["number_of_time_steps"]) in" *
-                  " $(seconds(now() - start)) s. ETA: $(@sprintf("%.4f", eta)) s"
+                  " $(seconds(now() -  start)) s. ETA: $(@sprintf("%.4f", eta)) s"
             start = now()
         end
     end
     @info "-- Finished time step loop"
+
+    # extract output data per category including the time step in the first column
+    output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
+    function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
+        keys === nothing && return Int[]
+        return 1 .+ [key_indexes[output_key_signature(k)] for k in keys]
+    end
+    time_and_subset_cols(key_indexes, keys) = vcat(1, subset_cols(key_indexes, keys))
+    key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
+
+    if do_calculate_economy || do_calculate_emissions
+        output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
+                                                     time_and_subset_cols(key_indexes, output_keys_economic_emissions)))
+        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emissions,
+                                                                  output_data_economic_emissions)
+        economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
+        emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
+    end
 
     # write output to CSV if not done continuously
     if do_write_CSV && !do_write_CSV_continuously
@@ -359,6 +285,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                           output_keys_to_CSV,
                           weather_CSV_keys,
                           sim_params,
+                          io_settings,
                           csv_time_unit;
                           do_return=false,
                           output_rows=output_csv)
@@ -366,16 +293,16 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
+        output_data_lineplot = Matrix(view(output_data_all_requested, :,
+                                           time_and_subset_cols(key_indexes, output_keys_lineplot)))
         create_profile_line_plots(output_data_lineplot,
                                   output_keys_lineplot,
                                   output_weather_lineplot,
                                   weather_data_keys,
-                                  project_config,
+                                  io_settings,
                                   sim_params)
-        filepath = default(project_config["io_settings"],
-                           "output_plot_file",
-                           "./output/output_plot.html")
-        @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
+        filepath = sim_params["run_path"](io_settings["output_plot_file"])
+        @info "Line plot created and saved to $filepath"
     end
 
     # create Sankey diagram
@@ -385,22 +312,20 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                       output_interface_values,
                       medium_of_interfaces,
                       nr_of_interfaces,
-                      project_config["io_settings"],
+                      io_settings,
                       sim_params)
-        filepath = default(project_config["io_settings"],
-                           "sankey_plot_file",
-                           "./output/output_sankey.html")
-        @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
+        filepath = sim_params["run_path"](io_settings["sankey_plot_file"])
+        @info "Sankey created and saved to $filepath"
     end
 
     if do_write_CSV
-        @info "CSV-file with outputs written to $(sim_params["run_path"](csv_output_file_path))"
+        @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
 
     # plot additional figures potentially available from components after simulation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
+    if io_settings["auxiliary_plots"]
         component_list = []
-        output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
                 push!(component_list, component[2].uac)
@@ -408,9 +333,59 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         end
         if length(component_list) > 0
             @info "(Further) auxiliary plots are saved to folder " *
-                  "$(sim_params["run_path"](output_path)) for the following components: " *
+                  "$(output_path) for the following components: " *
                   "$(join(component_list, ", "))"
         end
+    end
+
+    # output economic results
+    if do_calculate_economy
+        if io_settings["plot_economic_cashflows"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "cashflows")
+            success && @info "Economy plot created and saved to $filepath"
+        end
+
+        if io_settings["plot_economic_present_values"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_present_values_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "present_values")
+            success && @info "Economy plot created and saved to $filepath"
+        end
+
+        # export economic results to CSV
+        if io_settings["output_economic_CSV"]
+            filepath = sim_params["run_path"](io_settings["economic_CSV_file_path"])
+            success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+            success && @info "Economic results exported to $filepath"
+        end
+    end
+
+    # output emissions results
+    if do_calculate_emissions
+        # plot figure with yearly emissions
+        if io_settings["plot_emission_results"]
+            filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
+            success = plot_emissions_results(emissions_result, filepath, sim_params,
+                                             io_settings["fixed_output_precision"])
+            success && @info "Emissions plot created and saved to $filepath"
+        end
+
+        if io_settings["output_emissions_CSV"]
+            # export emissions results to CSV
+            filepath = sim_params["run_path"](io_settings["emissions_CSV_file_path"])
+            success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+            success && @info "Emissions results exported to $filepath"
+        end
+    end
+
+    # plot utilized price and emission profiles
+    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
+        filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
+        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
+                                                             io_settings["fixed_output_precision"])
+        success && @info "Utilized price and emission profiles exported as plot to $filepath"
     end
 end
 
@@ -455,13 +430,13 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     end
 
     @info "-- Now preparing inputs"
-    sim_params, components, operations = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+    sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
+    current_runs[run_ID] = SimulationRun(sim_params, io_settings, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, operations)
+    run_simulation_loop(sim_params, io_settings, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     return true
 end

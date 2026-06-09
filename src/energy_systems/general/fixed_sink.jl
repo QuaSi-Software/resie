@@ -1,3 +1,171 @@
+#! format: off
+const FIXED_SINK_COMPONENT_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the sink (e.g. electricity, heat, gas, etc.)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a temperature profile file",
+        display_name="Temperature profile file",
+        required=false,
+        conditionals=[
+            ("temperature_from_global_file", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
+        display_name="Global file temp. key",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_temperature" => (
+        default=nothing,
+        description="Constant temperature value",
+        display_name="Constant temperature",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "energy_profile_file_path" => (
+        default=nothing,
+        description="Path to a profile file with energy values",
+        display_name="Energy profile file",
+        required=false,
+        conditionals=[("constant_demand", "mutex")],
+        validations=[
+            ("at_least_one", "energy_profile_file_path", "constant_demand")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_demand" => (
+        default=nothing,
+        description="Constant demand (power, not work)",
+        display_name="Constant demand",
+        required=false,
+        conditionals=[("energy_profile_file_path", "mutex")],
+        validations=[
+            ("self", "value_gte_num_or_nothing", 0.0),
+            ("at_least_one", "energy_profile_file_path", "constant_demand")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "scale" => (
+        default=1.0,
+        description="Scaling factor for the energy profile",
+        display_name="Energy scale",
+        required=false,
+        conditionals=[("energy_profile_file_path", "is_not_nothing")],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "treat_profile_as_volume_flow_in_qm_per_hour" => (
+        default=false,
+        description="Flag to signify that the profile should be treated as a mass flow " *
+                    "with a unit of [m^3/h]",
+        display_name="Medium density",
+        required=false,
+        conditionals=[("energy_profile_file_path", "is_not_nothing")],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "rho_medium" => (
+        default=nothing,
+        description="Density of the energy carrier medium (if applicable)",
+        display_name="Medium density",
+        required=false,
+        conditionals=[("treat_profile_as_volume_flow_in_qm_per_hour", "is_true")],
+        type=Floathing,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "cp_medium" => (
+        default=nothing,
+        description="Mass-specific thermal capacity of the energy carrier medium " *
+                    "(if applicable)",
+        display_name="Medium th. capacity",
+        required=false,
+        conditionals=[("treat_profile_as_volume_flow_in_qm_per_hour", "is_true")],
+        type=Floathing,
+        json_type="number",
+        unit="J/(kg*K)"
+    ),
+)
+
+const FIXED_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fixed", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "unmet_energy_price_profile_file_path" => nothing,
+        "unmet_energy_price_profile_scale" => 1.0,
+        "constant_unmet_energy_price" => 0.0,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
+    ),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_demand or scale)"
+    ),
+)
+
+const FIXED_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_sink", 
+    Dict{String,Any}(
+        "energy_emissions_credits_profile_file_path" => nothing,
+        "energy_emissions_credits_profile_scale" => 1.0,
+        "constant_energy_emissions_credits" => nothing,
+        "energy_emissions_credits_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_demand or scale)"
+    )
+)
+#! format: on
+
 """
 Implementation of a component modeling a generic fixed sink of a chosen medium.
 
@@ -17,6 +185,9 @@ mutable struct FixedSink <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
@@ -32,38 +203,88 @@ mutable struct FixedSink <: Component
     cp_medium::Floathing
 
     function FixedSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        energy_profile = "energy_profile_file_path" in keys(config) ?
-                         Profile(config["energy_profile_file_path"], sim_params) :
-                         nothing
-
-        constant_temperature,
-        temperature_profile = get_parameter_profile_from_config(config,
-                                                                sim_params,
-                                                                "temperature",
-                                                                "temperature_profile_file_path",
-                                                                "temperature_from_global_file",
-                                                                "constant_temperature",
-                                                                uac)
-        medium = Symbol(config["medium"])
-        register_media([medium])
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_fixed_sink,   # sys_function
-                   medium,          # medium
-                   InterfaceMap(medium => nothing),  # input_interfaces
-                   InterfaceMap(medium => nothing),  # output_interfaces
-                   energy_profile,                   # energy_profile
-                   temperature_profile,              # temperature_profile
-                   default(config, "scale", 1.0),    # scaling_factor
-                   0.0,     # demand
-                   nothing, # temperature
-                   default(config, "constant_demand", nothing),       # constant_demand (power, not work!)
-                   constant_temperature,   # constant_temperature
-                   default(config, "treat_profile_as_volume_flow_in_qm_per_hour", false),
-                   default(config, "rho_medium", nothing),  # [kg/m^3]
-                   default(config, "cp_medium", nothing))   # [J/kgK]
+        return new(SSOT_parameter_constructor(FixedSink, uac, config, sim_params)...)
     end
+end
+
+"""
+A component that models the demand consumers in a building require.
+
+As the simulation does not encompass demand calculations, this is usually taken from other
+tools that calculate the demand before an energy system simulation is performed. These
+profiles usually are normalized to some degree, therefore Demand instances require a scaling
+factor to turn the relative values to absolute values of required energy.
+
+This is an alias to the generic implementation of a fixed sink.
+"""
+const Demand = FixedSink
+
+function component_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{FixedSink})::Dict{String,Any}
+    return deepcopy(FIXED_SINK_EMISSIONS_PARAMETERS)
+end
+
+function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    if param_name == "temperature_from_global_file"
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name == "temperature_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "constant_temperature"
+        return convert(Temperature, default(config, param_name, nothing))
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{FixedSink}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(FixedSink)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FixedSink)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FixedSink)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
+end
+
+function init_from_params(x::Type{FixedSink}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+
+    energy_profile = params["energy_profile_file_path"] !== nothing ?
+                     Profile(params["energy_profile_file_path"], sim_params) :
+                     nothing
+
+    # return tuple in the order expected by new()
+    return (uac,                                     # uac
+            Controller(params["control_parameters"]),
+            sf_fixed_sink,                           # sys_function
+            medium,                                  # medium
+            InterfaceMap(medium => nothing),         # input_interfaces
+            InterfaceMap(medium => nothing),         # output_interfaces
+            params["economic_parameters"],
+            params["emissions_parameters"],
+            energy_profile,                          # energy_profile
+            some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
+            params["scale"],                         # scaling_factor
+            0.0,                                     # demand
+            nothing,                                 # temperature
+            params["constant_demand"],               # constant_demand (power, not work!)
+            params["constant_temperature"],          # constant_temperature
+            params["treat_profile_as_volume_flow_in_qm_per_hour"],
+            params["rho_medium"],
+            params["cp_medium"])
 end
 
 function initialise!(unit::FixedSink, sim_params::Dict{String,Any})
@@ -115,6 +336,14 @@ function process(unit::FixedSink, sim_params::Dict{String,Any})
     sub!(inface, unit.demand, unit.temperature, nothing)
 end
 
+function get_reference_for_capex_and_embodied_emissions(unit::FixedSink)
+    if unit.constant_demand !== nothing
+        return unit.demand
+    else
+        return unit.scaling_factor
+    end
+end
+
 function output_values(unit::FixedSink)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
         return [string(unit.medium) * ":IN",
@@ -136,17 +365,5 @@ function output_value(unit::FixedSink, key::OutputKey)::Float64
     end
     throw(KeyError(key.value_key))
 end
-
-"""
-A component that models the demand consumers in a building require.
-
-As the simulation does not encompass demand calculations, this is usually taken from other
-tools that calculate the demand before an energy system simulation is performed. These
-profiles usually are normalized to some degree, therefore Demand instances require a scaling
-factor to turn the relative values to absolute values of required energy.
-
-This is an alias to the generic implementation of a fixed sink.
-"""
-const Demand = FixedSink
 
 export FixedSink, Demand

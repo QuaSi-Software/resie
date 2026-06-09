@@ -2,9 +2,10 @@
         "csv_output_file": "./test/scenarios/secondary_interfaces/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/secondary_interfaces/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/secondary_interfaces/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot_file": "./test/scenarios/secondary_interfaces/output_plot.html",
         "output_plot": "all_incl_flows"
     },
@@ -67,12 +68,11 @@
             "constant_power": 2
         },
         "SRC_GRID": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "BUS_EL"
-            ],
-            "is_source": true
+            ]
         },
         "BUS_EL": {
             "type": "Bus",

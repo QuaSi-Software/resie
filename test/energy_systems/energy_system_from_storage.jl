@@ -35,10 +35,9 @@ function test_run_energy_system_from_storage()
             "high_temperature" => 35.0,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -196,10 +195,9 @@ function test_run_energy_system_from_storage_denied()
             "high_temperature" => 35,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",

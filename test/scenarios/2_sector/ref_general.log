@@ -1,0 +1,31 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] Auxiliary info dumped to file .\test\scenarios\2_sector\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 8.36 s. ETA: 161.8606 s
+[Info] Progress: 66/672 in 0.041 s. ETA: 0.7529 s
+[Info] Progress: 99/672 in 0.008 s. ETA: 0.1389 s
+[Info] Progress: 132/672 in 0.007 s. ETA: 0.1145 s
+[Info] Progress: 165/672 in 0.035 s. ETA: 0.5377 s
+[Info] Progress: 198/672 in 0.009 s. ETA: 0.1293 s
+[Info] Progress: 231/672 in 0.003 s. ETA: 0.0401 s
+[Info] Progress: 264/672 in 0.013 s. ETA: 0.1607 s
+[Info] Progress: 297/672 in 0.004 s. ETA: 0.0455 s
+[Info] Progress: 330/672 in 0.015 s. ETA: 0.1555 s
+[Info] Progress: 363/672 in 0.008 s. ETA: 0.0749 s
+[Info] Progress: 396/672 in 0.007 s. ETA: 0.0585 s
+[Info] Progress: 429/672 in 0.01 s. ETA: 0.0736 s
+[Info] Progress: 462/672 in 0.007 s. ETA: 0.0445 s
+[Info] Progress: 495/672 in 0.008 s. ETA: 0.0429 s
+[Info] Progress: 528/672 in 0.009 s. ETA: 0.0393 s
+[Info] Progress: 561/672 in 0.012 s. ETA: 0.0404 s
+[Info] Progress: 594/672 in 0.004 s. ETA: 0.0095 s
+[Info] Progress: 627/672 in 0.01 s. ETA: 0.0136 s
+[Info] Progress: 660/672 in 0.011 s. ETA: 0.0040 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\2_sector\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\2_sector\sankey_plot.html
+[Info] general log saved to .\test\scenarios\2_sector\general.log

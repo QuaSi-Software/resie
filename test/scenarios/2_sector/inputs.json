@@ -3,6 +3,7 @@
         "csv_output_file": "./test/scenarios/2_sector/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/2_sector/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/2_sector/sankey_plot.html",
         "sankey_plot": "default",
         "__heating_csv_output_keys": {
@@ -31,7 +32,8 @@
         },
         "output_plot_file": "./test/scenarios/2_sector/output_plot.html",
         "output_plot_time_unit": "date",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_01_HZG_01_BFT": ["Load"]},
                 "axis": "right",
@@ -211,15 +213,16 @@
                 "TST_01_ELT_01_BUS"
             ],
             "capacity": 10000,
-            "load": 5000
+            "initial_load": 0.5,
+            "charge_efficiency": 1.0,
+            "discharge_efficiency": 1.0
         },
         "TST_01_HZG_01_GRI": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_g_natgas",
             "output_refs": [
                 "TST_01_HZG_01_CHP"
-            ],
-            "is_source": true
+            ]
         },
         "TST_01_HZG_02_SRC": {
             "type": "FlexibleSupply",
@@ -232,18 +235,16 @@
             "scale": 25000
         },
         "TST_01_ELT_01_GRI": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_01_ELT_01_BUS"
-            ],
-            "is_source": true
+            ]
         },
         "TST_01_ELT_01_GRO": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_e_ac_230v",
-            "output_refs": [],
-            "is_source": false
+            "output_refs": []
         }
     }
 }

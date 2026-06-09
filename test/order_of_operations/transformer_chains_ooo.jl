@@ -88,13 +88,14 @@ function test_base_order()
             "type" => "Battery",
             "output_refs" => ["TST_01_ELT_01_BUS"],
             "capacity" => 10000,
-            "load" => 5000,
+            "initial_load" => 0.5,
+            "charge_efficiency" => 1.0,
+            "discharge_efficiency" => 1.0,
         ),
         "TST_01_HZG_01_GRI" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_01_HZG_01_CHP"],
-            "is_source" => true,
         ),
         "TST_01_HZG_02_SRC" => Dict{String,Any}(
             "type" => "FlexibleSupply",
@@ -105,19 +106,16 @@ function test_base_order()
             "scale" => 25000,
         ),
         "TST_01_ELT_01_GRI" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELT_01_BUS"],
-            "is_source" => true,
         ),
         "TST_01_ELT_01_GRO" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "output_refs" => [],
-            "is_source" => false,
         ),
     )
-
     expected = [[1300, ("TST_01_ELT_01_PVP", EnergySystems.s_reset)],
                 [1299, ("TST_01_ELT_01_DEM", EnergySystems.s_reset)],
                 [1298, ("TST_01_HZG_01_DEM", EnergySystems.s_reset)],
@@ -211,10 +209,9 @@ function test_ooo_middle_bus()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -410,10 +407,9 @@ function test_ooo_middle_bus_different_order()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -593,10 +589,9 @@ function test_ooo_middle_transformer()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
-            "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "FlexibleSupply",
@@ -606,10 +601,9 @@ function test_ooo_middle_transformer()
             "constant_temperature" => 20,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -746,10 +740,9 @@ function test_ooo_parallels()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -899,10 +892,9 @@ function test_ooo_parallels_different_order()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1060,16 +1052,14 @@ function test_ooo_parallels_in_chain()
             "scale" => 500,
         ),
         "TST_GRI_H2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_h2",
             "input_refs" => ["TST_01_ELY_01"],
-            "is_source" => false,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
-            "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "FlexibleSupply",
@@ -1080,41 +1070,35 @@ function test_ooo_parallels_in_chain()
             "scale" => 1000,
         ),
         "TST_GRI_00" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELY_01"],
-            "is_source" => true,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_SRC_1b" => Dict{String,Any}(
             "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01b"],
-            "is_source" => true,
             "constant_power" => 400,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_02"],
-            "is_source" => true,
         ),
         "TST_GRI_03" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_03"],
-            "is_source" => true,
         ),
         "TST_GRI_04" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_04"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1288,10 +1272,9 @@ function test_ooo_parallels_in_a_row()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1520,10 +1503,9 @@ function test_ooo_connected_middle_busses()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1771,28 +1753,24 @@ function test_ooo_connected_middle_transformer()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
-            "is_source" => false,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_GRI_NG" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_h2",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1955,22 +1933,19 @@ function test_ooo_connected_middle_transformer_variant()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
-            "is_source" => false,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "FlexibleSupply",
@@ -1980,10 +1955,9 @@ function test_ooo_connected_middle_transformer_variant()
             "constant_power" => 100000,
         ),
         "TST_GRI_NG" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_h2",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2176,22 +2150,19 @@ function test_ooo_circle_grid_input_denied()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2295,22 +2266,19 @@ function test_ooo_circle_grid_input_allowed()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2414,22 +2382,19 @@ function test_ooo_circle_middle_transformer_input()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2545,28 +2510,24 @@ function test_ooo_circle_variant()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_GRI_natgas_1" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_GRI_natgas_2" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_02"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2698,22 +2659,19 @@ function test_ooo_circle_middle_transformer_interconnections()
             "constant_temperature" => 20,
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
-            "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
-            "is_source" => false,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",

@@ -1,3 +1,26 @@
+#! format: off
+CONMOD_FORBID_SRC_TO_SNK_PARAMS = Dict(
+    "src_uac" => (
+        default=nothing,
+        description="UAC of the source component.",
+        display_name="Source UAC",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "snk_uac" => (
+        default=nothing,
+        description="UAC of the sink component.",
+        display_name="Sink UAC",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Control module for disallowing a specific source to be used to supply a specific sink.
 
@@ -28,6 +51,9 @@ end
 
 # method for control module name on type-level
 control_module_name(x::Type{CM_Forbid_Src_To_Snk})::String = "forbid_src_to_snk"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_Forbid_Src_To_Snk})::Dict{String,NamedTuple} = CONMOD_FORBID_SRC_TO_SNK_PARAMS
 
 function has_method_for(mod::CM_Forbid_Src_To_Snk, func::ControlModuleFunction)::Bool
     return func == cmf_check_src_to_snk

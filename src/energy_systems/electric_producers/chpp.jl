@@ -1,3 +1,150 @@
+#! format: off
+const CHPP_COMPONENT_PARAMETERS = Dict(
+    "m_fuel_in" => (
+        default="m_c_g_natgas",
+        description="Fuel input medium",
+        display_name="Medium fuel_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_el_out" => (
+        default="m_e_ac_230v",
+        description="Electricity output medium",
+        display_name="Medium el_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "linear_interface" => (
+        default="fuel_in",
+        description="Which interface is considered linear relative to the part-load-ratio",
+        display_name="Linear interface",
+        options=["fuel_in", "el_out", "heat_out"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "efficiency_fuel_in" => (
+        default="const:1.0",
+        description="Efficiency function for the fuel input",
+        display_name="Efficiency fuel_in",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_el_out" => (
+        default="pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38",
+        description="Efficiency function for the electricity output",
+        display_name="Efficiency el_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_heat_out" => (
+        default="pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49",
+        description="Efficiency function for the heat output",
+        display_name="Efficiency heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "power_el" => (
+        default=nothing,
+        description="Design electric output power",
+        display_name="Electric power",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "min_power_fraction" => (
+        default=0.2,
+        description="Minimum part-load ratio to operate",
+        display_name="Min. power fraction",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "nr_discretization_steps" => (
+        default=8,
+        description="Number of intervals for interpolated efficiency functions",
+        display_name="Nr. discretization steps",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        unit="-"
+    ),
+)
+
+const CHPP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 15,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.0,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.06,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  100,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const CHPP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 15,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
+#! format: on
+
 """
 Implementation of a combined-heat-and-power plant (CHPP) component.
 
@@ -25,6 +172,9 @@ mutable struct CHPP <: Component
     m_heat_out::Symbol
     m_el_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -40,49 +190,76 @@ mutable struct CHPP <: Component
     losses::Float64
 
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_fuel_in = Symbol(default(config, "m_fuel_in", "m_c_g_natgas"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
-        register_media([m_fuel_in, m_heat_out, m_el_out])
-        interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
-
-        linear_interface = Symbol(replace(default(config, "linear_interface", "fuel_in"), "m_" => ""))
-        if !(linear_interface in interface_list)
-            @error "Given unknown interface name $linear_interface designated as linear " *
-                   "for component $uac"
-        end
-
-        efficiencies = Dict{Symbol,Function}(
-            Symbol("fuel_in") => parse_efficiency_function(default(config,
-                                                                   "efficiency_fuel_in",
-                                                                   "const:1.0")),
-            Symbol("el_out") => parse_efficiency_function(default(config,
-                                                                  "efficiency_el_out",
-                                                                  "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38")),
-            Symbol("heat_out") => parse_efficiency_function(default(config,
-                                                                    "efficiency_heat_out",
-                                                                    "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49")),
-        )
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,                      # sys_function
-                   InterfaceMap(m_fuel_in => nothing),  # input_interfaces
-                   InterfaceMap(m_heat_out => nothing,  # output_interfaces
-                                m_el_out => nothing),
-                   m_fuel_in,
-                   m_heat_out,
-                   m_el_out,
-                   config["power_el"] / efficiencies[Symbol("el_out")](1.0),
-                   linear_interface,
-                   default(config, "min_power_fraction", 0.2),
-                   efficiencies,
-                   interface_list,
-                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),       # energy_to_plr
-                   1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
-                   default(config, "output_temperature", nothing),
-                   0.0) # losses
+        return new(SSOT_parameter_constructor(CHPP, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_EMISSIONS_PARAMETERS)
+end
+
+function extract_parameter(x::Type{CHPP}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{CHPP}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(CHPP)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(CHPP)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(CHPP)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
+end
+
+function init_from_params(x::Type{CHPP}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol
+    m_fuel_in = Symbol(params["m_fuel_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    m_el_out = Symbol(params["m_el_out"])
+    interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
+    linear_interface = Symbol(params["linear_interface"])
+
+    efficiencies = Dict{Symbol,Function}(
+        Symbol("fuel_in") => params["efficiency_fuel_in"],
+        Symbol("el_out") => params["efficiency_el_out"],
+        Symbol("heat_out") => params["efficiency_heat_out"],
+    )
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_fuel_in => nothing),
+            InterfaceMap(m_heat_out => nothing, m_el_out => nothing),
+            m_fuel_in,
+            m_heat_out,
+            m_el_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
+            params["power_el"] / efficiencies[Symbol("el_out")](1.0),
+            linear_interface,
+            params["min_power_fraction"],
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / params["nr_discretization_steps"], # discretization_step
+            params["output_temperature"],
+            0.0) # losses
 end
 
 function initialise!(unit::CHPP, sim_params::Dict{String,Any})
@@ -103,16 +280,18 @@ function control(unit::CHPP,
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], nothing, nothing, unit.output_temperature)
 end
 
-function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
+function set_max_energies!(unit::CHPP, is_transformer_potential::Bool, fuel_in::Float64, el_out::Float64,
+                           heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature;
+                    is_transformer_potential=is_transformer_potential)
 end
 
 function calculate_energies(unit::CHPP, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 
@@ -123,9 +302,9 @@ function potential(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3])
+        set_max_energies!(unit, true, energies[1], energies[2], energies[3])
     end
 end
 
@@ -134,7 +313,7 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         unit.losses = 0.0
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0, 0.0)
         return
     end
 
@@ -143,10 +322,16 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[3], nothing, unit.output_temperature)
 
     unit.losses = check_epsilon(energies[1] - energies[2] - energies[3], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::CHPP)
     return unit.min_power_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::CHPP)
+    return unit.power # [W]
 end
 
 function output_values(unit::CHPP)::Vector{String}

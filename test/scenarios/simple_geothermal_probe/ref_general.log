@@ -1,0 +1,35 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The profile at .\profiles\examples\district\PV_Stuttgart_30_south_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at .\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] Successfully calculated g-function for geothermal probe field "TST_GTP_01" with 36 probes.
+[Info] Auxiliary info dumped to file .\test\scenarios\simple_geothermal_probe\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 438/8760 in 0.034 s. ETA: 0.6460 s
+[Info] Progress: 876/8760 in 0.029 s. ETA: 0.5220 s
+[Info] Progress: 1314/8760 in 0.032 s. ETA: 0.5440 s
+[Info] Progress: 1752/8760 in 0.056 s. ETA: 0.8960 s
+[Info] Progress: 2190/8760 in 0.066 s. ETA: 0.9900 s
+[Info] Progress: 2628/8760 in 0.15 s. ETA: 2.1000 s
+[Info] Progress: 3066/8760 in 0.084 s. ETA: 1.0920 s
+[Info] Progress: 3504/8760 in 0.133 s. ETA: 1.5960 s
+[Info] Progress: 3942/8760 in 0.116 s. ETA: 1.2760 s
+[Info] Progress: 4380/8760 in 0.117 s. ETA: 1.1700 s
+[Info] Progress: 4818/8760 in 0.124 s. ETA: 1.1160 s
+[Info] Progress: 5256/8760 in 0.147 s. ETA: 1.1760 s
+[Info] Progress: 5694/8760 in 0.112 s. ETA: 0.7840 s
+[Info] Progress: 6132/8760 in 0.117 s. ETA: 0.7020 s
+[Info] Progress: 6570/8760 in 0.119 s. ETA: 0.5950 s
+[Info] Progress: 7008/8760 in 0.104 s. ETA: 0.4160 s
+[Info] Progress: 7446/8760 in 0.093 s. ETA: 0.2790 s
+[Info] Progress: 7884/8760 in 0.108 s. ETA: 0.2160 s
+[Info] Progress: 8322/8760 in 0.104 s. ETA: 0.1040 s
+[Info] Progress: 8760/8760 in 0.118 s. ETA: 0.0000 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\simple_geothermal_probe\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\simple_geothermal_probe\sankey_plot.html
+[Info] CSV-file with outputs written to ./test/scenarios/simple_geothermal_probe/out.csv
+[Info] general log saved to .\test\scenarios\simple_geothermal_probe\general.log

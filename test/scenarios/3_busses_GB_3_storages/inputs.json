@@ -3,8 +3,10 @@
         "csv_output_file": "./test/scenarios/3_busses_GB_3_storages/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/3_busses_GB_3_storages/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/3_busses_GB_3_storages/sankey_plot.html",
         "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_DEM_01": ["m_h_w_ht1:IN"],
             "ESS_BUS_TH_01": ["Balance"],
@@ -12,7 +14,8 @@
             "ESS_GRI_EG_01": ["m_c_g_natgas:OUT"]
         },
         "output_plot_file": "./test/scenarios/3_busses_GB_3_storages/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_BFT_TH_01": ["Load"]},
                 "axis": "right",
@@ -118,11 +121,9 @@
             "scale": 1500
         },
         "ESS_GRI_EG_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_g_natgas",
-            "output_refs": [
-                "ESS_GBO_01"],
-            "is_source": true
+            "output_refs": ["ESS_GBO_01"]
         },
         "ESS_GBO_01": {
             "type": "FuelBoiler",

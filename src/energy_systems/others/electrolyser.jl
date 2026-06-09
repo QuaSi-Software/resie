@@ -1,3 +1,327 @@
+#! format: off
+const ELECTROLYSER_COMPONENT_PARAMETERS = Dict(
+    "m_el_in" => (
+        default="m_e_ac_230v",
+        description="Electricity input medium",
+        display_name="Medium el_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_h2_out" => (
+        default="m_c_g_h2",
+        description="Hydrogen output medium",
+        display_name="Medium h2_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_o2_out" => (
+        default="m_c_g_o2",
+        description="Oxygen output medium",
+        display_name="Medium o2_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_ht_out" => (
+        default="m_h_w_ht1",
+        description="High-temperature heat output medium",
+        display_name="Medium heat_ht_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_lt_out" => (
+        default="m_h_w_lt1",
+        description="Low-temperature heat output medium",
+        display_name="Medium heat_lt_out",
+        required=false,
+        conditionals=[("heat_lt_is_usable", "is_true")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "heat_lt_is_usable" => (
+        default=false,
+        description="Toggle if the low temperature heat output is usable",
+        display_name="LT-heat is usable?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "linear_interface" => (
+        default="el_in",
+        description="Which interface is considered linear relative to the part-load-ratio",
+        display_name="Linear interface",
+        options=["el_in", "h2_out", "o2_out", "heat_ht_out", "heat_lt_out"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "efficiency_el_in" => (
+        default="const:1.0",
+        description="Efficiency function for the electricity input",
+        display_name="Efficiency el_in",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_h2_out" => (
+        default="const:0.57",
+        description="Efficiency function for the hydrogen output including cycling and drying losses",
+        display_name="Efficiency h2_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_h2_out_lossless" => (
+        default="const:0.6",
+        description="Efficiency function for the hydrogen output without cycling and drying losses",
+        display_name="Efficiency h2_out_lossless",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_o2_out" => (
+        default="const:0.6",
+        description="Efficiency function for the oxygen output, conversion to energy via " *
+                    "stochiometric hydrogen equivalent",
+        display_name="Efficiency o2_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_heat_ht_out" => (
+        default="const:0.15",
+        description="Efficiency function for the high-temperature heat output",
+        display_name="Efficiency heat_ht_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_heat_lt_out" => (
+        default="const:0.07",
+        description="Efficiency function for the low-temperature heat output",
+        display_name="Efficiency heat_lt_out",
+        required=false,
+        conditionals=[("heat_lt_is_usable", "is_true")],
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "power_el" => (
+        description="Electric design power",
+        display_name="Electric power",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "nr_switchable_units" => (
+        default=1,
+        description="Number of switchable units that make up the assembly",
+        display_name="Nr. units",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        unit="-"
+    ),
+    "dispatch_strategy" => (
+        default="equal_with_mpf",
+        description="Strategy to use for dispatching the units of the assembly to achieve desired part-load ratio.",
+        display_name="Dispatch strategy",
+        required=false,
+        options=("all_equal", "try_optimal", "equal_with_mpf"),
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "optimal_unit_plr" => (
+        default=0.65,
+        description="Part-load ratio of a single unit when operation is optimal",
+        display_name="Optimal unit PLR",
+        required=false,
+        conditionals=[("dispatch_strategy", "is", "try_optimal")],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "min_power_fraction" => (
+        default=0.4,
+        description="Minimum part-load ratio to operate of a single unit",
+        display_name="Min. power fraction unit",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "min_power_fraction_total" => (
+        default=0.2,
+        description="Minimum part-load ratio to operate of the whole assembly",
+        display_name="Min. power fraction total",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "output_temperature_ht" => (
+        default=55.0,
+        description="Fixed output temperature for high-temperature, or nothing for auto-detection",
+        display_name="Output high-temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "output_temperature_lt" => (
+        default=25.0,
+        description="Fixed output temperature for low-temperature, or nothing for auto-detection",
+        display_name="Output low-temperature",
+        required=false,
+        conditionals=[("heat_lt_is_usable", "is_true")],
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "nr_discretization_steps" => (
+        default=1,
+        description="Number of intervals for interpolated efficiency functions",
+        display_name="Nr. discretization steps",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        unit="-"
+    ),
+)
+
+const ELECTROLYSER_ECONOMIC_PARAMETERS = Base.merge(get_economic_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "capex_specific" => nothing,
+        "capex_price_change_rate_per_year" => -0.02,
+        "maintenance_inspection_rate_per_year" => 0.025,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.01,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  50,
+        "subsidy_rate_of_capex" =>  0.0,
+        "subsidy_max" =>  -1.0
+        ),
+    Dict{String,Any}(
+        "capex_specific" => "€/W"
+        )
+    ),
+    Dict{String,Any}(
+        "water_price" => (
+            default=3.5,
+            description="Price per m^3 of fresh water",
+            display_name="water price per cubic meter",
+            required=false,
+            validations=[("self", "value_gte_num", 0.0)],
+            type=Float64,
+            json_type="number",
+            unit="€/m^3 water"
+        ),
+        "water_price_change_rate_per_year" => (
+            default=0.02,
+            description="Yearly change rate of water price",
+            display_name="water price change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+        "water_demand_ratio" => (
+            default=0.36,
+            description="Water demand per kWh of produced hydrogen",
+            display_name="water demand ratio",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="l/kWh H2"
+        ),
+        "oxygen_price" => (
+            default=0.14,
+            description="Price per kg of produced oxygen",
+            display_name="oxygen price",
+            required=false,
+            validations=[("self", "value_gte_num", 0.0)],
+            type=Float64,
+            json_type="number",
+            unit="€/kg O2"
+        ),
+        "oxygen_price_change_rate_per_year" => (
+            default=0.02,
+            description="Yearly change rate of oxygen price",
+            display_name="oxygen price change rate per year",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="1/year"
+        ),
+        "oxygen_production_ratio" => (
+            default=0.239,
+            description="Oxygen production per kWh of produced hydrogen",
+            display_name="oxygen production factor",
+            required=false,
+            type=Float64,
+            json_type="number",
+            unit="kg O2/kWh H2"
+        ),
+    )
+)
+
+const ELECTROLYSER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
+#! format: on
+
 """
 Implementation of an electrolyser, turning electricity and pure water into H2, O2 and heat.
 
@@ -29,7 +353,11 @@ mutable struct Electrolyser <: Component
     m_h2_out::Symbol
     m_o2_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
+    power_rated_el::Float64
     power_total::Float64
     nr_units::Integer
     dispatch_strategy::String
@@ -54,90 +382,121 @@ mutable struct Electrolyser <: Component
     losses_heat::Float64
     losses_hydrogen::Float64
 
+    balance::Float64
+
+    water_demand::Vector{Float64}
+    oxygen_production::Vector{Float64}
+
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        heat_lt_is_usable = default(config, "heat_lt_is_usable", false)
-
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_heat_ht_out = Symbol(default(config, "m_heat_ht_out", "m_h_w_ht1"))
-        m_heat_lt_out = Symbol(default(config, "m_heat_lt_out", "m_h_w_lt1"))
-        m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
-        m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
-        register_media([m_el_in, m_heat_ht_out, m_heat_lt_out, m_h2_out, m_o2_out])
-        interface_list = (Symbol("el_in"),
-                          Symbol("heat_ht_out"),
-                          Symbol("heat_lt_out"),
-                          Symbol("h2_out"),
-                          Symbol("o2_out"))
-
-        linear_interface = Symbol(replace(default(config, "linear_interface", "el_in"), "m_" => ""))
-        if !(linear_interface in interface_list)
-            @error "Given unknown interface name $linear_interface designated as linear " *
-                   "for component $uac"
-        end
-
-        efficiencies = Dict{Symbol,Function}(
-            Symbol("el_in") => parse_efficiency_function(default(config,
-                                                                 "efficiency_el_in", "const:1.0")),
-            Symbol("heat_ht_out") => parse_efficiency_function(default(config,
-                                                                       "efficiency_heat_ht_out", "const:0.15")),
-            Symbol("heat_lt_out") => parse_efficiency_function(default(config,
-                                                                       "efficiency_heat_lt_out", "const:0.07")),
-            Symbol("h2_out") => parse_efficiency_function(default(config,
-                                                                  "efficiency_h2_out", "const:0.57")),
-            Symbol("h2_out_lossless") => parse_efficiency_function(default(config,
-                                                                           "efficiency_h2_out_lossless", "const:0.6")),
-            Symbol("o2_out") => parse_efficiency_function(default(config,
-                                                                  "efficiency_o2_out", "const:0.6")),
-        )
-
-        output_interfaces = InterfaceMap(m_heat_ht_out => nothing,
-                                         m_h2_out => nothing,
-                                         m_o2_out => nothing)
-        if heat_lt_is_usable
-            output_interfaces[m_heat_lt_out] = nothing
-        else
-            # if low temperature heat output is not used, make sure it is not limiting
-            efficiencies[Symbol("heat_lt_out")] => parse_efficiency_function("const:1.0")
-        end
-
-        nr_units = default(config, "nr_switchable_units", 1)
-        power_total = config["power_el"] / efficiencies[Symbol("el_in")](1.0)
-        power = power_total / nr_units
-
-        dispatch_strategy = default(config, "dispatch_strategy", "equal_with_mpf")
-        if !(dispatch_strategy in ("all_equal", "try_optimal", "equal_with_mpf"))
-            @error "Unknown dispatch strategy $dispatch_strategy for electrolyser $uac"
-        end
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,                    # sys_function
-                   InterfaceMap(m_el_in => nothing),  # input_interfaces
-                   output_interfaces,
-                   m_el_in,
-                   m_heat_ht_out,
-                   m_heat_lt_out,
-                   m_h2_out,
-                   m_o2_out,
-                   power,
-                   power_total,
-                   nr_units,
-                   dispatch_strategy,
-                   default(config, "optimal_unit_plr", 0.65),
-                   linear_interface,
-                   default(config, "min_power_fraction", 0.4),
-                   default(config, "min_power_fraction_total", 0.2),
-                   efficiencies,
-                   interface_list,
-                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),   # energy_to_plr
-                   1.0 / default(config, "nr_discretization_steps", 1), # discretization_step
-                   heat_lt_is_usable,
-                   default(config, "output_temperature_ht", 55.0),
-                   default(config, "output_temperature_lt", 25.0),
-                   0.0, # losses
-                   0.0, # losses_heat
-                   0.0) # losses_hydrogen
+        return new(SSOT_parameter_constructor(Electrolyser, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{Electrolyser})::Dict{String,Any}
+    return deepcopy(ELECTROLYSER_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{Electrolyser})::Dict{String,Any}
+    return deepcopy(ELECTROLYSER_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{Electrolyser})::Dict{String,Any}
+    return deepcopy(ELECTROLYSER_EMISSIONS_PARAMETERS)
+end
+
+function extract_parameter(x::Type{Electrolyser}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{Electrolyser}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(Electrolyser)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(Electrolyser)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(Electrolyser)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
+end
+
+function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol
+    heat_lt_is_usable = params["heat_lt_is_usable"]
+    m_el_in = Symbol(params["m_el_in"])
+    m_heat_ht_out = Symbol(params["m_heat_ht_out"])
+    m_heat_lt_out = Symbol(params["m_heat_lt_out"])
+    m_h2_out = Symbol(params["m_h2_out"])
+    m_o2_out = Symbol(params["m_o2_out"])
+    interface_list = (Symbol("el_in"),
+                      Symbol("heat_ht_out"),
+                      Symbol("heat_lt_out"),
+                      Symbol("h2_out"),
+                      Symbol("o2_out"))
+
+    efficiencies = Dict{Symbol,Function}(
+        Symbol("el_in") => params["efficiency_el_in"],
+        Symbol("heat_ht_out") => params["efficiency_heat_ht_out"],
+        Symbol("heat_lt_out") => params["efficiency_heat_lt_out"],
+        Symbol("h2_out") => params["efficiency_h2_out"],
+        Symbol("h2_out_lossless") => params["efficiency_h2_out_lossless"],
+        Symbol("o2_out") => params["efficiency_o2_out"],
+    )
+
+    output_interfaces = InterfaceMap(m_heat_ht_out => nothing,
+                                     m_h2_out => nothing,
+                                     m_o2_out => nothing)
+    if heat_lt_is_usable
+        output_interfaces[m_heat_lt_out] = nothing
+    else
+        # if low temperature heat output is not used, make sure it is not limiting
+        efficiencies[Symbol("heat_lt_out")] => parse_efficiency_function("const:1.0")
+    end
+
+    nr_units = params["nr_switchable_units"]
+    power_rated_el = params["power_el"]
+    power_total = power_rated_el / efficiencies[Symbol("el_in")](1.0)
+    power = power_total / nr_units
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_el_in => nothing),
+            output_interfaces,
+            m_el_in,
+            m_heat_ht_out,
+            m_heat_lt_out,
+            m_h2_out,
+            m_o2_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
+            power,
+            power_rated_el,
+            power_total,
+            nr_units,
+            params["dispatch_strategy"],
+            params["optimal_unit_plr"],
+            Symbol(params["linear_interface"]),
+            params["min_power_fraction"],
+            params["min_power_fraction_total"],
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / params["nr_discretization_steps"], # discretization_step
+            heat_lt_is_usable,
+            params["output_temperature_ht"],
+            params["output_temperature_lt"],
+            0.0, # losses
+            0.0, # losses_heat
+            0.0, # losses_hydrogen
+            0.0, # balance
+            zeros(sim_params["number_of_time_steps_output"]),  # water_demand
+            zeros(sim_params["number_of_time_steps_output"]))  # oxygen_production
 end
 
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
@@ -175,20 +534,22 @@ function control(unit::Electrolyser,
 end
 
 function set_max_energies!(unit::Electrolyser,
+                           is_transformer_potential::Bool,
                            el_in::Float64,
                            heat_ht_out::Union{Floathing,Vector{<:Floathing}},
                            heat_lt_out::Float64,
                            h2_out::Float64,
                            o2_out::Float64,
                            purpose_uac_ht::Union{Stringing,Vector{<:Stringing}}=nothing)
-    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in; is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out, nothing, unit.output_temperature_ht,
-                    purpose_uac_ht)
+                    purpose_uac_ht; is_transformer_potential=is_transformer_potential)
     if unit.heat_lt_is_usable
-        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt;
+                        is_transformer_potential=is_transformer_potential)
     end
-    set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
-    set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
+    set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out; is_transformer_potential=is_transformer_potential)
 end
 
 """
@@ -248,7 +609,7 @@ function calculate_energies(unit::Electrolyser,
                                                                               Vector{<:Stringing}}}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
-    if max_plr <= 0.0
+    if max_plr <= 0.0 || unit.power <= sim_params["epsilon"]
         return (false, [])
     end
 
@@ -352,9 +713,9 @@ function potential(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5], energies[6])
+        set_max_energies!(unit, true, energies[1], energies[2], energies[3], energies[4], energies[5], energies[6])
     end
 end
 
@@ -362,7 +723,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
@@ -388,8 +749,26 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     end
     add!(unit.output_interfaces[unit.m_h2_out], energies[4])
     add!(unit.output_interfaces[unit.m_o2_out], energies[5])
-end
 
+    # calculate energy balance of the electrolyser
+    unit.balance = energies[1] -                   # input
+                   sum(energies[2]; init=0.0) -    # output ht
+                   sum(energies[4]; init=0.0) -    # output h2
+                   (unit.heat_lt_is_usable ? energies[3] : 0.0) -   # output lt
+                   unit.losses                     # losses
+
+    # calculate non-energy commodities
+    if sim_params["economic_parameters"]["calculate_economy"] &&
+       sim_params["current_date"] >= sim_params["start_date_output"]
+        step = Int(floor(Dates.value(Dates.Millisecond(sub_ignoring_leap_days(sim_params["current_date"],
+                                                                              sim_params["start_date_output"]))) /
+                         (1000 * Int(sim_params["time_step_seconds"])))) + 1
+
+        unit.water_demand[step] = unit.economic_parameters["water_demand_ratio"] * sum(energies[4]; init=0.0) / 1000  # liter water
+        unit.oxygen_production[step] = unit.economic_parameters["oxygen_production_ratio"] *
+                                       sum(energies[4]; init=0.0) / 1000  # kg Oxygen
+    end
+end
 # has its own reset function as here more losses are present that need to be reset in every timestep
 function reset(unit::Electrolyser)
     for inface in values(unit.input_interfaces)
@@ -403,15 +782,48 @@ function reset(unit::Electrolyser)
         end
     end
 
-    # reset losses
+    # reset other parameter
     unit.losses = 0.0
     unit.losses_hydrogen = 0.0
     unit.losses_heat = 0.0
+    unit.balance = 0.0
 end
 
 function component_has_minimum_part_load(unit::Electrolyser)
     return (unit.dispatch_strategy == "equal_with_mpf" && unit.min_power_fraction > 0.0) ||
            unit.min_power_fraction_total > 0.0
+end
+
+function get_additional_opex_from_component(unit::Electrolyser, sim_params::Dict{String,Any})
+    # prices only on yearly basis here as simplification
+    observation_period_in_years = sim_params["economic_parameters"]["observation_period_in_years"]
+    # liter water in each time step as Vector
+    water_demand_profile = extend_profile(unit.water_demand, observation_period_in_years,
+                                          sim_params["economic_parameters"]["repeat_period"], sim_params)
+    # kg oxygen in each time step as Vector
+    oxygen_production_profile = extend_profile(unit.oxygen_production, observation_period_in_years,
+                                               sim_params["economic_parameters"]["repeat_period"], sim_params)
+
+    timesteps_per_year = Int(floor(length(water_demand_profile) / observation_period_in_years))
+    r_water = 1.0 + unit.economic_parameters["water_price_change_rate_per_year"]
+    r_oxygen = 1.0 + unit.economic_parameters["oxygen_price_change_rate_per_year"]
+
+    # get yearly sums
+    yearly_water_costs = zeros(Float64, observation_period_in_years)
+    yearly_oxygen_revenue = zeros(Float64, observation_period_in_years)
+    for year in 1:observation_period_in_years
+        annual_water_demand = sum(water_demand_profile[((year - 1) * timesteps_per_year + 1):(year * timesteps_per_year)])
+        annual_oxygen_production = sum(oxygen_production_profile[((year - 1) * timesteps_per_year + 1):(year * timesteps_per_year)])
+
+        yearly_water_costs[year] = annual_water_demand * unit.economic_parameters["water_price"] * r_water^(year - 1)
+        yearly_oxygen_revenue[year] = annual_oxygen_production * unit.economic_parameters["oxygen_price"] *
+                                      r_oxygen^(year - 1)
+    end
+    return ["water_costs_per_year", "oxygen_revenue_per_year"], [.-yearly_water_costs, yearly_oxygen_revenue]
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::Electrolyser)
+    return unit.power_rated_el # [W]
 end
 
 function output_values(unit::Electrolyser)::Vector{String}

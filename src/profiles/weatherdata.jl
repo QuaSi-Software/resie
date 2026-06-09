@@ -127,13 +127,13 @@ mutable struct WeatherData
                       "ones given in the input file:\n" *
                       "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
             end
-            if sim_params["timezone"] === nothing
-                sim_params["timezone"] = 1.0  # MEZ
-                @info "The timezone was set to MEZ (GMT+1) as it is the standard for DWD .dat files."
+            if sim_params["time_zone"] === nothing
+                sim_params["time_zone"] = 1.0  # MEZ
+                @info "The time zone was set to MEZ (GMT+1) as it is the standard for DWD .dat files."
             else
-                sim_params["timezone"] = Float64(sim_params["timezone"])
-                @info "The timezone given in the DWD .dat file was overwritten by the " *
-                      "one given in the input file: $(sim_params["timezone"])"
+                sim_params["time_zone"] = Float64(sim_params["time_zone"])
+                @info "The time zone given in the DWD .dat file was overwritten by the " *
+                      "one given in the input file: $(sim_params["time_zone"])"
             end
 
             # Wind speed is measured as mean over the 10 Minutes ahead of the full hour 
@@ -208,12 +208,12 @@ mutable struct WeatherData
                       "ones given in the input file:\n" *
                       "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
             end
-            if sim_params["timezone"] === nothing
-                sim_params["timezone"] = Float64(headerdata["TZ"])
+            if sim_params["time_zone"] === nothing
+                sim_params["time_zone"] = Float64(headerdata["TZ"])
             else
-                sim_params["timezone"] = Float64(sim_params["timezone"])
-                @info "The timezone given in the EPW weather file was overwritten by the " *
-                      "one given in the input file: $(sim_params["timezone"])"
+                sim_params["time_zone"] = Float64(sim_params["time_zone"])
+                @info "The time zone given in the EPW weather file was overwritten by the " *
+                      "one given in the input file: $(sim_params["time_zone"])"
             end
 
             # Long wave irradiation is probably(?) given at full hours
@@ -321,7 +321,7 @@ function calc_sunrise_sunset(timestamps::Vector{DateTime}, time_step::Second, te
             sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
                                                           sim_params["latitude"],
                                                           sim_params["longitude"],
-                                                          sim_params["timezone"],
+                                                          sim_params["time_zone"],
                                                           1.0,
                                                           average_yearly_temperature)
         end
@@ -570,12 +570,12 @@ function get_weather_data_keys(sim_params::Dict{String,Any})
 end
 
 function gather_weather_data(weather_data_keys, sim_params)
-    return_values = Vector{Any}()
-    append!(return_values, sim_params["time_since_output"])
+    return_values = zeros(Float64, 1 + length(weather_data_keys))
+    return_values[1] = sim_params["time_since_output"]
 
-    for weather_data_key in weather_data_keys
-        append!(return_values,
-                Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)), sim_params))
+    for (idx, weather_data_key) in enumerate(weather_data_keys)
+        return_values[idx + 1] = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)),
+                                                        sim_params)
     end
     return return_values
 end

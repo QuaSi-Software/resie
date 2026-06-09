@@ -3,9 +3,10 @@
         "csv_output_file": "./test/scenarios/reversible_heat_pump/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/reversible_heat_pump/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/reversible_heat_pump/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot_file": "./test/scenarios/reversible_heat_pump/output_plot.html",
         "output_plot": "all_incl_flows"
     },
@@ -103,7 +104,7 @@
             "___SIMPLIFIED MODEL___": "",
             "borehole_thermal_resistance": 0.1,
             "___DETAILED MODEL___": "",
-            "probe_type": 2,
+            "probe_type": "double U-pipe",
             "pipe_diameter_outer": 0.032,
             "pipe_diameter_inner": 0.0262,
             "pipe_heat_conductivity": 0.42,
@@ -134,12 +135,11 @@
             "heat_losses_factor": 1.0
         },
         "TST_EL_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_EL_BUS_01"
-            ],
-            "is_source": true
+            ]
         }
     }
 }

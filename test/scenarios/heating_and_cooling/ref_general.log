@@ -1,0 +1,31 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] Auxiliary info dumped to file .\test\scenarios\heating_and_cooling\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 0.256 s. ETA: 4.9571 s
+[Info] Progress: 66/672 in 0.008 s. ETA: 0.1469 s
+[Info] Progress: 99/672 in 0.006 s. ETA: 0.1042 s
+[Info] Progress: 132/672 in 0.013 s. ETA: 0.2127 s
+[Info] Progress: 165/672 in 0.007 s. ETA: 0.1075 s
+[Info] Progress: 198/672 in 0.009 s. ETA: 0.1293 s
+[Info] Progress: 231/672 in 0.008 s. ETA: 0.1069 s
+[Info] Progress: 264/672 in 0.008 s. ETA: 0.0989 s
+[Info] Progress: 297/672 in 0.008 s. ETA: 0.0909 s
+[Info] Progress: 330/672 in 0.009 s. ETA: 0.0933 s
+[Info] Progress: 363/672 in 0.008 s. ETA: 0.0749 s
+[Info] Progress: 396/672 in 0.008 s. ETA: 0.0669 s
+[Info] Progress: 429/672 in 0.008 s. ETA: 0.0589 s
+[Info] Progress: 462/672 in 0.01 s. ETA: 0.0636 s
+[Info] Progress: 495/672 in 0.009 s. ETA: 0.0483 s
+[Info] Progress: 528/672 in 0.011 s. ETA: 0.0480 s
+[Info] Progress: 561/672 in 0.009 s. ETA: 0.0303 s
+[Info] Progress: 594/672 in 0.005 s. ETA: 0.0118 s
+[Info] Progress: 627/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 660/672 in 0.017 s. ETA: 0.0062 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\heating_and_cooling\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\heating_and_cooling\sankey_plot.html
+[Info] general log saved to .\test\scenarios\heating_and_cooling\general.log

@@ -353,10 +353,9 @@ end
 function test_data_storage_loading_with_matrix()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
-            "is_source" => true,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",

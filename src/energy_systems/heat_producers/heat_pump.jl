@@ -1,6 +1,360 @@
 using Optim: optimize, minimizer, Options, NelderMead
 using ..Resie: get_run
 
+#! format: off
+const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
+    "m_el_in" => (
+        default="m_e_ac_230v",
+        description="Electrical input medium",
+        display_name="Medium el_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_in" => (
+        default="m_h_w_lt1",
+        description="Heat input medium",
+        display_name="Medium heat_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out_secondary" => (
+        default="m_h_w_ht1",
+        description="Heat output medium on secondary interface",
+        display_name="Medium heat_out_secondary",
+        required=false,
+        type=String,
+        json_type="string",
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "has_secondary_interface" => (
+        default=false,
+        description="Toggles the secondary heat output interface on/off",
+        display_name="Has secondary interface?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "primary_el_sources" => (
+        default=Vector{String}(),
+        description="Electricity sources for the primary heat output",
+        display_name="Primary electricity sources",
+        required=false,
+        type=Vector{String},
+        json_type="array",
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "secondary_el_sources" => (
+        default=Vector{String}(),
+        description="Electricity sources for the secondary heat output",
+        display_name="Secondary electricity sources",
+        required=false,
+        type=Vector{String},
+        json_type="array",
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "cop_function" => (
+        default="carnot:0.4",
+        description="COP function definition (e.g., 'carnot:0.4' or 'const:3.0')",
+        display_name="COP function",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="cop",
+        unit="-"
+    ),
+    "plf_function" => (
+        default="const:1.0",
+        description="Part-load factor function definition",
+        display_name="PLF function",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "max_power_function" => (
+        default="const:1.0",
+        description="Maximum power function as fraction of design power",
+        display_name="Max. power function",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="2dim",
+        unit="-"
+    ),
+    "min_power_function" => (
+        default="const:0.2",
+        description="Minimum power function as fraction of design power",
+        display_name="Min. power function",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="2dim",
+        unit="-"
+    ),
+    "icing_coefficients" => (
+        default="3,-0.42,15,2,30",
+        description="Icing loss coefficients (comma-separated)",
+        display_name="Icing coefficients",
+        required=false,
+        conditionals=[("consider_icing", "is_true")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "model_type" => (
+        default="simplified",
+        description="Operation model: 'simplified', 'on-off', or 'inverter'",
+        display_name="Model type",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["simplified", "on-off", "inverter"],
+        unit="-"
+    ),
+    "power_th" => (
+        default=nothing,
+        description="Design thermal power",
+        display_name="Thermal power",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "bypass_cop" => (
+        default=15.0,
+        description="COP in bypass operation (when input >= output temperature)",
+        display_name="Bypass COP",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "min_usage_fraction" => (
+        default=0.0,
+        description="Minimum part-load ratio to operate",
+        display_name="Min. usage fraction",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "consider_icing" => (
+        default=false,
+        description="Toogle to account for icing losses on heat input side",
+        display_name="Consider icing?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "input_temperature" => (
+        default=nothing,
+        description="Fixed input temperature, or nothing for auto-detection",
+        display_name="Input temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "nr_optimisation_passes" => (
+        default=20,
+        description="Maximum iterations for PLR optimisation",
+        display_name="Nr. optimisation passes",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_heat" => (
+        default=5.0,
+        description="Weight for heat demand matching in optimization",
+        display_name="Eval. factor heat",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_time" => (
+        default=1.0,
+        description="Weight for time usage in optimisation",
+        display_name="Eval. factor time",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_elec" => (
+        default=1.0,
+        description="Weight for electricity minimization in optimisation",
+        display_name="Eval. factor electricity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "fudge_factor" => (
+        default=1.001,
+        description="Overestimation factor for available heat output in optimisation",
+        display_name="Fudge factor",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "x_abstol" => (
+        default=0.01,
+        description="Absolute tolerance for PLR optimization",
+        display_name="Abs. tolerance PLR",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "f_abstol" => (
+        default=0.001,
+        description="Objective function tolerance for PLR optimization",
+        display_name="Abs. tolerance obj. function",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "power_losses_factor" => (
+        default=0.97,
+        description="Fraction of input power used (losses: 1 - factor)",
+        display_name="Power losses factor",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "heat_losses_factor" => (
+        default=0.95,
+        description="Fraction of input heat used (losses: 1 - factor)",
+        display_name="Heat losses factor",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "constant_loss_power" => (
+        default=0.0,
+        description="Constant power loss, e.g. standby power",
+        display_name="Constant power loss",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+)
+
+const HEAT_PUMP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.015,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  5,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const HEAT_PUMP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
+#! format: on
+
 """
 Implementation of a heat pump component, elevating heat to a higher temperature using
 electricity.
@@ -29,6 +383,9 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_out_secondary::Symbol
     m_heat_in::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     has_secondary_interface::Bool
     primary_el_sources::Vector{String}
@@ -65,6 +422,7 @@ mutable struct HeatPump <: Component
     losses_power::Float64
     losses_heat::Float64
     losses::Float64
+    balance::Float64
 
     cop::Float64
     effective_cop::Float64
@@ -74,103 +432,141 @@ mutable struct HeatPump <: Component
     time_active::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+        return new(SSOT_parameter_constructor(HeatPump, uac, config, sim_params)...)
+    end
+end
 
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        has_secondary_interface = default(config, "has_secondary_interface", false)
-        m_heat_out_secondary = Symbol(adjust_name_if_secondary(m_heat_out, true))
+function component_parameters(x::Type{HeatPump})::Dict{String,Any}
+    return deepcopy(HEAT_PUMP_COMPONENT_PARAMETERS)
+end
 
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
+function economic_parameters(x::Type{HeatPump})::Dict{String,Any}
+    return deepcopy(HEAT_PUMP_ECONOMIC_PARAMETERS)
+end
 
-        func_def = default(config, "cop_function", "carnot:0.4")
-        constant_cop, cop_function = parse_cop_function(func_def)
+function emissions_parameters(x::Type{HeatPump})::Dict{String,Any}
+    return deepcopy(HEAT_PUMP_EMISSIONS_PARAMETERS)
+end
 
-        func_def = default(config, "plf_function", "const:1.0")
-        plf_function = parse_efficiency_function(func_def)
+function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name == "icing_coefficients"
+        value = default(config, param_name, param_def.default)
+        return parse.(Float64, split(value, ","))
+    end
 
-        func_def = default(config, "max_power_function", "const:1.0")
-        max_power_function = parse_2dim_function(func_def)
+    if param_name == "constant_loss_power"
+        value = default(config, param_name, param_def.default)
+        return sim_params["watt_to_wh"](value)
+    end
 
-        func_def = default(config, "min_power_function", "const:0.2")
-        min_power_function = parse_2dim_function(func_def)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
 
-        coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
-        icing_coefficients = parse.(Float64, split(coeff_def, ","))
+function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(HeatPump)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(HeatPump)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(HeatPump)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 
-        model_type = lowercase(default(config, "model_type", "simplified"))
-        if !(model_type in ("simplified", "on-off", "inverter"))
-            @error "Unknown model type $(model_type) given for heat pump $(uac)."
-            throw(InputError)
-        end
+    if param_type == "component"
+        model_type = extracted["model_type"]
+        cop_func_def = default(config, "cop_function", HEAT_PUMP_COMPONENT_PARAMETERS["cop_function"].default)
+        plf_func_def = default(config, "plf_function", HEAT_PUMP_COMPONENT_PARAMETERS["plf_function"].default)
 
-        if model_type in ("inverter", "on-off") && constant_cop !== nothing
+        if model_type in ("inverter", "on-off") && occursin("const", cop_func_def)
             @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
                    "or on-off operation, but has a constant COP. Toggle optimisation off " *
                    "by switching to simplified model type as the algorithm is unstable " *
                    "this case."
-            throw(InputError)
+            throw(InputError())
         end
 
-        if model_type == "simplified" && !occursin("const", default(config, "plf_function", "const:1.0"))
+        if model_type == "simplified" && !occursin("const", plf_func_def)
             @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
                    "function. The simplified model cannot handle this correctly. Please " *
                    "use a different model type or switch to a constant PLF function."
-            throw(InputError)
+            throw(InputError())
         end
-
-        output_interfaces = InterfaceMap(m_heat_out => nothing)
-        if has_secondary_interface
-            output_interfaces[m_heat_out_secondary] = nothing
-        end
-
-        return new(uac,
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,
-                   InterfaceMap(m_heat_in => nothing,
-                                m_el_in => nothing),
-                   output_interfaces,
-                   m_el_in,
-                   m_heat_out,
-                   m_heat_out_secondary,
-                   m_heat_in,
-                   has_secondary_interface,                       # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
-                   default(config, "primary_el_sources", []),     # electricity source(s) used for the primary heat output interface (only if has_secondary_interface)
-                   default(config, "secondary_el_sources", []),   # electricity source(s) used for the secondary heat output interface (only if has_secondary_interface)
-                   model_type,
-                   config["power_th"],
-                   max_power_function,
-                   min_power_function,
-                   plf_function,
-                   constant_cop,
-                   cop_function,
-                   default(config, "bypass_cop", 15.0),
-                   default(config, "min_usage_fraction", 0.0),
-                   default(config, "consider_icing", false),
-                   icing_coefficients,
-                   default(config, "output_temperature", nothing),
-                   default(config, "input_temperature", nothing),
-                   UInt(default(config, "nr_optimisation_passes", 20)),
-                   default(config, "eval_factor_heat", 5.0),
-                   default(config, "eval_factor_time", 1.0),
-                   default(config, "eval_factor_elec", 1.0),
-                   default(config, "fudge_factor", 1.001),
-                   default(config, "x_abstol", 0.01),
-                   default(config, "f_abstol", 0.001),
-                   default(config, "power_losses_factor", 0.97),
-                   default(config, "heat_losses_factor", 0.95),
-                   sim_params["watt_to_wh"](default(config, "constant_loss_power", 0.0)),
-                   0.0, # current_constant_loss
-                   0.0, # losses_power
-                   0.0, # losses_heat
-                   0.0, # losses
-                   0.0, # cop
-                   0.0, # effective_cop
-                   0.0, # mixing temperature in the input interface
-                   0.0, # mixing temperature in the output interface
-                   0.0, # avg_plr
-                   0.0) # time_active
     end
+end
+
+function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol
+    m_el_in = Symbol(params["m_el_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    m_heat_out_secondary = Symbol(adjust_name_if_secondary(m_heat_out, true))
+    m_heat_in = Symbol(params["m_heat_in"])
+
+    # set constant COP if the function is defined that way
+    constant_cop = nothing
+    func_def = default(raw_params, "cop_function", HEAT_PUMP_COMPONENT_PARAMETERS["cop_function"].default)
+    if occursin("const", func_def)
+        constant_cop = params["cop_function"](0.0, 0.0)
+    end
+
+    output_interfaces = InterfaceMap(m_heat_out => nothing)
+    if params["has_secondary_interface"]
+        output_interfaces[m_heat_out_secondary] = nothing
+    end
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_heat_in => nothing, m_el_in => nothing),
+            output_interfaces,
+            m_el_in,
+            m_heat_out,
+            m_heat_out_secondary,
+            m_heat_in,
+            params["economic_parameters"],
+            params["emissions_parameters"],
+            params["has_secondary_interface"],
+            params["primary_el_sources"],
+            params["secondary_el_sources"],
+            params["model_type"],
+            params["power_th"],
+            params["max_power_function"],
+            params["min_power_function"],
+            params["plf_function"],
+            constant_cop,
+            params["cop_function"],
+            params["bypass_cop"],
+            params["min_usage_fraction"],
+            params["consider_icing"],
+            params["icing_coefficients"],
+            params["output_temperature"],
+            params["input_temperature"],
+            params["nr_optimisation_passes"],
+            params["eval_factor_heat"],
+            params["eval_factor_time"],
+            params["eval_factor_elec"],
+            params["fudge_factor"],
+            params["x_abstol"],
+            params["f_abstol"],
+            params["power_losses_factor"],
+            params["heat_losses_factor"],
+            params["constant_loss_power"],
+            0.0,  # current_constant_loss
+            0.0,  # losses_power
+            0.0,  # losses_heat
+            0.0,  # losses
+            0.0,  # balance
+            0.0,  # cop
+            0.0,  # effective_cop
+            0.0,  # mix_temp_input
+            0.0,  # mix_temp_output
+            0.0,  # avg_plr
+            0.0)  # time_active
 end
 
 """
@@ -456,6 +852,7 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
 end
 
 function set_max_energies!(unit::HeatPump,
+                           is_transformer_potential::Bool,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
@@ -468,15 +865,19 @@ function set_max_energies!(unit::HeatPump,
                            purpose_uac_heat_out_secondary::Union{<:Stringing,Vector{<:Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
-    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in; is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, slices_heat_in_temperature, nothing,
-                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in;
+                    is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
-                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
+                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out;
+                    is_transformer_potential=(is_transformer_potential && !unit.has_secondary_interface))
     if unit.has_secondary_interface
         set_max_energy!(unit.output_interfaces[unit.m_heat_out_secondary], heat_out_secondary, nothing,
                         slices_heat_out_secondary_temperature, purpose_uac_heat_out_secondary,
-                        has_calculated_all_maxima_heat_out)
+                        has_calculated_all_maxima_heat_out; is_transformer_potential=false)
+        # if unit.has_secondary_interface, always write max energy to allow communication  
+        # across the two interfaces. This may can lead to problems in very complex energy systems.
     end
 end
 
@@ -800,15 +1201,6 @@ function calculate_slices(unit::HeatPump,
             continue
         end
 
-        # check if heat is available for specific src_idx and snk_idx
-        if energies.available_heat_in[src_idx] == 0
-            src_idx += 1
-            continue
-        elseif energies.available_heat_out[snk_idx] == 0
-            snk_idx += 1
-            continue
-        end
-
         # check and determine input temperature of layer, also skip if it's not in the list
         # of indices to be used (this is used by the mechanism for transformer chains and
         # is controlled by arguments fixed_heat_in and fixed_heat_out)
@@ -1002,8 +1394,8 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
                                      unit.constant_loss_energy)
     energies.potential_el_in -= unit.current_constant_loss
 
-    # shortcut if we're limited by zero input electricity
-    if energies.potential_el_in <= 0.0
+    # shortcut if we're limited by zero input electricity or 0 W thermal design power
+    if energies.potential_el_in <= 0.0 || unit.design_power_th <= sim_params["epsilon"]
         do_calculation = false
     end
 
@@ -1134,7 +1526,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
         return
     end
 
@@ -1153,6 +1545,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                                                             sim_params["epsilon"])
 
         set_max_energies!(unit,
+                          true,
                           energies.slices_el_in,
                           energies.slices_heat_in,
                           primary.slices_heat_out,
@@ -1167,6 +1560,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                           energies.heat_out_has_inf_energy)
     else
         set_max_energies!(unit,
+                          true,
                           energies.slices_el_in,
                           energies.slices_heat_in,
                           energies.slices_heat_out,
@@ -1342,7 +1736,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         # due to constant losses we are guaranteed to have an electricity slice, though
         # it might be zero. we also need to set the max_energy values to zero for the
         # heat input and output, as the sub! and add! methods do that when called
-        set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -1395,10 +1789,20 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
+
+    # calculate energy balance of the heat pump
+    unit.balance = el_in +                                   # input el
+                   sum(energies.slices_heat_in; init=0.0) -  # input heat
+                   heat_out -                                # outputs
+                   unit.losses                               # losses
 end
 
 function component_has_minimum_part_load(unit::HeatPump)
     return unit.min_usage_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::HeatPump)
+    return unit.design_power_th # [W]
 end
 
 # has its own reset function as here more parameters are present that need to be reset in
@@ -1416,6 +1820,7 @@ function reset(unit::HeatPump)
     unit.losses_power = 0.0
     unit.avg_plr = 0.0
     unit.time_active = 0.0
+    unit.balance = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}

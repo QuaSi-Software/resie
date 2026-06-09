@@ -24,22 +24,19 @@ function get_energy_system_ely_and_hp()
             "scale" => 3000,
         ),
         "TST_GRI_O2_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "output_refs" => [],
-            "is_source" => false,
         ),
         "TST_GRI_el_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_ELY_01"],
-            "is_source" => true,
         ),
         "TST_GRI_el_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
@@ -114,7 +111,7 @@ function test_multiple_transformer_with_limitations()
     EnergySystems.potential(heat_pump, simulation_parameters)
     @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy) ≈
           2240 / 4 * ((3.5 - 1) / 3.5)
-    @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_el_in].max_energy) ≈ 2240 / 4 / 3.5
+    @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_el_in].max_energy) ≈ Inf
     @test EnergySystems.get_max_energy(heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy) ≈ 2240 / 4
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
@@ -125,8 +122,8 @@ function test_multiple_transformer_with_limitations()
     @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_heat_ht_out].max_energy) ≈
           2400 / 4 / 0.6 * 0.4
     @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_h2_out].max_energy) ≈ 2400 / 4
-    @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy) ≈ 2400 / 4
-    @test EnergySystems.get_max_energy(electrolyser.input_interfaces[electrolyser.m_el_in].max_energy) ≈ 2400 / 4 / 0.6
+    @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy) ≈ Inf
+    @test EnergySystems.get_max_energy(electrolyser.input_interfaces[electrolyser.m_el_in].max_energy) ≈ Inf
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
@@ -193,7 +190,7 @@ function test_multiple_transformer_with_limitations()
     EnergySystems.potential(heat_pump, simulation_parameters)
     @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy) ≈
           2240 / 4 * ((3.5 - 1) / 3.5)
-    @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_el_in].max_energy) ≈ 2240 / 4 / 3.5
+    @test EnergySystems.get_max_energy(heat_pump.input_interfaces[heat_pump.m_el_in].max_energy) ≈ Inf
     @test EnergySystems.get_max_energy(heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy) ≈ 2240 / 4
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
@@ -205,10 +202,8 @@ function test_multiple_transformer_with_limitations()
           0.5 * 2400 / 4 / 0.6 * 0.4
     @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_h2_out].max_energy) ≈
           0.5 * 2400 / 4
-    @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy) ≈
-          0.5 * 2400 / 4
-    @test EnergySystems.get_max_energy(electrolyser.input_interfaces[electrolyser.m_el_in].max_energy) ≈
-          0.5 * 2400 / 4 / 0.6
+    @test EnergySystems.get_max_energy(electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy) ≈ Inf
+    @test EnergySystems.get_max_energy(electrolyser.input_interfaces[electrolyser.m_el_in].max_energy) ≈ Inf
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0

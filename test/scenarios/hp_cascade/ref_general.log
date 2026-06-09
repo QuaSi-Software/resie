@@ -1,0 +1,32 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] Auxiliary info dumped to file .\test\scenarios\hp_cascade\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 0.048 s. ETA: 0.9295 s
+[Info] Progress: 66/672 in 0.011 s. ETA: 0.2020 s
+[Info] Progress: 99/672 in 0.01 s. ETA: 0.1736 s
+[Info] Progress: 132/672 in 0.009 s. ETA: 0.1473 s
+[Info] Progress: 165/672 in 0.011 s. ETA: 0.1690 s
+[Info] Progress: 198/672 in 0.009 s. ETA: 0.1293 s
+[Info] Progress: 231/672 in 0.011 s. ETA: 0.1470 s
+[Info] Progress: 264/672 in 0.01 s. ETA: 0.1236 s
+[Info] Progress: 297/672 in 0.005 s. ETA: 0.0568 s
+[Info] Progress: 330/672 in 0.01 s. ETA: 0.1036 s
+[Info] Progress: 363/672 in 0.01 s. ETA: 0.0936 s
+[Info] Progress: 396/672 in 0.01 s. ETA: 0.0836 s
+[Info] Progress: 429/672 in 0.011 s. ETA: 0.0810 s
+[Info] Progress: 462/672 in 0.012 s. ETA: 0.0764 s
+[Info] Progress: 495/672 in 0.012 s. ETA: 0.0644 s
+[Info] Progress: 528/672 in 0.009 s. ETA: 0.0393 s
+[Info] Progress: 561/672 in 0.012 s. ETA: 0.0404 s
+[Info] Progress: 594/672 in 0.005 s. ETA: 0.0118 s
+[Info] Progress: 627/672 in 0.011 s. ETA: 0.0150 s
+[Info] Progress: 660/672 in 0.008 s. ETA: 0.0029 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\output\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\hp_cascade\sankey_plot.html
+[Info] CSV-file with outputs written to ./test/scenarios/hp_cascade/out.csv
+[Info] general log saved to .\test\scenarios\hp_cascade\general.log

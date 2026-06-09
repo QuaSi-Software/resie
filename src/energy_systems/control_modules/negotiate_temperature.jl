@@ -1,3 +1,117 @@
+#! format: off
+CONMOD_NEGOTIATE_TEMPERATURE_PARAMS = Dict(
+    "target_uac" => (
+        default=nothing,
+        description="UAC of the target component.",
+        display_name="Target UAC",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_mode" => (
+        default="mean",
+        description="Mode of how the temperature is negotiated. Includes simple " *
+                    "calculations and also a mode optimising for the maximum amount of " *
+                    "energy exchanged.",
+        display_name="Temperature mode",
+        required=false,
+        options=["constant_temperature", "optimize", "mean", "upper", "lower"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "limit_max_output_energy_to_avoid_pulsing" => (
+        default=false,
+        description="Limits the maximum output energy to avoid cases where the negotiated " *
+                    "temperature alternates in every time step.",
+        display_name="Limit to avoid pulsing?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "use_hysteresis" => (
+        default=false,
+        description="If activated uses a hysteresis between two given temperatures.",
+        display_name="Use hysteresis?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "hysteresis_temp_on" => (
+        default=nothing,
+        description="Temperature at which the hysteresis turns on.",
+        display_name="Hyst. temp. on",
+        required=true,
+        conditionals=[
+            ("use_hysteresis", "is_true")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "hysteresis_temp_off" => (
+        default=nothing,
+        description="Temperature at which the hysteresis turns off.",
+        display_name="Hyst. temp. off",
+        required=true,
+        conditionals=[
+            ("use_hysteresis", "is_true")
+        ],
+        validations=[
+            ("self", "value_gt_rel", "hysteresis_temp_on"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "constant_output_temperature" => (
+        default=nothing,
+        description="Constant output temperature if the mode is set to constant.",
+        display_name="Const. output temp.",
+        required=true,
+        conditionals=[
+            ("temperature_mode", "is", "constant_temperature")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "optim_temperature_rel_tol" => (
+        default=1e-5,
+        description="Relative tolerance for optimizing temperature mode.",
+        display_name="Rel. tolerance",
+        required=false,
+        conditionals=[
+            ("temperature_mode", "is", "optimize")
+        ],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "optim_temperature_abs_tol" => (
+        default=0.001,
+        description="Absolute tolerance for optimizing temperature mode.",
+        display_name="Abs. tolerance",
+        required=false,
+        conditionals=[
+            ("temperature_mode", "is", "optimize")
+        ],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Control module to negotiate temperatures between a source and a target when both
 have temperature-dependent energy input/output.
@@ -94,6 +208,9 @@ end
 
 # method for control module name on type-level
 control_module_name(x::Type{CM_Negotiate_Temperature})::String = "negotiate_temperature"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_Negotiate_Temperature})::Dict{String,NamedTuple} = CONMOD_NEGOTIATE_TEMPERATURE_PARAMS
 
 function has_method_for(mod::CM_Negotiate_Temperature, func::ControlModuleFunction)::Bool
     return func == cmf_negotiate_temperature
