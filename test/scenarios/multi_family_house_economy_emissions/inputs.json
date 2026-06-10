@@ -2,7 +2,7 @@
     "io_settings": {
         "csv_output_file": "./test/scenarios/multi_family_house_economy_emissions/out.csv",
         "csv_time_unit": "date",
-        "csv_output_keys": "all_incl_flows",
+        "csv_output": "nothing",
         "csv_output_weather": false,
         "write_csv_continuously": false,
         "auxiliary_info": true,

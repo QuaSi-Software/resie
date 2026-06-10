@@ -2,7 +2,7 @@
     "io_settings": {
         "csv_output_file": "./output/out.csv",
         "csv_time_unit": "date",
-        "csv_output_keys": "all_incl_flows",
+        "csv_output": "all_incl_flows",
         "csv_output_weather": false,
         "write_csv_continuously": false,
         "auxiliary_info": true,
@@ -322,8 +322,9 @@
             "medium": "m_e_ac_230v",
             "is_source": true,
             "economic_parameters": {
-                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
-                "energy_price_profile_scale": 1e-6,
+                "constant_energy_price": 0.35e-3,
+                "_energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
+                "_energy_price_profile_scale": 1e-6,
                 "energy_price_change_rate_per_year": 0.0
             },
             "emissions_parameters": {
