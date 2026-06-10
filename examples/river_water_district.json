@@ -51,7 +51,7 @@
         "Building_A_PV": {
             "type": "PVPlant",
             "output_refs": {
-                "m_el_out": "Building_A_BUS_electricity"
+                "m_el_out": "Central_electricity_Bus"
             },
             "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
             "scale": 250,
@@ -207,87 +207,10 @@
                 ]
             }
         },
-        "Building_A_Battery": {
-            "type": "Battery",
-            "output_refs": ["Building_A_BUS_electricity"],
-            "m_el_in": "m_e_ac_230v",
-            "m_el_out": "m_e_ac_230v",
-            "capacity": 59380,
-            "initial_load": 0.0,
-            "model_type": "simplified",
-            "charge_efficiency": 0.95,
-            "discharge_efficiency": 0.95,
-            "economic_parameters": {
-                "lifetime_years": 12.0,
-                "capex_specific": "linear:0.2",
-                "capex_price_change_rate_per_year": -0.031,
-                "maintenance_inspection_rate_per_year": 0.0,
-                "maintenance_inspection_price_change_rate_per_year": 0.0,
-                "repair_rate_per_year": 0.01,
-                "repair_price_change_rate_per_year": 0.0,
-                "operational_labour_hours_per_year": 0.0,
-                "subsidy_rate_of_capex": 0.0
-            }
-        },
-        "Building_A_BUS_electricity": {
-            "type": "Bus",
-            "medium": "m_e_ac_230v",
-            "connections": {
-                "input_order": [
-                    "Building_A_PV",
-                    "Building_A_Battery",
-                    "Building_A_el_GRI"
-                ],
-                "output_order": [
-                    "Building_A_el_demand",
-                    "Building_A_Booster",
-                    "Building_A_Battery",
-                    "Building_A_el_GRO"
-                ],
-                "energy_flow": [
-                    [1,1,1,1],
-                    [1,1,0,0],
-                    [1,1,0,0]
-                ]
-            }
-        },
-        "Building_A_el_GRI": {
-            "type": "GridInput",
-            "output_refs": {
-                "medium": "Building_A_BUS_electricity"
-            },
-            "medium": "m_e_ac_230v",
-            "is_source": true,
-            "economic_parameters": {
-                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
-                "energy_price_profile_scale": 1e-6,
-                "energy_price_change_rate_per_year": 0.02
-            },
-            "emissions_parameters": {
-                "energy_emissions_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
-                "energy_emissions_profile_scale": 1e-3,
-                "energy_emissions_change_rate_per_year": -0.03
-            }
-        },
-        "Building_A_el_GRO": {
-            "type": "GridOutput",
-            "output_refs": {},
-            "medium": "m_e_ac_230v",
-            "is_source": false,
-            "economic_parameters": {
-                "constant_energy_price": 0.09e-3,
-                "energy_price_change_rate_per_year": 0.0
-            },
-            "emissions_parameters": {
-                "embodied_emissions_specific": "const:0.0",
-                "constant_energy_emissions_credits": 0.0
-            }
-
-        },
         "Building_B_PV_east": {
             "type": "PVPlant",
             "output_refs": {
-                "m_el_out": "Building_B_BUS_electricity"
+                "m_el_out": "Central_electricity_Bus"
             },
             "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
             "scale": 224,
@@ -312,7 +235,7 @@
         "Building_B_PV_west": {
             "type": "PVPlant",
             "output_refs": {
-                "m_el_out": "Building_B_BUS_electricity"
+                "m_el_out": "Central_electricity_Bus"
             },
             "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_west_Wh_per_square_meter.prf",
             "scale": 224,
@@ -468,12 +391,12 @@
                 ]
             }
         },
-        "Building_B_Battery": {
+        "Central_Battery": {
             "type": "Battery",
-            "output_refs": ["Building_B_BUS_electricity"],
+            "output_refs": ["Central_electricity_Bus"],
             "m_el_in": "m_e_ac_230v",
             "m_el_out": "m_e_ac_230v",
-            "capacity": 59380,
+            "capacity": 118760,
             "initial_load": 0.0,
             "model_type": "simplified",
             "charge_efficiency": 0.95,
@@ -490,34 +413,39 @@
                 "subsidy_rate_of_capex": 0.0
             }
         },
-        "Building_B_BUS_electricity": {
+        "Central_electricity_Bus": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "connections": {
                 "input_order": [
+                    "Building_A_PV",
                     "Building_B_PV_east",
                     "Building_B_PV_west",
-                    "Building_B_Battery",
-                    "Building_B_el_GRI"
+                    "Central_Battery",
+                    "Central_el_GRI"
                 ],
                 "output_order": [
+                    "Building_A_el_demand",
                     "Building_B_el_demand",
+                    "Building_A_Booster",
                     "Building_B_Booster",
-                    "Building_B_Battery",
-                    "Building_B_el_GRO"
+                    "River_water_HP",
+                    "Central_Battery",
+                    "Central_el_GRO"
                 ],
                 "energy_flow": [
-                    [1,1,1,1],
-                    [1,1,1,1],
-                    [1,1,0,0],
-                    [1,1,0,0]
+                    [1,1,1,1,1,1,1],
+                    [1,1,1,1,1,1,1],
+                    [1,1,1,1,1,1,1],
+                    [1,1,1,1,1,0,0],
+                    [1,1,1,1,1,0,0]
                 ]
             }
         },
-        "Building_B_el_GRI": {
+        "Central_el_GRI": {
             "type": "GridInput",
             "output_refs": {
-                "medium": "Building_B_BUS_electricity"
+                "medium": "Central_electricity_Bus"
             },
             "medium": "m_e_ac_230v",
             "is_source": true,
@@ -532,7 +460,7 @@
                 "energy_emissions_change_rate_per_year": -0.03
             }
         },
-        "Building_B_el_GRO": {
+        "Central_el_GRO": {
             "type": "GridOutput",
             "output_refs": {},
             "medium": "m_e_ac_230v",
@@ -543,7 +471,9 @@
             },
             "emissions_parameters": {
                 "embodied_emissions_specific": "const:0.0",
-                "constant_energy_emissions_credits": 0.0
+                "energy_emissions_credits_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
+                "energy_emissions_credits_profile_scale": 1e-3,
+                "energy_emissions_credits_change_rate_per_year": -0.03
             }
         },
         "Cental_thermal_Bus": {
@@ -590,24 +520,6 @@
             "emissions_parameters": {
                 "constant_energy_emissions": 0.0
            }
-        },
-        "River_water_HP_Grid_el": {
-            "type": "GridInput",
-            "output_refs": {
-                "medium": "River_water_HP"
-            },
-            "medium": "m_e_ac_230v",
-            "is_source": true,
-            "economic_parameters": {
-                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
-                "energy_price_profile_scale": 1e-6,
-                "energy_price_change_rate_per_year": 0.02
-            },
-            "emissions_parameters": {
-                "energy_emissions_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
-                "energy_emissions_profile_scale": 1e-3,
-                "energy_emissions_change_rate_per_year": -0.03
-            }
         },
         "River_water_HP": {
             "type": "HeatPump",
