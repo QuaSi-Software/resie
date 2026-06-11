@@ -281,11 +281,12 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     if do_write_CSV
+        csv_file_path = sim_params["run_path"](csv_output_file_path)
         if do_write_CSV_continuously
-            @info "CSV-file with outputs continuously written to $(csv_output_file_path)"
+            @info "CSV-file with outputs continuously written to $(csv_file_path)"
         else
             # write output to CSV if not done continuously
-            write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
+            write_to_CSV_file(csv_file_path,
                               output_keys_to_CSV,
                               weather_CSV_keys,
                               sim_params,
@@ -293,14 +294,13 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                               csv_time_unit;
                               do_return=false,
                               output_rows=output_csv)
-            @info "CSV-file with outputs written to $(csv_output_file_path)"
+            @info "CSV-file with outputs written to $(csv_file_path)"
         end
 
         if do_write_summary_CSV
-            input_path = sim_params["run_path"](csv_output_file_path)
-            output_path = replace(input_path, r"\.csv$"i => "_aggregated.csv")
+            output_path = replace(csv_file_path, r"\.csv$"i => "_aggregated.csv")
 
-            success = aggregate_csv(input_path,
+            success = aggregate_csv(csv_file_path,
                                     output_path,
                                     output_keys_to_CSV,
                                     weather_CSV_keys,
