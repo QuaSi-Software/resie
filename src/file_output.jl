@@ -1090,6 +1090,16 @@ function aggregate_csv(input_path::AbstractString,
         return any(term -> occursin(term, output_key), zero_as_missing_terms)
     end
 
+    # identify weather quantities that should be summed
+    function is_weather_energy_column(weather_key::AbstractString)::Bool
+        # hardcoded at this point as they will probably not change...
+        weather_energy_terms = ["beamHorIrr",
+                                "difHorIrr",
+                                "globHorIrr",
+                                "longWaveIrr"]
+        return any(term -> occursin(term, weather_key), weather_energy_terms)
+    end
+
     # parse numbers with German decimal comma and tolerate simple thousands separators
     function parse_decimal_number(value::AbstractString)::Union{Float64,Missing}
         s = strip(value)
@@ -1169,7 +1179,7 @@ function aggregate_csv(input_path::AbstractString,
     end
 
     if weather_data_keys !== nothing
-        append!(classification_keys, ["Weather" for _ in weather_data_keys])
+        append!(classification_keys, ["Weather " * key for key in weather_data_keys])
     end
 
     if length(classification_keys) != length(headers)
@@ -1201,9 +1211,7 @@ function aggregate_csv(input_path::AbstractString,
             classification_key = classification_keys[j]
 
             # collect all valid numeric values of the current column
-            for row_index in 2:length(rows)
-                row = rows[row_index]
-
+            for row in rows[2:end]
                 if j > length(row)
                     continue
                 end
@@ -1242,7 +1250,7 @@ function aggregate_csv(input_path::AbstractString,
                                decimal_string(value_wh / 1_000),
                                decimal_string(value_wh / 1_000_000)])
 
-            elseif is_energy_column(classification_key)
+            elseif is_energy_column(classification_key) || is_weather_energy_column(classification_key)
                 # energy columns contain timestep values and are therefore summed
                 value_wh = clean_small_value(sum(values))
                 min_value = clean_small_value(minimum(values))
