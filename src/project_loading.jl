@@ -53,6 +53,16 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
+    "write_summary_CSV" => (
+        default=true,
+        description="Toggle if a CSV summary output with sum/mean values should be created " *
+                    "additionally to the timestep-wise CSV output.",
+        display_name="Write summary CSV?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
     "csv_output_file" => (
         default="./output/out.csv",
         description="File path to where the CSV output will be written",
