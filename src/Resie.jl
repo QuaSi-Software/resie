@@ -308,10 +308,11 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                      "Balance", "Charge"],              # energy terms
                                     ["_sum"],                           # cumulative terms
                                     ["COP", "Time_active", "Avg_PLR", "MixingTemperature_Input",
-                                     "MixingTemperature_Output"],        # zero as missing terms
+                                     "MixingTemperature_Output"],       # zero as missing terms
                                     ["Time"],                           # time columns
                                     ';',                                # separator
-                                    sim_params["epsilon"])              # threshold
+                                    sim_params["epsilon"],              # threshold
+                                    io_settings["fixed_output_precision"])
             success && @info "Summary CSV-file with outputs created and written to $(output_path)"
         end
     end

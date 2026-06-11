@@ -1003,7 +1003,7 @@ end
 """
     aggregate_csv(input_path, output_path, output_keys, weather_data_keys,
                   energy_terms, cumulative_terms, zero_as_missing_terms,
-                  time_columns, separator, threshold)
+                  time_columns, separator, threshold, fixed_output_precision)
 
 Create a summary CSV from a time-series CSV result file.
 
@@ -1033,7 +1033,8 @@ function aggregate_csv(input_path::AbstractString,
                        zero_as_missing_terms::Vector{String},
                        time_columns::Vector{String},
                        separator::Char,
-                       threshold::Float64)::Bool
+                       threshold::Float64,
+                       fixed_output_precision::Int)::Bool
     if !isfile(input_path)
         @info "No summary CSV could be created, as the CSV result file could not be found at: $(input_path)"
         return false
@@ -1137,7 +1138,12 @@ function aggregate_csv(input_path::AbstractString,
 
     # write numbers with decimal comma for consistency with the ReSiE CSV format
     function decimal_string(value::Real)::String
-        s = string(round(Float64(value); sigdigits=12))
+        # apply fixed precision to the summary output
+        if fixed_output_precision > 0
+            s = string(round(Float64(value); digits=fixed_output_precision))
+        else
+            s = string(Float64(value))
+        end
         return replace(s, "." => ",")
     end
 
