@@ -1,0 +1,2 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+TST_01_HZG_01_DEM m_h_w_ht1 IN;energy;sum;1;750,0;750,0;750,0;0,75;0,00075

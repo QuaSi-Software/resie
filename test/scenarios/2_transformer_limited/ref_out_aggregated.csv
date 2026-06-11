@@ -1,0 +1,8 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+TST_01_ELT_01_ELY m_c_g_h2 OUT;energy;sum;96;7275,0;0,0;375,0;7,275;0,007275
+TST_01_ELT_01_ELY m_h_w_lt1 OUT;energy;sum;96;4850,0;0,0;250,0;4,85;0,00485
+TST_DEM_H2_01 Demand;energy;sum;96;22125,0;0,0;1125,0;22,125;0,022125
+TST_DEM_H2_01 m_c_g_h2 IN;energy;sum;96;7275,0;0,0;375,0;7,275;0,007275
+TST_DEM_ht_01 Demand;energy;sum;96;25800,0;112,5;1125,0;25,8;0,0258
+TST_DEM_ht_01 m_h_w_ht1 IN;energy;sum;96;7275,0;0,0;375,0;7,275;0,007275
+TST_HP_01 m_h_w_ht1 OUT;energy;sum;96;7275,0;0,0;375,0;7,275;0,007275

@@ -1,8 +1,8 @@
 {
     "io_settings": {
+        "csv_output": "all_excl_flows",
         "csv_output_file": "./test/scenarios/electric_transformer/out.csv",
         "csv_time_unit": "date",
-        "csv_output_keys": {},
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/electric_transformer/auxiliary_info.md",
         "fixed_output_precision": 10,
