@@ -847,7 +847,6 @@ function add_transformer_steps(simulation_order,
                 # if any of the input or output branches has a component with minimum part load set and there is 
                 # at leas one input and one output branch, add the branch containing the component with min part load 
                 # again at the end if we are in potential step and if it is not already at the end.
-                # Note: only shallow copies are made here!
                 middle_bus_branches,
                 is_input,
                 is_connecting_branch = double_branches_if_part_load(first_middle_bus,
@@ -1284,8 +1283,6 @@ If all branches have the same direction, the input arrays are returned unchanged
 duplication. Duplicated branches are appended to the end of the branch array and the corresponding entries in
 `is_input` and `is_connecting_branch` are appended accordingly.
 
-The duplicated branches are shallow copies of the branch references, as the existing branch object is appended again.
-
 # Arguments
 - `middle_bus::Component`: The middle bus component
 - `middle_bus_branches::Array{Array{Grouping}}`: An array containing branches with components connected to the middle bus
@@ -1326,9 +1323,9 @@ function double_branches_if_part_load(middle_bus, middle_bus_branches, is_input,
         if is_input[branch_idx] &&
            contains_transformer_with_min_part_load(branch; detect_single_transformer=true) &&
            any(connection_allowed(middle_bus, branch[end].uac, output_uac) for output_uac in output_component_uac)
-            push!(middle_bus_branches_doubled, middle_bus_branches[branch_idx])
-            push!(is_input_doubled, is_input[branch_idx])
-            push!(is_connecting_branch_doubled, is_connecting_branch[branch_idx])
+            push!(middle_bus_branches_doubled, copy(middle_bus_branches[branch_idx]))
+            push!(is_input_doubled, copy(is_input[branch_idx]))
+            push!(is_connecting_branch_doubled, copy(is_connecting_branch[branch_idx]))
         end
     end
 
@@ -1339,9 +1336,9 @@ function double_branches_if_part_load(middle_bus, middle_bus_branches, is_input,
         if !is_input[branch_idx] &&
            contains_transformer_with_min_part_load(branch; detect_single_transformer=true) &&
            any(connection_allowed(middle_bus, input_uac, branch[1].uac) for input_uac in input_component_uac)
-            push!(middle_bus_branches_doubled, middle_bus_branches[branch_idx])
-            push!(is_input_doubled, is_input[branch_idx])
-            push!(is_connecting_branch_doubled, is_connecting_branch[branch_idx])
+            push!(middle_bus_branches_doubled, copy(middle_bus_branches[branch_idx]))
+            push!(is_input_doubled, copy(is_input[branch_idx]))
+            push!(is_connecting_branch_doubled, copy(is_connecting_branch[branch_idx]))
         end
     end
 
