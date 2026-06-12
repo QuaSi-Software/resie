@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10492373.svg)](https://zenodo.org/doi/10.5281/zenodo.10492373)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20555214.svg)](https://doi.org/10.5281/zenodo.20555214) 
 
 # ReSiE - simulation engine for district-scale networks of energy systems
 
