@@ -1,10 +1,10 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10492373.svg)](https://zenodo.org/doi/10.5281/zenodo.10492373)
 
-# Resie - simulation engine for district-scale networks of energy systems
+# ReSiE - simulation engine for district-scale networks of energy systems
 
-Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
+Use of ReSiE is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
 
-Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. External files with different license have their own license file in their respective folders.
+ReSiE is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. External files with different license have their own license file in their respective folders.
 For information on how you can contribute please check the documentation.
 
 ## Installation
@@ -139,7 +139,7 @@ Open `launch.json` (via the gear wheel in the run config dropdown in the debug t
 {
     "type": "julia",
     "request": "launch",
-    "name": "Run Resie tests",
+    "name": "Run ReSiE tests",
     "program": "path/to/resie/test/runtests.jl",
     "stopOnEntry": false,
     "cwd": "path/to/resie/",
