@@ -21,7 +21,9 @@ For information on how you can contribute please check the documentation.
 3. Start the julia REPL with `julia`
 4. Switch to the package REPL with `]` (no enter necessary)
 5. Activate the project environment: `activate .`
-6. Install and precompile required packages: `instantiate`. This should create a file `Manifest.toml` in the ReSiE root directory
+    * The dot stands for the current directory and is important to denote, that the activated environment relates to the ReSiE directory
+6. Install and precompile required packages: `instantiate`
+   * This should create a file `Manifest.toml` in the ReSiE root directory
 7. Exit out of the package REPL with shortcut `Ctrl+c`
 8. Exit out of the julia REPL with `exit()` or shortcut `Ctrl+d`
 
