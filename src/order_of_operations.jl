@@ -655,20 +655,6 @@ function add_transformer_steps(simulation_order,
         return current_reverse
     end
 
-    function contains_transformer_with_min_part_load(components)
-        transformer_only = [component
-                            for component in components if component.sys_function === EnergySystems.sf_transformer]
-        if length(transformer_only) <= 1
-            return false
-        end
-        for component in transformer_only
-            if EnergySystems.component_has_minimum_part_load(component)
-                return true
-            end
-        end
-        return false
-    end
-
     # detect the first "middle transformers" that has either at more than one input interface 
     # or at more than one output interface at least each one transformer. 
     # "First" means it has no other middle transformer in it's inputs.
@@ -855,6 +841,19 @@ function add_transformer_steps(simulation_order,
                 push!(middle_bus_branches, popat!(middle_bus_branches, findfirst(is_connecting_branch)))
                 push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
                 push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
+            end
+
+            if step_category == "potential"
+                # if any of the input or output branches has a component with minimum part load set and there is 
+                # at leas one input and one output branch, add the branch containing the component with min part load 
+                # again at the end if we are in potential step and if it is not already at the end.
+                # Note: only shallow copies are made here!
+                middle_bus_branches,
+                is_input,
+                is_connecting_branch = double_branches_if_part_load(first_middle_bus,
+                                                                    middle_bus_branches,
+                                                                    is_input,
+                                                                    is_connecting_branch)
             end
 
             # iterate over middle bus branches
@@ -1236,6 +1235,117 @@ function order_indexes(constraints)
     end
 
     return sorted_list
+end
+
+"""
+    contains_transformer_with_min_part_load(components; detect_single_transformer=false)
+
+This function checks whether a branch contains at least one transformer with an active minimum part load.
+Only components with the system function `EnergySystems.sf_transformer` are considered.
+
+If `detect_single_transformer` is set to `false`, branches containing only one transformer are ignored. This is used
+to detect only branches with multiple transformers by default. If `detect_single_transformer` is set to `true`, a
+single transformer with minimum part load is sufficient for the function to return `true`.
+
+# Arguments
+- `components::Array{Grouping}`: An array containing the components of a branch
+- `detect_single_transformer::Bool`: A keyword argument indicating if a single transformer should be considered
+
+# Returns
+- `has_transformer_with_min_part_load::Bool`: A bool indicating if the branch contains at least one relevant transformer with minimum part load
+"""
+function contains_transformer_with_min_part_load(components; detect_single_transformer=false)
+    transformer_only = [component
+                        for component in components if component.sys_function === EnergySystems.sf_transformer]
+    if length(transformer_only) < 1
+        return false
+    elseif !detect_single_transformer && length(transformer_only) == 1
+        return false
+    end
+    for component in transformer_only
+        if EnergySystems.component_has_minimum_part_load(component)
+            return true
+        end
+    end
+    return false
+end
+
+"""
+    double_branches_if_part_load(middle_bus, middle_bus_branches, is_input, is_connecting_branch)
+
+This function duplicates branches connected to a middle bus if they contain a transformer with minimum part load and
+are allowed to exchange energy with at least one opposite branch.
+
+The function is used for middle bus branch ordering where part-load constraints can introduce additional dependencies
+between input and output branches. A branch is only duplicated if the branch contains a transformer with minimum part
+load and if a connection from this branch to at least one branch of the opposite direction is allowed.
+
+If all branches have the same direction, the input arrays are returned unchanged. The last branch is skipped during
+duplication. Duplicated branches are appended to the end of the branch array and the corresponding entries in
+`is_input` and `is_connecting_branch` are appended accordingly.
+
+The duplicated branches are shallow copies of the branch references, as the existing branch object is appended again.
+
+# Arguments
+- `middle_bus::Component`: The middle bus component
+- `middle_bus_branches::Array{Array{Grouping}}`: An array containing branches with components connected to the middle bus
+- `is_input::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
+- `is_connecting_branch::Array{Bool}`: An array with bools indicating if a branch in branches is a connecting branch
+
+# Returns
+- `middle_bus_branches_doubled::Array{Array{Grouping}}`: An array containing the original branches and additional duplicated branches
+- `is_input_doubled::Array{Bool}`: An array containing the input indicators for the original and duplicated branches
+- `is_connecting_branch_doubled::Array{Bool}`: An array containing the connecting branch indicators for the original and duplicated branches
+
+"""
+function double_branches_if_part_load(middle_bus, middle_bus_branches, is_input, is_connecting_branch)
+    # check if we have at least one input and one output branch. All branches have at least one transformer here.
+    # Later, we check if a possible branch containing a part-load component is allowed to transfer energy to an
+    # opposite branch.
+    if !any(is_input) || all(is_input)
+        return middle_bus_branches, is_input, is_connecting_branch
+    end
+
+    # get all connected input and output components of the the middle_bus_branches to the middle_bus
+    input_component_uac = [branch[end].uac
+                           for (branch_idx, branch) in enumerate(middle_bus_branches)
+                           if is_input[branch_idx]]
+
+    output_component_uac = [branch[1].uac
+                            for (branch_idx, branch) in enumerate(middle_bus_branches)
+                            if !is_input[branch_idx]]
+
+    middle_bus_branches_doubled = copy(middle_bus_branches)
+    is_input_doubled = copy(is_input)
+    is_connecting_branch_doubled = copy(is_connecting_branch)
+
+    # first, copy input branches containing transformers with part load and with connection allowed 
+    # to at least one output branch to the end of the middle_bus_branches
+    for (branch_idx, branch) in enumerate(middle_bus_branches)
+        branch_idx == length(middle_bus_branches) && continue   # skip the last branch
+        if is_input[branch_idx] &&
+           contains_transformer_with_min_part_load(branch; detect_single_transformer=true) &&
+           any(connection_allowed(middle_bus, branch[end].uac, output_uac) for output_uac in output_component_uac)
+            push!(middle_bus_branches_doubled, middle_bus_branches[branch_idx])
+            push!(is_input_doubled, is_input[branch_idx])
+            push!(is_connecting_branch_doubled, is_connecting_branch[branch_idx])
+        end
+    end
+
+    # then, copy output branches containing transformers with part load and with connection allowed
+    # to at least one input branch to the end of the middle_bus_branches
+    for (branch_idx, branch) in enumerate(middle_bus_branches)
+        branch_idx == length(middle_bus_branches) && continue   # skip the last branch
+        if !is_input[branch_idx] &&
+           contains_transformer_with_min_part_load(branch; detect_single_transformer=true) &&
+           any(connection_allowed(middle_bus, input_uac, branch[1].uac) for input_uac in input_component_uac)
+            push!(middle_bus_branches_doubled, middle_bus_branches[branch_idx])
+            push!(is_input_doubled, is_input[branch_idx])
+            push!(is_connecting_branch_doubled, is_connecting_branch[branch_idx])
+        end
+    end
+
+    return middle_bus_branches_doubled, is_input_doubled, is_connecting_branch_doubled
 end
 
 """
