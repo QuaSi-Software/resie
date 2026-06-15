@@ -1681,7 +1681,11 @@ function split_slices_primary_secondary(unit::HeatPump,
             is_secondary = src in secondary_uac
 
             if is_primary && is_secondary
-                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
+                @error "In heat pump $(unit.uac), the source '$src' is both in primary_uac and secondary_uac, choose one!"
+                throw(InputError())
+            elseif !is_primary && !is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac!"
+                throw(InputError())
             end
 
             # scale energy quantities
