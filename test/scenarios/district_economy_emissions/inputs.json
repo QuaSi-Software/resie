@@ -1,0 +1,745 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/district_economy_emissions/out.csv",
+        "csv_time_unit": "date",
+        "csv_output": "nothing",
+        "csv_output_weather": false,
+        "write_csv_continuously": false,
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/district_economy_emissions/auxiliary_info.md",
+        "auxiliary_plots": false,
+        "sankey_plot_file": "./test/scenarios/district_economy_emissions/sankey_plot.html",
+        "sankey_plot": "default",
+        "output_plot_file": "./test/scenarios/district_economy_emissions/output_plot.html",
+        "output_plot_time_unit": "date",
+        "output_plot": "all_incl_flows",
+        "plot_weather_data": false,
+        "plot_economic_cashflows": true,
+        "economic_plot_cashflows_file_path": "./test/scenarios/district_economy_emissions/economic_results_cashflows.html",
+        "plot_economic_present_values": true,
+        "economic_plot_present_values_file_path": "./test/scenarios/district_economy_emissions/economic_results_present_values.html",
+        "output_economic_CSV": true,
+        "economic_CSV_file_path": "./test/scenarios/district_economy_emissions/economic_results.csv",
+        "plot_emission_results": true,
+        "emissions_plot_file_path": "./test/scenarios/district_economy_emissions/emissions_plot.html",
+        "output_emissions_CSV": true,
+        "emissions_CSV_file_path": "./test/scenarios/district_economy_emissions/emissions_results.csv",
+        "plot_price_and_emission_profiles": false
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes",
+        "epsilon": 1e-06
+    },
+    "economic_parameters": {
+        "calculate_economy": true,
+        "observation_period_in_years": 20,
+        "interest_rate": 0.03,
+        "repeat_method": "last_year"
+    },
+    "emissions_parameters": {
+        "calculate_emissions": true,
+        "observation_period_in_years": 20,
+        "include_embodied_emissions": false,
+        "repeat_method": "last_year"
+    },
+    "components": {
+        "Building_A_PV": {
+            "type": "PVPlant",
+            "output_refs": {
+                "m_el_out": "Building_A_BUS_electricity"
+            },
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 250,
+            "m_el_out": "m_e_ac_230v",
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "constant_energy_price": 0.0,
+                "capex_specific": "power_func:311.0,0.92",
+                "capex_price_change_rate_per_year": -0.02,
+                "maintenance_inspection_rate_per_year": 0.01,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions": 0.0
+            }
+        },
+        "Building_A_el_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_e_ac_230v",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_living_2690_square_meter.prf",
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.28e-3,
+                "energy_price_change_rate_per_year": 0.02
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+
+        },
+        "Building_A_heating_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_h_w_ht1",
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_EH55_living_2690_square_meter.prf",
+            "constant_temperature": 37,
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.12e-3
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+        },
+        "Building_A_DHW_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_h_w_ht1",
+            "energy_profile_file_path": "./profiles/examples/district/demand_DHW_living_2690_square_meter.prf",
+            "constant_temperature": 58,
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.12e-3
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+        },
+        "Building_A_BFT": {
+            "type": "BufferTank",
+            "output_refs": {
+                "medium": "Building_A_BUS_thermal"
+            },
+            "medium": "m_h_w_ht1",
+            "volume": 2.25,
+            "model_type": "ideally_stratified",
+            "__GENERAL_PARAMETER__": "",
+            "high_temperature": 37,
+            "low_temperature": 17,
+            "rho_medium": 1000,
+            "cp_medium": 4180,
+            "initial_load": 0.0,
+            "max_load_rate": 1,
+            "max_unload_rate": 1.5,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 25,
+            "ground_temperature": 15,
+            "thermal_transmission_lid": 0.2,
+            "thermal_transmission_barrel": 0.2,
+            "thermal_transmission_bottom": 0.2,
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "capex_specific": "power_func:18,0.92",
+                "capex_specific_scale": 1e3,
+                "capex_price_change_rate_per_year": 0.0,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.0,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            }
+        },
+        "Building_A_Booster": {
+            "type": "ThermalBooster",
+            "m_el_in": "m_e_ac_230v",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_ht1",
+            "output_refs": ["Building_A_DHW_demand"],
+            "power_el": 10000.0,
+            "cp_medium_out": 4180.0,
+            "constant_demand_input_temperature": 12,
+            "input_temperature": 37,
+            "terminal_dT": 2.0,
+            "power_losses_factor": 0.97,
+            "heat_losses_factor": 0.95,
+            "allow_boost_solely": false,
+            "allow_boost_additional": false,
+            "economic_parameters": {
+                "lifetime_years": 18,
+                "capex_specific": "power_func:1.428,0.75",
+                "capex_specific_scale": 1e-3,
+                "capex_price_change_rate_per_year": 0.012,
+                "maintenance_inspection_rate_per_year": 0.01,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            },
+            "emissions_parameters": {
+                "lifetime_years": 18,
+                "embodied_emissions_specific": "const:0.0",
+                "embodied_emissions_change_rate_per_year": 0.0
+            }
+        },
+        "Building_A_BUS_thermal": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "Cental_thermal_Bus",
+                    "Building_A_BFT"
+                ],
+                "output_order": [
+                    "Building_A_Booster",
+                    "Building_A_heating_demand",
+                    "Building_A_BFT"
+                ],
+                "energy_flow": [
+                    [1,1,1],
+                    [1,1,1]
+                ]
+            }
+        },
+        "Building_A_Battery": {
+            "type": "Battery",
+            "output_refs": ["Building_A_BUS_electricity"],
+            "m_el_in": "m_e_ac_230v",
+            "m_el_out": "m_e_ac_230v",
+            "capacity": 59380,
+            "initial_load": 0.0,
+            "model_type": "simplified",
+            "charge_efficiency": 0.95,
+            "discharge_efficiency": 0.95,
+            "economic_parameters": {
+                "lifetime_years": 12.0,
+                "capex_specific": "linear:0.2",
+                "capex_price_change_rate_per_year": -0.031,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0
+            }
+        },
+        "Building_A_BUS_electricity": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "Building_A_PV",
+                    "Building_A_Battery",
+                    "Building_A_el_GRI"
+                ],
+                "output_order": [
+                    "Building_A_el_demand",
+                    "Building_A_Booster",
+                    "Building_A_Battery",
+                    "Building_A_el_GRO"
+                ],
+                "energy_flow": [
+                    [1,1,1,1],
+                    [1,1,0,0],
+                    [1,1,0,0]
+                ]
+            }
+        },
+        "Building_A_el_GRI": {
+            "type": "GridInput",
+            "output_refs": {
+                "medium": "Building_A_BUS_electricity"
+            },
+            "medium": "m_e_ac_230v",
+            "is_source": true,
+            "economic_parameters": {
+                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
+                "energy_price_profile_scale": 1e-6,
+                "energy_price_change_rate_per_year": 0.02
+            },
+            "emissions_parameters": {
+                "energy_emissions_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
+                "energy_emissions_profile_scale": 1e-3,
+                "energy_emissions_change_rate_per_year": -0.03
+            }
+        },
+        "Building_A_el_GRO": {
+            "type": "GridOutput",
+            "output_refs": {},
+            "medium": "m_e_ac_230v",
+            "is_source": false,
+            "economic_parameters": {
+                "constant_energy_price": 0.09e-3,
+                "energy_price_change_rate_per_year": 0.0
+            },
+            "emissions_parameters": {
+                "embodied_emissions_specific": "const:0.0",
+                "constant_energy_emissions_credits": 0.0
+            }
+
+        },
+        "Building_B_PV_east": {
+            "type": "PVPlant",
+            "output_refs": {
+                "m_el_out": "Building_B_BUS_electricity"
+            },
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
+            "scale": 224,
+            "m_el_out": "m_e_ac_230v",
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "constant_energy_price": 0.0,
+                "capex_specific": "power_func:311.0,0.92",
+                "capex_price_change_rate_per_year": -0.02,
+                "maintenance_inspection_rate_per_year": 0.01,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions": 0.0
+            }
+        },
+        "Building_B_PV_west": {
+            "type": "PVPlant",
+            "output_refs": {
+                "m_el_out": "Building_B_BUS_electricity"
+            },
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_west_Wh_per_square_meter.prf",
+            "scale": 224,
+            "m_el_out": "m_e_ac_230v",
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "constant_energy_price": 0.0,
+                "capex_specific": "power_func:311.0,0.92",
+                "capex_price_change_rate_per_year": -0.02,
+                "maintenance_inspection_rate_per_year": 0.01,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions": 0.0
+            }
+        },
+        "Building_B_el_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_e_ac_230v",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_living_commercial_4860_square_meter.prf",
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.28e-3,
+                "energy_price_change_rate_per_year": 0.02
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+
+        },
+        "Building_B_heating_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_h_w_ht1",
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_living_commercial_4860_square_meter.prf",
+            "constant_temperature": 37,
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.12e-3
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+        },
+        "Building_B_DHW_demand": {
+            "type": "Demand",
+            "output_refs": {},
+            "medium": "m_h_w_ht1",
+            "energy_profile_file_path": "./profiles/examples/district/demand_DHW_living_commercial_4860_square_meter.prf",
+            "constant_temperature": 58,
+            "scale": 1,
+            "economic_parameters": {
+                "constant_energy_price": 0.12e-3
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions_credits": 0.0
+            }
+        },
+        "Building_B_BFT": {
+            "type": "BufferTank",
+            "output_refs": {
+                "medium": "Building_B_BUS_thermal"
+            },
+            "medium": "m_h_w_ht1",
+            "volume": 2.75,
+            "model_type": "ideally_stratified",
+            "__GENERAL_PARAMETER__": "",
+            "high_temperature": 37,
+            "low_temperature": 17,
+            "rho_medium": 1000,
+            "cp_medium": 4180,
+            "initial_load": 0.0,
+            "max_load_rate": 1,
+            "max_unload_rate": 1.5,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 25,
+            "ground_temperature": 15,
+            "thermal_transmission_lid": 0.2,
+            "thermal_transmission_barrel": 0.2,
+            "thermal_transmission_bottom": 0.2,
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "capex_specific": "power_func:18,0.92",
+                "capex_specific_scale": 1e3,
+                "capex_price_change_rate_per_year": 0.0,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.0,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            }
+        },
+        "Building_B_Booster": {
+            "type": "ThermalBooster",
+            "m_el_in": "m_e_ac_230v",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_ht1",
+            "output_refs": ["Building_B_DHW_demand"],
+            "power_el": 6500.0,
+            "cp_medium_out": 4180.0,
+            "constant_demand_input_temperature": 12,
+            "input_temperature": 37,
+            "terminal_dT": 2.0,
+            "power_losses_factor": 0.97,
+            "heat_losses_factor": 0.95,
+            "allow_boost_solely": false,
+            "allow_boost_additional": false,
+            "economic_parameters": {
+                "lifetime_years": 18,
+                "capex_specific": "power_func:1.428,0.75",
+                "capex_specific_scale": 1e-3,
+                "capex_price_change_rate_per_year": 0.012,
+                "maintenance_inspection_rate_per_year": 0.01,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            },
+            "emissions_parameters": {
+                "lifetime_years": 18,
+                "embodied_emissions_specific": "const:0.0",
+                "embodied_emissions_change_rate_per_year": 0.0
+            }
+        },
+        "Building_B_BUS_thermal": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "Cental_thermal_Bus",
+                    "Building_B_BFT"
+                ],
+                "output_order": [
+                    "Building_B_Booster",
+                    "Building_B_heating_demand",
+                    "Building_B_BFT"
+                ],
+                "energy_flow": [
+                    [1,1,1],
+                    [1,1,1]
+                ]
+            }
+        },
+        "Building_B_Battery": {
+            "type": "Battery",
+            "output_refs": ["Building_B_BUS_electricity"],
+            "m_el_in": "m_e_ac_230v",
+            "m_el_out": "m_e_ac_230v",
+            "capacity": 59380,
+            "initial_load": 0.0,
+            "model_type": "simplified",
+            "charge_efficiency": 0.95,
+            "discharge_efficiency": 0.95,
+            "economic_parameters": {
+                "lifetime_years": 12.0,
+                "capex_specific": "linear:0.2",
+                "capex_price_change_rate_per_year": -0.031,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0
+            }
+        },
+        "Building_B_BUS_electricity": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "Building_B_PV_east",
+                    "Building_B_PV_west",
+                    "Building_B_Battery",
+                    "Building_B_el_GRI"
+                ],
+                "output_order": [
+                    "Building_B_el_demand",
+                    "Building_B_Booster",
+                    "Building_B_Battery",
+                    "Building_B_el_GRO"
+                ],
+                "energy_flow": [
+                    [1,1,1,1],
+                    [1,1,1,1],
+                    [1,1,0,0],
+                    [1,1,0,0]
+                ]
+            }
+        },
+        "Building_B_el_GRI": {
+            "type": "GridInput",
+            "output_refs": {
+                "medium": "Building_B_BUS_electricity"
+            },
+            "medium": "m_e_ac_230v",
+            "is_source": true,
+            "economic_parameters": {
+                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
+                "energy_price_profile_scale": 1e-6,
+                "energy_price_change_rate_per_year": 0.02
+            },
+            "emissions_parameters": {
+                "energy_emissions_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
+                "energy_emissions_profile_scale": 1e-3,
+                "energy_emissions_change_rate_per_year": -0.03
+            }
+        },
+        "Building_B_el_GRO": {
+            "type": "GridOutput",
+            "output_refs": {},
+            "medium": "m_e_ac_230v",
+            "is_source": false,
+            "economic_parameters": {
+                "constant_energy_price": 0.09e-3,
+                "energy_price_change_rate_per_year": 0.0
+            },
+            "emissions_parameters": {
+                "embodied_emissions_specific": "const:0.0",
+                "constant_energy_emissions_credits": 0.0
+            }
+        },
+        "Cental_thermal_Bus": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "River_water_HP",
+                    "central_BFT",
+                    "Gasboiler"
+                ],
+                "output_order": [
+                    "Building_A_BUS_thermal",
+                    "Building_B_BUS_thermal",
+                    "central_BFT"
+                ],
+                "energy_flow": [
+                    [1,1,1],
+                    [1,1,1],
+                    [1,1,1]
+                ]
+            }
+        },
+        "River_water_thermal_source": {
+            "type": "FlexibleSupply",
+            "output_refs": {
+                "medium": "River_water_HP"
+            },
+            "medium": "m_h_w_lt1",
+            "temperature_profile_file_path": "./profiles/examples/district/river_water_temperature_mean_values_2010-2021.prf",
+            "constant_power": 1000000,
+            "economic_parameters": {
+                "constant_energy_price": 0.0,
+                "lifetime_years": 20.0,
+                "capex_specific": "const:50000",
+                "capex_price_change_rate_per_year": 0.0,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0
+            },
+            "emissions_parameters": {
+                "constant_energy_emissions": 0.0
+           }
+        },
+        "River_water_HP_Grid_el": {
+            "type": "GridInput",
+            "output_refs": {
+                "medium": "River_water_HP"
+            },
+            "medium": "m_e_ac_230v",
+            "is_source": true,
+            "economic_parameters": {
+                "energy_price_profile_file_path": "./profiles/examples/district/electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf",
+                "energy_price_profile_scale": 1e-6,
+                "energy_price_change_rate_per_year": 0.02
+            },
+            "emissions_parameters": {
+                "energy_emissions_profile_file_path": "./profiles/examples/district/electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf",
+                "energy_emissions_profile_scale": 1e-3,
+                "energy_emissions_change_rate_per_year": -0.03
+            }
+        },
+        "River_water_HP": {
+            "type": "HeatPump",
+            "output_refs": {
+                "m_heat_out": "Cental_thermal_Bus"
+            },
+            "power_th": 100000,
+            "model_type": "inverter",
+            "plf_function": "const:1.0",
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_h_w_lt1",
+            "m_el_in": "m_e_ac_230v",
+            "m_heat_out": "m_h_w_ht1",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "field:0,35,45,55,65;-5.0,3.0,2.4,2.3,2.0;0,4,3.3,2.8,2.4;10.0,5.0,4.2,3.3,2.8;20.0,6.3,5.0,4.1,3.2;30.0,9.0,7.0,4.7,4.2",
+            "bypass_cop": 15,
+            "min_power_function": "const:0.2",
+            "min_usage_fraction": 0.2,
+            "max_power_function": "poly-2:0.3763118581,0.0858428260,0.0,-0.00393688142,0.0,0.0,0.00005894802365,0.0,0.0,0.0",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 0.97,
+            "power_losses_factor": 0.97,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": false,
+            "optimise_slice_dispatch": false,
+            "optimal_plr": 0.5,
+            "nr_optimisation_passes": 10,
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "capex_specific": "power_func:9472,0.51",
+                "capex_specific_scale": 1e-3,
+                "capex_price_change_rate_per_year": -0.01,
+                "maintenance_inspection_rate_per_year": 0.015,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            }
+        },
+        "central_BFT": {
+            "type": "BufferTank",
+            "output_refs": {
+                "medium": "Cental_thermal_Bus"
+            },
+            "__OPTIONAL_MEDIA__": "",
+            "medium": "m_h_w_ht1",
+            "___SIZING___": "",
+            "volume": 25,
+            "___MODEL_PARAMETERS___": "",
+            "model_type": "ideally_stratified",
+            "__GENERAL_PARAMETER__": "",
+            "high_temperature": 37,
+            "low_temperature": 17,
+            "rho_medium": 1000,
+            "cp_medium": 4180,
+            "initial_load": 0.0,
+            "max_load_rate": 2,
+            "max_unload_rate": 0.12,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 4,
+            "constant_ambient_temperature": 15,
+            "ground_temperature": 20,
+            "thermal_transmission_lid": 0.1,
+            "thermal_transmission_barrel": 0.1,
+            "thermal_transmission_bottom": 0.1,
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "capex_specific": "power_func:1183,0.91",
+                "capex_specific_scale": 1.0,
+                "capex_price_change_rate_per_year": 0.0,
+                "maintenance_inspection_rate_per_year": 0.0,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.0,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            }
+        },
+        "Gasboiler": {
+            "type": "FuelBoiler",
+            "output_refs": {
+                "m_heat_out": "Cental_thermal_Bus"
+            },
+            "m_fuel_in": "m_c_g_ch4",
+            "m_heat_out": "m_h_w_ht1",
+            "power_th": 150000,
+            "__OPTIONAL__": "",
+            "efficiency_fuel_in": "const:1.06",
+            "efficiency_heat_out": "const:1.0",
+            "linear_interface": "heat_out",
+            "min_power_fraction": 0.0,
+            "control_modules": [
+                {
+                    "name": "storage_driven",
+                    "high_threshold": 0.4,
+                    "low_threshold": 0.1,
+                    "storage_uac": "central_BFT"
+                }
+            ],
+            "economic_parameters": {
+                "lifetime_years": 20,
+                "capex_specific": "power_func:4634,0.46",
+                "capex_specific_scale": 1e-3,
+                "capex_price_change_rate_per_year": -0.01,
+                "maintenance_inspection_rate_per_year": 0.015,
+                "maintenance_inspection_price_change_rate_per_year": 0.0,
+                "repair_rate_per_year": 0.01,
+                "repair_price_change_rate_per_year": 0.0,
+                "operational_labour_hours_per_year": 0.0,
+                "subsidy_rate_of_capex": 0.0,
+                "subsidy_max": -1.0
+            }
+        },
+        "Grid_NaturalGas": {
+            "type": "GridInput",
+            "output_refs": {
+                "medium": "Gasboiler"
+            },
+            "medium": "m_c_g_ch4",
+            "is_source": true,
+            "economic_parameters": {
+                "constant_energy_price": 0.095e-3,
+                "energy_price_change_rate_per_year": 0.04
+            },
+            "emissions_parameters": {
+                "energy_emissions_profile_file_path": "./profiles/examples/district/gas_emissions_2020_2070.prf",
+                "energy_emissions_change_rate_per_year": 0
+            }
+        }
+
+    }
+}

@@ -26,28 +26,29 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\multisector_district\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 1752/35040 in 2.903 s. ETA: 55.1570 s
-[Info] Progress: 3504/35040 in 2.714 s. ETA: 48.8520 s
-[Info] Progress: 5256/35040 in 3.041 s. ETA: 51.6970 s
-[Info] Progress: 7008/35040 in 2.837 s. ETA: 45.3920 s
-[Info] Progress: 8760/35040 in 2.816 s. ETA: 42.2400 s
-[Info] Progress: 10512/35040 in 2.922 s. ETA: 40.9080 s
-[Info] Progress: 12264/35040 in 4.09 s. ETA: 53.1700 s
-[Info] Progress: 14016/35040 in 3.144 s. ETA: 37.7280 s
-[Info] Progress: 15768/35040 in 2.701 s. ETA: 29.7110 s
-[Info] Progress: 17520/35040 in 2.525 s. ETA: 25.2500 s
-[Info] Progress: 19272/35040 in 2.63 s. ETA: 23.6700 s
-[Info] Progress: 21024/35040 in 2.309 s. ETA: 18.4720 s
-[Info] Progress: 22776/35040 in 2.285 s. ETA: 15.9950 s
-[Info] Progress: 24528/35040 in 2.266 s. ETA: 13.5960 s
-[Info] Progress: 26280/35040 in 2.29 s. ETA: 11.4500 s
-[Info] Progress: 28032/35040 in 2.244 s. ETA: 8.9760 s
-[Info] Progress: 29784/35040 in 2.376 s. ETA: 7.1280 s
-[Info] Progress: 31536/35040 in 2.246 s. ETA: 4.4920 s
-[Info] Progress: 33288/35040 in 2.565 s. ETA: 2.5650 s
-[Info] Progress: 35040/35040 in 3.344 s. ETA: 0.0000 s
+[Info] Progress: 1752/35040 in 11.299 s. ETA: 214.6810 s
+[Info] Progress: 3504/35040 in 8.731 s. ETA: 157.1580 s
+[Info] Progress: 5256/35040 in 8.836 s. ETA: 150.2120 s
+[Info] Progress: 7008/35040 in 8.4 s. ETA: 134.4000 s
+[Info] Progress: 8760/35040 in 10.502 s. ETA: 157.5300 s
+[Info] Progress: 10512/35040 in 10.702 s. ETA: 149.8280 s
+[Info] Progress: 12264/35040 in 8.378 s. ETA: 108.9140 s
+[Info] Progress: 14016/35040 in 8.499 s. ETA: 101.9880 s
+[Info] Progress: 15768/35040 in 8.082 s. ETA: 88.9020 s
+[Info] Progress: 17520/35040 in 13.039 s. ETA: 130.3900 s
+[Info] Progress: 19272/35040 in 11.839 s. ETA: 106.5510 s
+[Info] Progress: 21024/35040 in 7.995 s. ETA: 63.9600 s
+[Info] Progress: 22776/35040 in 8.884 s. ETA: 62.1880 s
+[Info] Progress: 24528/35040 in 7.914 s. ETA: 47.4840 s
+[Info] Progress: 26280/35040 in 9.932 s. ETA: 49.6600 s
+[Info] Progress: 28032/35040 in 8.266 s. ETA: 33.0640 s
+[Info] Progress: 29784/35040 in 7.597 s. ETA: 22.7910 s
+[Info] Progress: 31536/35040 in 8.696 s. ETA: 17.3920 s
+[Info] Progress: 33288/35040 in 7.675 s. ETA: 7.6750 s
+[Info] Progress: 35040/35040 in 8.706 s. ETA: 0.0000 s
 [Info] -- Finished time step loop
+[Info] CSV-file with outputs written to .\test\scenarios\multisector_district\out.csv
+[Info] Summary CSV-file with outputs created and written to .\test\scenarios\multisector_district\out_aggregated.csv
 [Info] Line plot created and saved to .\test\scenarios\multisector_district\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\multisector_district\sankey_plot.html
-[Info] CSV-file with outputs written to ./test/scenarios/multisector_district/out.csv
 [Info] general log saved to .\test\scenarios\multisector_district\general.log

@@ -646,6 +646,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_para
     Dict{String,Any}(
             "lifetime_years" => 30,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.02,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -664,6 +665,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_pa
     Dict{String,Any}(
         "lifetime_years" => 30,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(

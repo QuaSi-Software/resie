@@ -4,6 +4,14 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.1
+* add two new examples and scenarios for a multi-family house and a district, both with economic evaluation and GHG emissions
+* add the generation of a summary CSV (`write_summary_CSV`) that calculates means, sums, minimums, and maximums of all outputs with auto-detection of the parameter type
+* add emissions and economic outputs and summary CSV outputs to the scenario comparison and reference results, as well as several missing CSV outputs
+* add the parameter `capex_specific_scale` for convenient scaling of investment cost functions
+* clarify the installation instructions for ReSiE in the README
+* align the formatting of file paths in log output
+
 ### Version 0.14.0
 
 #### Major feature: Costs and emissions

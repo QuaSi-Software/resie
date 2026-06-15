@@ -497,7 +497,8 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     subsidies_per_year = zeros(Float64, observation_period)
 
     # calculate initial investment (A0)
-    investment_first_year = component.economic_parameters["capex_specific"](capex_reference)   # € at time 0
+    investment_first_year = component.economic_parameters["capex_specific"](component.economic_parameters["capex_specific_scale"] *
+                                                                            capex_reference)   # € at time 0
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period

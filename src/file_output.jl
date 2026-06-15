@@ -1,6 +1,7 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
 using Random
+using CSV
 
 """
     get_output_keys(io_settings, components)
@@ -998,4 +999,277 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     # save plot
     file_path = sim_params["run_path"](io_settings["sankey_plot_file"])
     savefig(p, file_path)
+end
+
+"""
+    aggregate_csv(input_path, output_path, output_keys, weather_data_keys,
+                  energy_terms, cumulative_terms, zero_as_missing_terms,
+                  time_columns, separator, threshold, fixed_output_precision)
+
+Create a summary CSV from a time-series CSV result file.
+
+The input CSV is expected to contain one header row and one column per logged
+parameter. Time columns are ignored. The classification of component and flow
+outputs is based on the corresponding `OutputKey.value_key` entries in
+`output_keys`, not on the CSV column names. This avoids incorrect classifications
+caused by component names, media names or user-defined UACs.
+
+Columns matching `cumulative_terms` are treated as cumulative time series and
+represented by their last valid value. Columns matching `energy_terms` are
+summed. Weather data and all other numeric columns are treated as intensive
+quantities and averaged.
+
+Empty values, non-numeric values, `NaN` and infinite values are ignored. For
+columns matching `zero_as_missing_terms`, zero values are ignored as well, e.g.
+for COP-like quantities where zero means inactive or undefined.
+
+Returns `true` if the summary CSV was created successfully and `false` otherwise.
+"""
+function aggregate_csv(input_path::AbstractString,
+                       output_path::AbstractString,
+                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                       weather_data_keys::Union{Nothing,Vector{String}},
+                       energy_terms::Vector{String},
+                       cumulative_terms::Vector{String},
+                       zero_as_missing_terms::Vector{String},
+                       time_columns::Vector{String},
+                       separator::Char,
+                       threshold::Float64,
+                       fixed_output_precision::Int)::Bool
+    if !isfile(input_path)
+        @info "No summary CSV could be created, as the CSV result file could not be found at: $(input_path)"
+        return false
+    end
+
+    # identify columns that should not be aggregated
+    function is_time_column(output_key::AbstractString)::Bool
+        col = strip(output_key)
+        return col in time_columns || startswith(lowercase(col), "time")
+    end
+
+    # identify cumulative time series for which the last value is used
+    function is_cumulative_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), cumulative_terms)
+    end
+
+    # identify extensive energy-related quantities that should be summed
+    function is_energy_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), energy_terms)
+    end
+
+    # identify intensive quantities where zero represents an invalid value
+    function is_zero_as_missing_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), zero_as_missing_terms)
+    end
+
+    # identify weather quantities that should be summed
+    function is_weather_energy_column(weather_key::AbstractString)::Bool
+        # hardcoded at this point as they will probably not change...
+        weather_energy_terms = ["beamHorIrr",
+                                "difHorIrr",
+                                "globHorIrr",
+                                "longWaveIrr"]
+        return any(term -> occursin(term, weather_key), weather_energy_terms)
+    end
+
+    # parse numbers with German decimal comma and tolerate simple thousands separators
+    function parse_decimal_number(value::AbstractString)::Union{Float64,Missing}
+        s = strip(value)
+
+        if isempty(s)
+            return missing
+        end
+
+        s = replace(s, "\ufeff" => "")
+        s = replace(s, "\u00a0" => "")
+        s = replace(s, " " => "")
+
+        x = tryparse(Float64, replace(s, "," => "."))
+        if x !== nothing
+            return x
+        end
+
+        if occursin(",", s)
+            s2 = replace(s, "." => "")
+            s2 = replace(s2, "," => ".")
+
+            x = tryparse(Float64, s2)
+            if x !== nothing
+                return x
+            end
+        end
+
+        return missing
+    end
+
+    # avoid very small numerical residuals in the summary output
+    function clean_small_value(value::Float64)::Float64
+        return abs(value) < threshold ? 0.0 : value
+    end
+
+    # write numbers with decimal comma for consistency with the ReSiE CSV format
+    function decimal_string(value::Real)::String
+        # apply fixed precision to the summary output
+        if fixed_output_precision > 0
+            s = string(round(Float64(value); digits=fixed_output_precision))
+        else
+            s = string(Float64(value))
+        end
+        return replace(s, "." => ",")
+    end
+
+    # escape fields only if required by the CSV format
+    function csv_escape(value::AbstractString)::String
+        s = String(value)
+
+        if occursin(string(separator), s) || occursin("\"", s) ||
+           occursin("\n", s) || occursin("\r", s)
+            return "\"" * replace(s, "\"" => "\"\"") * "\""
+        end
+
+        return s
+    end
+
+    function write_csv_row(io, row::AbstractVector{<:AbstractString})::Nothing
+        println(io, join(csv_escape.(row), string(separator)))
+        return nothing
+    end
+
+    csv = CSV.File(input_path;
+                   delim=separator,
+                   header=1,
+                   normalizenames=false,
+                   stringtype=String,
+                   types=String)
+
+    if length(csv) < 1
+        @info "No summary CSV could be created, as the CSV result file contains no data rows: $(input_path)"
+        return false
+    end
+
+    # Get column names in CSV order.
+    csv_column_names = collect(propertynames(first(csv)))
+
+    # Clean header names for output and time-column checks.
+    headers = [String(strip(replace(String(name), "\ufeff" => "")))
+               for name in csv_column_names]
+
+    # create classification keys in the same order as the CSV columns
+    classification_keys = String["Time"]
+
+    if output_keys !== nothing
+        append!(classification_keys, [outkey.value_key for outkey in output_keys])
+    end
+
+    if weather_data_keys !== nothing
+        append!(classification_keys, ["Weather " * key for key in weather_data_keys])
+    end
+
+    if length(classification_keys) != length(headers)
+        @info "No summary CSV could be created, as the number of output keys does not match the number of CSV columns."
+        return false
+    end
+
+    # ignore time columns and process all remaining columns alphabetically
+    data_indices = [j for j in eachindex(headers)
+                    if !is_time_column(headers[j])]
+
+    sort!(data_indices; by=j -> lowercase(headers[j]))
+
+    open(output_path, "w") do io
+        write_csv_row(io,
+                      ["Parameter",
+                       "Type",
+                       "Aggregation",
+                       "Values used",
+                       "Value",
+                       "Min",
+                       "Max",
+                       "Value kWh",
+                       "Value MWh"])
+
+        for j in data_indices
+            column_name = headers[j]
+            values = Float64[]
+            classification_key = classification_keys[j]
+
+            column = csv[csv_column_names[j]]
+
+            for raw_value in column
+                if raw_value === missing
+                    continue
+                end
+
+                parsed = parse_decimal_number(String(raw_value))
+
+                if parsed !== missing && isfinite(parsed)
+                    if is_zero_as_missing_column(classification_key) && parsed == 0.0
+                        continue
+                    end
+
+                    push!(values, parsed)
+                end
+            end
+            if isempty(values)
+                continue
+            end
+
+            n = length(values)
+
+            if is_cumulative_column(classification_key)
+                # cumulative columns are already integrated over time
+                value_wh = clean_small_value(values[end])
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "cumulative",
+                               "last",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            elseif is_energy_column(classification_key) || is_weather_energy_column(classification_key)
+                # energy columns contain timestep values and are therefore summed
+                value_wh = clean_small_value(sum(values))
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "energy",
+                               "sum",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            else
+                # remaining numeric columns are interpreted as intensive quantities
+                mean_value = sum(values) / n
+                min_value = minimum(values)
+                max_value = maximum(values)
+                aggregation = is_zero_as_missing_column(classification_key) ? "mean_excluding_zero" : "mean"
+
+                write_csv_row(io,
+                              [column_name,
+                               "intensive",
+                               aggregation,
+                               string(n),
+                               decimal_string(mean_value),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               "",
+                               ""])
+            end
+        end
+    end
+
+    return true
 end
