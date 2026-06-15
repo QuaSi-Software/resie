@@ -1,6 +1,7 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
 using Random
+using CSV
 
 """
     get_output_keys(io_settings, components)
@@ -1040,36 +1041,6 @@ function aggregate_csv(input_path::AbstractString,
         return false
     end
 
-    # parse a single CSV line while respecting quoted fields
-    function parse_csv_line(line::AbstractString)::Vector{String}
-        values = String[]
-        buffer = IOBuffer()
-        in_quotes = false
-        i = firstindex(line)
-
-        while i <= lastindex(line)
-            c = line[i]
-
-            if c == '"'
-                if in_quotes && i < lastindex(line) && line[nextind(line, i)] == '"'
-                    print(buffer, '"')
-                    i = nextind(line, i)
-                else
-                    in_quotes = !in_quotes
-                end
-            elseif c == separator && !in_quotes
-                push!(values, String(take!(buffer)))
-            else
-                print(buffer, c)
-            end
-
-            i = nextind(line, i)
-        end
-
-        push!(values, String(take!(buffer)))
-        return values
-    end
-
     # identify columns that should not be aggregated
     function is_time_column(output_key::AbstractString)::Bool
         col = strip(output_key)
@@ -1164,18 +1135,24 @@ function aggregate_csv(input_path::AbstractString,
         return nothing
     end
 
-    lines = readlines(input_path)
+    csv = CSV.File(input_path;
+                   delim=separator,
+                   header=1,
+                   normalizenames=false,
+                   stringtype=String,
+                   types=String)
 
-    if length(lines) < 2
+    if length(csv) < 1
         @info "No summary CSV could be created, as the CSV result file contains no data rows: $(input_path)"
         return false
     end
 
-    rows = parse_csv_line.(lines)
+    # Get column names in CSV order.
+    csv_column_names = collect(propertynames(first(csv)))
 
-    # clean header names and remove the UTF-8 BOM if present
-    headers = [String(strip(replace(rows[1][j], "\ufeff" => "")))
-               for j in eachindex(rows[1])]
+    # Clean header names for output and time-column checks.
+    headers = [String(strip(replace(String(name), "\ufeff" => "")))
+               for name in csv_column_names]
 
     # create classification keys in the same order as the CSV columns
     classification_keys = String["Time"]
@@ -1216,13 +1193,14 @@ function aggregate_csv(input_path::AbstractString,
             values = Float64[]
             classification_key = classification_keys[j]
 
-            # collect all valid numeric values of the current column
-            for row in rows[2:end]
-                if j > length(row)
+            column = csv[csv_column_names[j]]
+
+            for raw_value in column
+                if raw_value === missing
                     continue
                 end
 
-                parsed = parse_decimal_number(row[j])
+                parsed = parse_decimal_number(String(raw_value))
 
                 if parsed !== missing && isfinite(parsed)
                     if is_zero_as_missing_column(classification_key) && parsed == 0.0
@@ -1232,7 +1210,6 @@ function aggregate_csv(input_path::AbstractString,
                     push!(values, parsed)
                 end
             end
-
             if isempty(values)
                 continue
             end
