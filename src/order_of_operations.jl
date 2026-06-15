@@ -845,7 +845,7 @@ function add_transformer_steps(simulation_order,
 
             if step_category == "potential"
                 # if any of the input or output branches has a component with minimum part load set and there is 
-                # at leas one input and one output branch, add the branch containing the component with min part load 
+                # at least one input and one output branch, add the branch containing the component with min part load 
                 # again at the end if we are in potential step and if it is not already at the end.
                 middle_bus_branches,
                 is_input,
