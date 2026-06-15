@@ -7,6 +7,7 @@ using LinearAlgebra
 using Base.Threads
 using Optim
 using BlackBoxOptim
+using Infiltrator
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -340,10 +341,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                                      weather_CSV_keys, 
                                      sim_params, 
                                      csv_time_unit)
+                row[2:end] = replace.(row[2:end], '.' => ',')
                 if do_write_CSV_continuously
                     # Write row to the output file
                     open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
-                        row = replace(row, "." => ",")
                         write(file_handle, join(row, ';') * "\n")
                     end
                 else
@@ -542,7 +543,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                                            optimizer, sample_values, sample_ID, 
                                            run_lock, output_lock, results_lock)
                 end
-                runtime = round(Int, Dates.seconds(now() - start_time))
+                runtime = round(Int, seconds(now() - start_time))
                 max_runs = length(optimizer["iterator"])
                 eta = round(Int, (max_runs - length(all_results)) * runtime / Threads.nthreads() / 60)
                 @globalInfo "[$(length(all_results))/$max_runs] → completed in $runtime s. ETA: $eta min"
@@ -560,7 +561,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                                                         run_lock, output_lock, results_lock),
                            optimizer["args"]...; optimizer["kwargs"]...)
             end
-            runtime = round(Int, Dates.seconds(now() - start_time))
+            runtime = round(Int, seconds(now() - start_time))
             @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
         end
 
@@ -659,30 +660,31 @@ function optim_func!(all_results, sim_params, proccesed_results_path, project_co
 end
 
 function run_sample(sim_params, proccesed_results_path, project_config, optimizer, sample_params, run_ID, run_lock, output_lock)
-
+    start = now()
     if sample_params !== nothing
         project_config = create_variant(sim_params, project_config, sample_params)
     end
 
-    sim_params, components, operations, 
-    economy_params, emission_params = prepare_inputs(project_config, run_ID)
-    @info "-- Simulation setup complete in $(seconds(now() - start)) s"
-
-    lock(run_lock) do 
-        current_runs[run_ID] = SimulationRun(sim_params, components, operations)
-    end
-
-    start = now()
-    @info "---- Simulation loop ----"
     results = OrderedDict()
-    
-    if !isnothing(sample_params)
-        for (key, value) in pairs(sample_params)
-            results[key] = value
-        end 
-    end
 
     try
+        sim_params, components, operations, 
+        economy_params, emission_params = prepare_inputs(project_config, run_ID)
+        @info "-- Simulation setup complete in $(seconds(now() - start)) s"
+
+        lock(run_lock) do 
+            current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+        end
+
+        start = now()
+        @info "---- Simulation loop ----"
+        
+        if !isnothing(sample_params)
+            for (key, value) in pairs(sample_params)
+                results[key] = value
+            end 
+        end
+
         sim_output = run_simulation_loop(project_config, sim_params, components, operations)
  
         results["error"] = ""
@@ -725,10 +727,31 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
                 end
                 results["objective"] = optimizer["objective_function"](obj_input...)
             end
+            # TODO for validation
+            if !isnothing(findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]))
+                results["hours_to_full"] = findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+            else 
+                results["hours_to_full"] = NaN
+            end
+            if !isnothing(findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]))
+                results["hours_to_empty"] = findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+            else
+                results["hours_to_empty"] = NaN
+            end
+            results["Eigennutzungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_PV_Freiflaeche Supply"])
+            results["Eigenversorgungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_WP m_e_ac_230v IN"])
+            if haskey(sim_output, "Grid_Price_IN Temperature")
+                results["energy_cost_grid"] = sum(sim_output["Hafner_Stromnetz_IN m_e_ac_230v OUT"] .* sim_output["Grid_Price_IN Temperature"] ./ 10^6)
+                results["energy_cost_pv"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) .* 0.08 ./ 10^3
+                results["energy_cost_wp_total"] = results["energy_cost_grid"] + results["energy_cost_pv"]
+                results["objective"] = results["energy_cost_wp_total"]
+            else
+                results["objective"] = results["Eigenversorgungsgrad"]
+            end
         end
 
     catch e
-        if filesize(proccesed_results_path) == 0
+        if !isnothing(proccesed_results_path) && filesize(proccesed_results_path) == 0
             throw(e)
         end
         # save excact error message to output file
@@ -736,9 +759,21 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
         @globalInfo full_error_message
         results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+
+        if !isnothing(optimizer) 
+            for key in parse_outkeys(optimizer["output_keys_sum"])
+                results[key] = NaN
+            end
+            for key in parse_outkeys(optimizer["output_keys_mean"])
+                results[key] = NaN
+            end 
+            if haskey(optimizer, "objective_function")
+                results["objective"] = NaN
+            end
+        end
     end
 
-    if optimizer["continuous_output"]
+    if !isnothing(optimizer) && optimizer["continuous_output"]
         # Write results to seperate file after all simulations are finished.
         row = join(collect(values(results)), ';') * "\n"
         row = replace(row, '.' => ',')
@@ -762,6 +797,14 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
         close_run(run_ID)
     end
 
+    if !isnothing(optimizer) &&
+       !isnothing(optimizer["matrix_plot_objective"]) && 
+       !in(optimizer["matrix_plot_objective"], keys(results))
+        @error "Chosen objective $(optimizer["matrix_plot_objective"]) for matrix_plot is" * 
+               " not in results. Current available options are $(keys(results))." *
+               " Other values can be added by use of objective_params."
+        throw(InputError())
+    end
     return results
 end
 
@@ -775,13 +818,13 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
     end
     if cfg["io_settings"]["output_plot"] != "nothing" 
         cfg["io_settings"]["output_plot_file"] = default(project_config["io_settings"],
-                                                        "csv_output_file",
-                                                        "./output/out.csv")
+                                                        "output_plot_file",
+                                                        "./output/output_plot.html")
     end
     if cfg["io_settings"]["sankey_plot"] != "nothing" 
         cfg["io_settings"]["sankey_plot_file"] = default(project_config["io_settings"],
-                                                        "csv_output_file",
-                                                        "./output/out.csv")
+                                                        "sankey_plot_file",
+                                                        "./output/output_sankey.html")
     end
 
     # set up the parameters for this simulation variant
@@ -790,23 +833,23 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
         cfg[category][uac][param_key] = value
         # rename outputs to clarify parameter values if outputfiles for each simulation 
         # should be generated
-        #TODO to same for all type of output files that get generated for each simulation
+        #TODO do same for all type of output files that get generated for each simulation
         # and add Info that this is happening with hint to set the files to nothing of if 
         # not needed for performance boost
         if cfg["io_settings"]["csv_output_keys"] != "nothing"
-            name, ext = split(cfg["io_settings"]["csv_output_file"], '.')
-            cfg["io_settings"]["csv_output_file"] *= name * "_" * uac * "_" * 
-                                                    param_key * "_" * value * "." * ext
+            name, ext = rsplit(cfg["io_settings"]["csv_output_file"], '.'; limit=2)
+            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * 
+                                                    param_key * "_" * string(value) * "." * ext
         end
         if cfg["io_settings"]["output_plot"] != "nothing"
-            name, ext = split(cfg["io_settings"]["output_plot_file"], '.')
-            cfg["io_settings"]["output_plot_file"] *= name * "_" * uac * "_" * 
-                                                    param_key * "_" * value * "." * ext
+            name, ext = rsplit(cfg["io_settings"]["output_plot_file"], '.'; limit=2)
+            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * 
+                                                    param_key * "_" * string(value) * "." * ext
         end
         if cfg["io_settings"]["sankey_plot"] != "nothing"
-            name, ext = split(cfg["io_settings"]["sankey_plot_file"], '.')
-            cfg["io_settings"]["sankey_plot_file"] *= name * "_" * uac * "_" * 
-                                                    param_key * "_" * value * "." * ext
+            name, ext = rsplit(cfg["io_settings"]["sankey_plot_file"], '.'; limit=2)
+            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * 
+                                                    param_key * "_" * string(value) * "." * ext
         end
     end
 
@@ -899,13 +942,15 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
 
     optimizer["continuous_output"] = default(optimizer_config, "continuous_output", true)
     if haskey(optimizer_config, "matrix_plot") && optimizer_config["matrix_plot"] !== "nothing"
-        optimizer["matrix_plot_objective"] = optimizer_config["matrix_plot"]
+        if optimizer_config["matrix_plot"] != "objective"
+            optimizer["matrix_plot_objective"] = parse_outkeys(optimizer_config["matrix_plot"])[1]
+        else
+            optimizer["matrix_plot_objective"] = "objective"
+        end
+        optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
     else
         optimizer["matrix_plot_objective"] = nothing
     end
-    optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
-
-                                           
 
     if optimizer_config["type"] == "parametervariation"
 

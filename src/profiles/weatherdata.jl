@@ -116,7 +116,8 @@ mutable struct WeatherData
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
             outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
-            transform = Proj.Transformation(inProj, outProj)
+            ctx = Proj.proj_context_clone()
+            transform = Proj.Transformation(inProj, outProj; ctx=ctx)
             latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
 
             if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing

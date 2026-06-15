@@ -60,11 +60,11 @@ function get_output_keys(project_config::AbstractDict{AbstractString,Any},
         # is set in input file or just get all excl flows
         do_return_data = true
         if haskey(project_config, "emissions")
-            do_return_all_outputs_excl_flows = true
+            do_return_all_outputs_incl_flows = true
         elseif haskey(project_config, "economy")
-            do_return_all_outputs_excl_flows = true
+            do_return_all_outputs_incl_flows = true
         elseif haskey(project_config, "optimizer")
-            do_return_all_outputs_excl_flows = true
+            do_return_all_outputs_incl_flows = true
         end
     end
 
@@ -519,19 +519,19 @@ function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKe
             time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
         end
 
-        push!(row, time)
+        push!(row, string(time))
     end
 
     if output_keys !== nothing
         for outkey in output_keys
             value = output_value(outkey.unit, outkey)
-            push!(row, value)
+            push!(row, string(value))
         end
     end
     if weather_data_keys !== nothing
         for key in weather_data_keys
             value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-            push!(row, value)
+            push!(row, string(value))
         end
     end
 
@@ -1023,7 +1023,8 @@ function create_matrix_plot(results::Vector{Any}, optimizer::Dict{String,Any}, s
                       cmin=min_obj,
                       cmax=low_quartile_obj,
                       showscale=true,
-                      line=attr(color="red", width=objective.==min_obj * 1)
+                      line=attr(color="red", width=objective.==min_obj * 1),
+                      colorbar=attr(title=optimizer["matrix_plot_objective"])
                       ),
         text = string.(objective),
         hovertemplate = "%{x}, %{y}, %{text}"
