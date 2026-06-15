@@ -61,22 +61,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
         all_keys = Vector{EnergySystems.OutputKey}()
 
-        return do_create, do_all_excl, do_all_incl
-    end
-
-    # Sorting the keys
-    function sort_by(output_key)
-        any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
-        # flows after others: primary = medium (always present), secondary
-        lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
-        # default: primary = unit.uac, secondary = medium (if present), tertiary
-        lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
-    end
-
-    # Build "all outputs" once per include/exclude flows
-    function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
-        all_keys = Vector{EnergySystems.OutputKey}()
-
         for unit in components
             output_vals = output_values(unit[2])
             temp_dict = Dict{String,Any}()
