@@ -7,7 +7,6 @@ using LinearAlgebra
 using Base.Threads
 using Optim
 using BlackBoxOptim
-using Infiltrator
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -23,6 +22,7 @@ type.
 """
 mutable struct SimulationRun
     parameters::Dict{String,Any}
+    io_settings::Dict{String,Any}
     components::Dict{String,Any}
     order_of_operations::Vector{Any}
 end
@@ -86,6 +86,8 @@ using .EnergySystems
 
 include("project_loading.jl")
 include("file_output.jl")
+include("economy.jl")
+include("emissions.jl")
 
 include("resie_logger.jl")
 using .Resie_Logger
@@ -97,167 +99,52 @@ using Interpolations
 using JSON
 using Dates
 
-const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
-const SECONDS_PER_HOUR::Float64 = 3600.0
-
 """
-    get_simulation_params(project_config)
-
-Constructs the dictionary of simulation parameters.
-
-# Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
-# Returns
--`Dict{String,Any}`: The simulation parameter dictionary
-"""
-function get_simulation_params(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
-
-    sim_params = Dict{String,Any}(
-        "time" => 0,
-        "time_since_output" => 0,
-        "current_date" => start_date,
-        "time_step_seconds" => time_step,
-        "number_of_time_steps" => nr_of_steps,
-        "number_of_time_steps_output" => nr_of_steps_output,
-        "start_date" => start_date,
-        "start_date_output" => start_date_output,
-        "end_date" => end_date,
-        "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
-        "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
-        "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
-        "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
-        "step_info_interval" => default(project_config["io_settings"],
-                                        "step_info_interval",
-                                        Integer(floor(nr_of_steps / 20))),
-        "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
-                                              false),
-        "show_detailed_errors" => default(project_config["io_settings"], "show_detailed_errors", false),
-    )
-
-    # add helper functions to convert power to work and vice-versa. this uses the time step
-    # of the simulation as the duration required for the conversion.
-    sim_params["watt_to_wh"] = function (watts::Float64)
-        return watts * time_step * HOURS_PER_SECOND
-    end
-    sim_params["wh_to_watts"] = function (wh::Float64)
-        return wh * SECONDS_PER_HOUR / time_step
-    end
-
-    # add helper function for using paths, absolute or relative to the run base path
-    if haskey(project_config["io_settings"], "base_path")
-        run_base_path = abspath(project_config["io_settings"]["base_path"])
-    else
-        run_base_path = abspath(joinpath(dirname(@__FILE__), ".."))
-    end
-    sim_params["run_path"] = function (path)
-        return isabspath(path) ? path : abspath(joinpath(run_base_path, path))
-    end
-
-    # load weather profiles accesible for all components
-    weather_file_path = default(project_config["simulation_parameters"],
-                                "weather_file_path",
-                                nothing)
-
-    if weather_file_path !== nothing
-        weather_interpolation_type_solar = default(project_config["simulation_parameters"],
-                                                   "weather_interpolation_type_solar", "linear_solar_radiation")
-        weather_interpolation_type_general = default(project_config["simulation_parameters"],
-                                                     "weather_interpolation_type_general", "linear_classic")
-        # WeatherData() writes the lat and long to sim_params if they are not given in the input file
-        sim_params["weather_data"] = WeatherData(sim_params["run_path"](weather_file_path),
-                                                 sim_params,
-                                                 guess_file_format(sim_params["run_path"](weather_file_path)),
-                                                 weather_interpolation_type_solar,
-                                                 weather_interpolation_type_general)
-    end
-
-    return sim_params
-end
-
-"""
-    prepare_inputs(project_config)
-
-Construct and prepare parameters, energy system components and the order of operation.
-
-# Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
-# Returns
--`Dict{String,Any}`: Simulation parameters
--`Grouping`: The constructed energy system components
--`OrderOfOperations`: Order of operations
-"""
-function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
-    sim_params = get_simulation_params(project_config)
-    sim_params["run_ID"] = run_ID
-
-    components = load_components(project_config["components"], sim_params)
-
-    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        operations = load_order_of_operations(project_config["order_of_operation"], components)
-        @info "The order of operations was successfully imported from the input file.\n" *
-              "Note that the order of operations has a major impact on the simulation " *
-              "result and should only be changed by experienced users!"
-    else
-        operations = calculate_order_of_operations(components)
-    end
-
-    #TODO create functions to parse new parameters from input file
-    if haskey(project_config, "economy")
-        # economy_params = get_economy_params(project_config["economy"])
-        economy_params = project_config["economy"]
-    else
-        economy_params = nothing
-    end
-
-    if haskey(project_config, "emission")
-        # emission_params = get_emission_params(project_config["emission"])
-        emission_params = project_config["emission"]
-    else
-        emission_params = nothing
-    end
-
-    return sim_params, components, operations, economy_params, emission_params
-end
-
-"""
-    run_simulation_loop()
+    run_simulation_loop(sim_params, io_settings, components, operations, optimizer)
 
 Performs the simulation as loop over time steps and records outputs.
 
 # Arguments
--`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
+-`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
--`operations::OrderOfOperations`:: Order of operations
+-`operations::OrderOfOperations`: Order of operations
+-`optimizer::Dict{String,Any}`: Definition of optimizer parameters
 """
-function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
-                             sim_params::Dict{String,Any},
+function run_simulation_loop(sim_params::Dict{String,Any},
+                             io_settings::Dict{String,Any},
                              components::Grouping,
-                             operations::OrderOfOperations)
+                             operations::OrderOfOperations,
+                             optimizer::Dict{String,Any})
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, 
+    #TODO add optimizer to get_output_keys()
+    output_keys_lineplot,
     output_keys_to_CSV,
-    output_keys_return = get_output_keys(project_config, components)
-
+    output_keys_economic_emissions,
+    output_keys_optimize = get_output_keys(io_settings,
+                                           sim_params["economic_parameters"],
+                                           sim_params["emissions_parameters"],
+                                           optimizer,
+                                           components)
+    all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
+                                                                                            String[]),
+                                                                                  something(output_keys_economic_emissions,
+                                                                                            String[]),
+                                                                                  something(output_keys_optimize,
+                                                                                            String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
-    do_create_plot_weather = weather_data_keys !== nothing &&
-                             default(project_config["io_settings"], "plot_weather_data", false)
-    do_write_CSV_weather = weather_data_keys !== nothing &&
-                           default(project_config["io_settings"], "csv_output_weather", false)
+    do_create_plot_weather = weather_data_keys !== nothing && io_settings["plot_weather_data"]
+    do_write_CSV_weather = weather_data_keys !== nothing && io_settings["csv_output_weather"]
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
-    do_write_CSV_continuously = default(project_config["io_settings"], "write_csv_continuously", false)
-    csv_output_file_path = default(project_config["io_settings"],
-                                   "csv_output_file",
-                                   "./output/out.csv")
-    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
-    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
-        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(InputError())
-    end
-    do_return_data = output_keys_return !== nothing 
+    do_write_CSV_continuously = io_settings["write_csv_continuously"]
+    do_write_summary_CSV = io_settings["write_summary_CSV"]
+    csv_output_file_path = io_settings["csv_output_file"]
+    csv_time_unit = io_settings["csv_time_unit"]
+    do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
+    do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
+    do_optimize = output_keys_optimize !== nothing
 
     # Initialize the arrays for output
     output_data_lineplot = do_create_plot_data ?
@@ -270,9 +157,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
                                 1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
-    output_return_data = do_return_data ?
-                        zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return)) :
-                        nothing
+    output_data_all_requested = do_create_plot_data || do_calculate_economy || do_calculate_emissions ?
+                                zeros(Float64, sim_params["number_of_time_steps_output"],
+                                      1 + length(all_requested_output_keys)) :
+                                nothing
 
     # write CSV file headers
     if do_write_CSV
@@ -283,14 +171,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         end
     end
 
-    # create keys consistent with csv_output for return data for return Dict
-    if do_return_data
-        output_return_header = get_output_header(output_keys_return, nothing, csv_time_unit)
-    end
-
     # check if sankey should be plotted
-    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
-                       project_config["io_settings"]["sankey_plot"] !== "nothing"
+    do_create_sankey = haskey(io_settings, "sankey_plot") && 
+                       io_settings["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get information about all interfaces for Sankey
         nr_of_interfaces,
@@ -325,12 +208,19 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         perform_operations(components, operations_adjusted, sim_params)
 
         if do_output
-            # check if any component was not balanced
-            warnings = check_balances(components, sim_params["epsilon"])
-            if length(warnings) > 0
-                for (key, balance) in warnings
-                    @balanceWarn "Balance for component $key was not zero in timestep " *
-                                 "$(sim_params["time_since_output"]): $balance"
+            # check if any component and/or interface was not balanced
+            interface_warnings = check_balances_of_interfaces(components, sim_params["epsilon"])
+            component_warnings = check_balances_of_components(components, sim_params["epsilon"])
+            if length(interface_warnings) > 0
+                for (key, balance) in interface_warnings
+                    @balanceWarn "In timestep $(sim_params["current_date"]), the balance in interface " *
+                                 "$key was not zero: $balance"
+                end
+            end
+            if length(component_warnings) > 0
+                for (key, balance) in component_warnings
+                    @error "In timestep $(sim_params["current_date"]), the balance for component " *
+                           "$key was not zero: $balance. This is probably caused by a bug in the component."
                 end
             end
 
@@ -356,18 +246,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_sankey
                 output_interface_values[output_steps, :] = collect_interface_energies(components, nr_of_interfaces)
             end
-
-            # gather output data of each component for line plot
-            if do_create_plot_data
-                output_data_lineplot[output_steps, :] = gather_output_data(output_keys_lineplot,
-                                                                           sim_params["time_since_output"])
-            end
+            # gather output data of weather
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
-            if do_return_data
-                output_return_data[output_steps, :] = gather_output_data(output_keys_return,
-                                                                         sim_params["time_since_output"])
+            # gather output data of each component for line plot, economy and emissions
+            if do_create_plot_data || do_calculate_economy || do_calculate_emissions || do_optimize
+                output_data_all_requested[output_steps, :] = gather_output_data(all_requested_output_keys,
+                                                                                sim_params["time_since_output"])
             end
 
             # simulation update
@@ -392,13 +278,76 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
     @info "-- Finished time step loop"
 
-    # write output to CSV if not done continuously
-    if do_write_CSV && !do_write_CSV_continuously
-        open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
-            for row_idx in 1:size(output_csv)[1]
-                write(file_handle, join(output_csv[row_idx, :], ";") * "\n")
-            end
+    # extract output data per category including the time step in the first column
+    # TODO replace with parse_outkeys() or use this approach in do_optimize
+    output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
+    function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
+        keys === nothing && return Int[]
+        return 1 .+ [key_indexes[output_key_signature(k)] for k in keys]
+    end
+    time_and_subset_cols(key_indexes, keys) = vcat(1, subset_cols(key_indexes, keys))
+    key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
+
+    if do_calculate_economy || do_calculate_emissions
+        output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
+                                                     time_and_subset_cols(key_indexes, output_keys_economic_emissions)))
+        economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emissions,
+                                                                  output_data_economic_emissions)
+        economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
+        emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
+    end
+
+    if do_optimize
+        # create keys consistent with csv_output for return data for return Dict
+        output_data_header = get_output_header(output_data_all_requested, nothing, csv_time_unit)
+        output_data = OrderedDict{String, AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
+        for key in parse_outkeys(optimizer["output_keys_sum"])
+            optim_results[key] = sum(output_data[key])
         end
+        for key in parse_outkeys(optimizer["output_keys_mean"])
+            optim_results[key] = sum(output_data[key]) / length(output_data[key])
+        end 
+        if haskey(optimizer, "objective_function")
+            obj_param_keys = parse_outkeys(optimizer["objective_params"])
+            obj_input = zeros(length(obj_param_keys))
+            for (idx, key) in enumerate(obj_param_keys)
+                obj_input[idx] = optim_results[key]
+            end
+            optim_results["objective"] = optimizer["objective_function"](obj_input...)
+        end
+    end
+
+    # write output to CSV if not done continuously
+    if do_write_CSV 
+        if do_write_CSV_continuously
+            @info "CSV-file with outputs continuously written to $(csv_file_path)"
+        else
+            open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+                for row_idx in 1:size(output_csv)[1]
+                    write(file_handle, join(output_csv[row_idx, :], ";") * "\n")
+                end
+            end
+            @info "CSV-file with outputs written to $(csv_file_path)"
+        end
+    end
+
+    if do_write_summary_CSV
+        output_path = replace(csv_file_path, r"\.csv$"i => "_aggregated.csv")
+
+        success = aggregate_csv(csv_file_path,
+                                output_path,
+                                output_keys_to_CSV,
+                                weather_CSV_keys,
+                                ["Transfer", "Demand", "IN", "OUT", "Supply", "Losses", 
+                                 "Gains", "EnergyFlow", "Balance", "Charge"], # energy terms
+                                ["_sum"],                           # cumulative terms
+                                ["COP", "Time_active", "Avg_PLR", "MixingTemperature_Input",
+                                 "MixingTemperature_Output"],       # zero as missing terms
+                                ["Time"],                           # time columns
+                                ';',                                # separator
+                                sim_params["epsilon"],              # threshold
+                                io_settings["fixed_output_precision"])
+        success && @info "Summary CSV-file with outputs created and written to $(output_path)"
     end
 
     # create profile line plot
@@ -409,9 +358,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                                   weather_data_keys,
                                   project_config,
                                   sim_params)
-        filepath = default(project_config["io_settings"],
-                           "output_plot_file",
-                           "./output/output_plot.html")
+        filepath = sim_params["run_path"](io_settings["output_plot_file"])
         @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
     end
 
@@ -422,45 +369,88 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                       output_interface_values,
                       medium_of_interfaces,
                       nr_of_interfaces,
-                      project_config["io_settings"],
+                      io_settings,
                       sim_params)
-        filepath = default(project_config["io_settings"],
-                           "sankey_plot_file",
-                           "./output/output_sankey.html")
-        @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
-    end
-
-    if do_write_CSV
-        @info "CSV-file with outputs written to $(sim_params["run_path"](csv_output_file_path))"
+        filepath = sim_params["run_path"](io_settings["sankey_plot_file"])
+        @info "Sankey created and saved to $filepath"
     end
 
     # plot additional figures potentially available from components after simulation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
+    if default(io_settings, "auxiliary_plots", false)
         component_list = []
-        #TODO does run_path has to be used here?
-        output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
                 push!(component_list, component[2].uac)
             end
         end
         if length(component_list) > 0
-            @info "(Further) auxiliary plots are saved to folder " *
-                  "$(sim_params["run_path"](output_path)) for the following components: " *
-                  "$(join(component_list, ", "))"
+            @info "(Further) auxiliary plots are saved to folder $(output_path) for the " * 
+                  "following components: $(join(component_list, ", "))"
         end
     end
-    return do_return_data ? OrderedDict{String, AbstractArray}(zip(output_return_header, eachcol(output_return_data))) : nothing
+
+    # output economic results
+    if do_calculate_economy
+        if io_settings["plot_economic_cashflows"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "cashflows")
+            success && @info "Economy plot created and saved to $filepath"
+        end
+
+        if io_settings["plot_economic_present_values"]
+            filepath = sim_params["run_path"](io_settings["economic_plot_present_values_file_path"])
+            success = plot_economic_results(economic_result, filepath, sim_params,
+                                            io_settings["fixed_output_precision"], "present_values")
+            success && @info "Economy plot created and saved to $filepath"
+        end
+
+        # export economic results to CSV
+        if io_settings["output_economic_CSV"]
+            filepath = sim_params["run_path"](io_settings["economic_CSV_file_path"])
+            success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
+            success && @info "Economic results exported to $filepath"
+        end
+    end
+
+    # output emissions results
+    if do_calculate_emissions
+        # plot figure with yearly emissions
+        if io_settings["plot_emission_results"]
+            filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
+            success = plot_emissions_results(emissions_result, filepath, sim_params,
+                                             io_settings["fixed_output_precision"])
+            success && @info "Emissions plot created and saved to $filepath"
+        end
+
+        if io_settings["output_emissions_CSV"]
+            # export emissions results to CSV
+            filepath = sim_params["run_path"](io_settings["emissions_CSV_file_path"])
+            success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
+            success && @info "Emissions results exported to $filepath"
+        end
+    end
+
+    # plot utilized price and emission profiles
+    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
+        filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
+        success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
+                                                             io_settings["fixed_output_precision"])
+        success && @info "Utilized price and emission profiles exported as plot to $filepath"
+    end
+
+    return do_optimize ? optim_results : nothing
 end
 
 """
-    load_and_run(filepath)
+    load_and_run(filepath, run_ID)
 
 Load a project from the given file and run the simulation with it.
 
 # Arguments
 - `filepath::String`: Filepath to the project config file.
-- `UUID`: The run ID used in the run registry
+- `run_ID::UUID`: The run ID used in the run registry
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
@@ -501,21 +491,20 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
     #TODO there may be better way to do this; maybe take some general parts of prepare_inputs 
     # and put them here
-    sim_params = get_simulation_params(project_config)
+    io_settings = get_io_settings(project_config)
+    sim_params = get_simulation_params(project_config, io_settings)
     
     #TODO discuss if the total_results should be overwritten made individual with e.g. timestamp
-    proccesed_results_path = default(project_config["io_settings"], 
-                                     "processed_results", 
-                                     "./output/total_results.csv")
-    proccesed_results_path = sim_params["run_path"](proccesed_results_path)
-    open(proccesed_results_path, "w") do f end
+    #TODO default of processed_results_path set in single source of truth as "./output/total_results.csv" for "processed_results" parameter
+    proccesed_results_path = sim_params["run_path"](io_settings["processed_results"])
+    open(proccesed_results_path, "w") do f end #TODO maybe remove
 
     if haskey(project_config, "optimizer")
         #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
         optimizer = load_optimizer(project_config["optimizer"])
 
         all_results = []
-        if haskey(optimizer, "objective_params")
+        if optimizer["type"] == "monte_carlo_annealing"
             obj = Array{Union{Float64,Nothing}}(nothing, length(parse_outkeys(optimizer["objective_params"])))
             obj_lock = ReentrantLock()
         end
@@ -530,8 +519,8 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                 # decide which algorithm to run based on type of optimizer
                 if optimizer["type"] == "parametervariation"
                     sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
-                    results = run_sample(sim_params, proccesed_results_path, project_config, 
-                                         optimizer, sample_params, sample_ID, 
+                    results = run_sample(io_settings, sim_params, proccesed_results_path, 
+                                         project_config, optimizer, sample_params, sample_ID, 
                                          run_lock, output_lock)
                     lock(results_lock) do 
                         push!(all_results, results) 
@@ -550,13 +539,14 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         else
             start_time = now()
+            #TODO replace optimize and bboptimize with Optimization.jl interface
             if optimizer["type"] == "Optim"
-                optimize(sample_values -> optim_func!(all_results, sim_params, proccesed_results_path, 
+                optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, proccesed_results_path, 
                                                       project_config, optimizer, sample_values, 
                                                       run_lock, output_lock, results_lock), 
                          optimizer["args"]...)
             elseif optimizer["type"] == "BlackBoxOptim"
-                bboptimize(sample_values -> optim_func!(all_results, sim_params, proccesed_results_path, 
+                bboptimize(sample_values -> optim_func!(all_results, io_settings, sim_params, proccesed_results_path, 
                                                         project_config, optimizer, sample_values, 
                                                         run_lock, output_lock, results_lock),
                            optimizer["args"]...; optimizer["kwargs"]...)
@@ -584,7 +574,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             create_matrix_plot(all_results, optimizer, sim_params)
         end
     else
-        _ = run_sample(sim_params, proccesed_results_path, project_config, 
+        _ = run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
                        nothing, nothing, run_ID, run_lock, output_lock)
     end
 
@@ -622,8 +612,8 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 
     # run sim and calculate objective results
-    results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
-                         sample_params, run_ID, run_lock, output_lock)
+    results = run_sample(io_settings, sim_params, proccesed_results_path, project_config,
+                         optimizer, sample_params, run_ID, run_lock, output_lock)
 
     # calculate minimum of results
     if any(!isnothing(obj))
@@ -644,13 +634,13 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 end
 
-function optim_func!(all_results, sim_params, proccesed_results_path, project_config, 
+function optim_func!(all_results, io_settings, sim_params, proccesed_results_path, project_config, 
                      optimizer, sample_values, run_lock, output_lock, results_lock)
 
     sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
     run_ID = uuid4()
-    results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
-                         sample_params, run_ID, run_lock, output_lock)
+    results = run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
+                         optimizer, sample_params, run_ID, run_lock, output_lock)
 
     lock(results_lock) do 
         push!(all_results, results)
@@ -659,10 +649,11 @@ function optim_func!(all_results, sim_params, proccesed_results_path, project_co
     return results["objective"]
 end
 
-function run_sample(sim_params, proccesed_results_path, project_config, optimizer, sample_params, run_ID, run_lock, output_lock)
+function run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
+                    optimizer, sample_params, run_ID, run_lock, output_lock)
     start = now()
     if sample_params !== nothing
-        project_config = create_variant(sim_params, project_config, sample_params)
+        project_config = create_variant(io_settings, sim_params, project_config, sample_params)
     end
 
     results = OrderedDict()
@@ -685,48 +676,15 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
             end 
         end
 
-        sim_output = run_simulation_loop(project_config, sim_params, components, operations)
+        sim_output = run_simulation_loop(project_config, sim_params, components, operations, optimizer)
+        for (key, value) in pairs(sim_output)
+            results[key] = value
+        end
  
         results["error"] = ""
-        #TODO get necessary values from project_config or economy_params, emission_params and optimizer
-        if !isnothing(economy_params) || !isnothing(emission_params)
-            years_sim = sim_params["number_of_time_steps_output"] * sim_params["time_step_seconds"] / 3600*8760
-            #TODO do prepare_inputs for new groups or include handling in existing 
-            # prepare_inputs with additional output
-            # years_economy_data = length(price_profile) / sim_params["time_step_seconds"]
-            # years_emission_data = length(emission_profile) / sim_params["time_step_seconds"]
-            if years_sim < 1
-                #TODO repeat whole sim_output until 1 year full
-            elseif years_sim > 1
-                #TODO repeat last year until economy_params["eval_time"]
-            end
-            if !isnothing(economy_params)
-                #TODO annuity and total_costs for each value for each component
-                # add values to flat dictionary to avoid unnecessary nesting
-                results = calc_economy(sim_output, results) 
-            end
-            if !isnothing(emission_params)
-                #TODO analog zu economy
-                # add values to flat dictionary to avoid unnecessary nesting
-                results = calc_emission(sim_output, results)
-            end
-        end
 
+        #TODO move objective calculation into run_simulation_loop
         if !isnothing(optimizer) 
-            for key in parse_outkeys(optimizer["output_keys_sum"])
-                results[key] = sum(sim_output[key])
-            end
-            for key in parse_outkeys(optimizer["output_keys_mean"])
-                results[key] = sum(sim_output[key]) / length(sim_output[key])
-            end 
-            if haskey(optimizer, "objective_function")
-                obj_param_keys = parse_outkeys(optimizer["objective_params"])
-                obj_input = zeros(length(obj_param_keys))
-                for (idx, key) in enumerate(obj_param_keys)
-                    obj_input[idx] = results[key]
-                end
-                results["objective"] = optimizer["objective_function"](obj_input...)
-            end
             # TODO for validation
             if !isnothing(findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]))
                 results["hours_to_full"] = findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
@@ -808,24 +766,10 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
     return results
 end
 
-function create_variant(sim_params::Dict{String, Any}, project_config::AbstractDict{AbstractString,Any}, sample_params::Dict{String,Any})
+function create_variant(io_settings::Dict{String,Any} , sim_params::Dict{String, Any}, 
+                        project_config::AbstractDict{AbstractString,Any}, 
+                        sample_params::Dict{String,Any})
     cfg = deepcopy(project_config)
-
-    if cfg["io_settings"]["csv_output_keys"] != "nothing" 
-        cfg["io_settings"]["csv_output_file"] = default(project_config["io_settings"],
-                                                        "csv_output_file",
-                                                        "./output/out.csv")
-    end
-    if cfg["io_settings"]["output_plot"] != "nothing" 
-        cfg["io_settings"]["output_plot_file"] = default(project_config["io_settings"],
-                                                        "output_plot_file",
-                                                        "./output/output_plot.html")
-    end
-    if cfg["io_settings"]["sankey_plot"] != "nothing" 
-        cfg["io_settings"]["sankey_plot_file"] = default(project_config["io_settings"],
-                                                        "sankey_plot_file",
-                                                        "./output/output_sankey.html")
-    end
 
     # set up the parameters for this simulation variant
     for (key, value) in pairs(sample_params)
@@ -836,20 +780,20 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
         #TODO do same for all type of output files that get generated for each simulation
         # and add Info that this is happening with hint to set the files to nothing of if 
         # not needed for performance boost
-        if cfg["io_settings"]["csv_output_keys"] != "nothing"
-            name, ext = rsplit(cfg["io_settings"]["csv_output_file"], '.'; limit=2)
-            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * 
-                                                    param_key * "_" * string(value) * "." * ext
+        if io_settings["csv_output"] != "nothing"
+            name, ext = rsplit(io_settings["csv_output_file"], '.'; limit=2)
+            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * param_key * 
+                                                    "_" * string(value) * "." * ext
         end
-        if cfg["io_settings"]["output_plot"] != "nothing"
-            name, ext = rsplit(cfg["io_settings"]["output_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * 
-                                                    param_key * "_" * string(value) * "." * ext
+        if io_settings["output_plot"] != "nothing"
+            name, ext = rsplit(io_settings["output_plot_file"], '.'; limit=2)
+            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * param_key * 
+                                                     "_" * string(value) * "." * ext
         end
-        if cfg["io_settings"]["sankey_plot"] != "nothing"
-            name, ext = rsplit(cfg["io_settings"]["sankey_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * 
-                                                    param_key * "_" * string(value) * "." * ext
+        if io_settings["sankey_plot"] != "nothing"
+            name, ext = rsplit(io_settings["sankey_plot_file"], '.'; limit=2)
+            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * param_key * 
+                                                     "_" * string(value) * "." * ext
         end
     end
 
@@ -908,7 +852,7 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
 end
 
 #TODO whole function may be better suited for project_loading.jl
-function load_optimizer(optimizer_config::OrderedDict{String,Any})
+function load_optimizer(optimizer_config::OrderedDict{String,Any})::Dict{String,Any}
     optimizer = Dict{String,Any}()
     optimizer["type"] = optimizer_config["type"]
 
@@ -939,6 +883,7 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
             optimizer["output_keys_mean"] = optimizer_config["objective_params"]["mean"]
         end
     end
+    optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
 
     optimizer["continuous_output"] = default(optimizer_config, "continuous_output", true)
     if haskey(optimizer_config, "matrix_plot") && optimizer_config["matrix_plot"] !== "nothing"
@@ -969,7 +914,6 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
 
     elseif optimizer_config["type"] == "monte_carlo_annealing"
         optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
 
         optimizer["iterator"] = range(1, optimizer_config["max_runs"]; step=1)
         optimizer["nbh_scale"] = default(optimizer_config, "nbh_scale", 0.5)
@@ -991,7 +935,6 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
         optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
 
         optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
 
         optimizer["iterator"] = [1]
 
@@ -1046,7 +989,6 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
         optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
 
         optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
 
         optimizer["iterator"] = [1]
 

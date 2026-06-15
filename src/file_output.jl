@@ -1,6 +1,8 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
-using Infiltrator
+using Random
+using CSV
+
 """
 get_output_keys(config[io_settings], components)
 
@@ -11,190 +13,185 @@ they should be created:
         - all possible keys (in-/excluding flows) if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
-function get_output_keys(project_config::AbstractDict{AbstractString,Any},
+function get_output_keys(io_settings::AbstractDict{String,Any},
+                         economic_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         optimizer_parameters::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
-    io_settings = project_config["io_settings"]
-    # determine if lineplot and csv should be created
-    do_plot_all_outputs_excl_flows = false
-    do_plot_all_outputs_incl_flows = false
-    do_create_plot = false
-    if haskey(io_settings, "output_plot")
-        do_create_plot = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["output_plot"] == "all_excl_flows"
-            do_plot_all_outputs_excl_flows = true
-        elseif io_settings["output_plot"] == "all_incl_flows"
-            do_plot_all_outputs_incl_flows = true
-        elseif io_settings["output_plot"] == "nothing"
-            do_create_plot = false
-        elseif io_settings["output_plot"] == "all"
-            @error "For \"output_plot\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError())
+    function parse_all_mode(io_settings, setting_name::String)
+        do_create = false
+        do_all_excl = false
+        do_all_incl = false
+
+        if haskey(io_settings, setting_name)
+            do_create = true
+            v = io_settings[setting_name]
+            if v == "all_excl_flows"
+                do_all_excl = true
+            elseif v == "all_incl_flows"
+                do_all_incl = true
+            elseif v == "nothing"
+                do_create = false
+            elseif v == "all"
+                @error "For \"$(setting_name)\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
+                throw(InputError())
+            end
         end
+
+        return do_create, do_all_excl, do_all_incl
     end
 
-    do_write_all_CSV_outputs_excl_flows = false
-    do_write_all_CSV_outputs_incl_flows = false
-    do_write_CSV = false
-    if haskey(io_settings, "csv_output_keys")
-        do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["csv_output_keys"] == "all_excl_flows"
-            do_write_all_CSV_outputs_excl_flows = true
-        elseif io_settings["csv_output_keys"] == "all_incl_flows"
-            do_write_all_CSV_outputs_incl_flows = true
-        elseif io_settings["csv_output_keys"] == "nothing"
-            do_write_CSV = false
-        elseif io_settings["csv_output_keys"] == "all"
-            @error "For \"csv_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError())
-        end
+    # Sorting the keys
+    function sort_by(output_key)
+        any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
+        # flows after others: primary = medium (always present), secondary
+        lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
+        # default: primary = unit.uac, secondary = medium (if present), tertiary
+        lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
     end
 
+    # Build "all outputs" once per include/exclude flows
+    function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
+        all_keys = Vector{EnergySystems.OutputKey}()
 
-    do_return_all_outputs_excl_flows = false
-    do_return_all_outputs_incl_flows = false
-    do_return_data = false
-    if haskey(project_config, "emissions") || haskey(project_config, "economy") || haskey(project_config, "optimizer") 
-        #TODO get_output_keys for return_data in a smart way if optimize, economy or emissions
-        # is set in input file or just get all excl flows
-        do_return_data = true
-        if haskey(project_config, "emissions")
-            do_return_all_outputs_incl_flows = true
-        elseif haskey(project_config, "economy")
-            do_return_all_outputs_incl_flows = true
-        elseif haskey(project_config, "optimizer")
-            do_return_all_outputs_incl_flows = true
-        end
-    end
-
-    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || 
-                               do_write_all_CSV_outputs_excl_flows || 
-                               do_return_all_outputs_excl_flows
-    plot_all_including_flows = do_plot_all_outputs_incl_flows || 
-                               do_write_all_CSV_outputs_incl_flows || 
-                               do_return_all_outputs_incl_flows
-
-    # collect all possible outputs of all units if needed
-    if plot_all_excluding_flows || plot_all_including_flows
-        if plot_all_excluding_flows
-            all_output_keys_excl_flows = Vector{EnergySystems.OutputKey}()
-        end
-        if plot_all_including_flows
-            all_output_keys_incl_flows = Vector{EnergySystems.OutputKey}()
-        end
         for unit in components
             output_vals = output_values(unit[2])
-            if plot_all_including_flows
-                temp_dict_incl_flows = Dict{String,Any}()
-                for output_val in output_vals
-                    if startswith(output_val, "EnergyFlow")
-                        if startswith(output_val, create_secondary_name("EnergyFlow"))
-                            key = adjust_name_if_secondary(String(unit[2].medium), true)
-                            nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
-                        else
-                            key = String(unit[2].medium)
-                            nr_skip = 12
-                        end
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val[nr_skip:end])
-                        else
-                            temp_dict_incl_flows[key] = [output_val[nr_skip:end]]
-                        end
-                    elseif startswith(output_val, "TemperatureFlow")
-                        # do nothing, temperature are added in output_keys()
+            temp_dict = Dict{String,Any}()
+
+            for output_val in output_vals
+                if startswith(output_val, "TemperatureFlow")
+                    # do nothing, temperature are added in output_keys()
+                    continue
+                end
+
+                if startswith(output_val, "EnergyFlow")
+                    if !include_flows
                         continue
+                    end
+
+                    # handle secondary interfaces
+                    if startswith(output_val, create_secondary_name("EnergyFlow"))
+                        key = adjust_name_if_secondary(String(unit[2].medium), true)
+                        nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
                     else
-                        key = unit[2].uac
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val)
-                        else
-                            temp_dict_incl_flows[key] = [output_val]
-                        end
+                        key = String(unit[2].medium)
+                        nr_skip = 12
+                    end
+
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val[nr_skip:end])
+                    else
+                        temp_dict[key] = [output_val[nr_skip:end]]
+                    end
+                else
+                    # Non-flow output => keyed by unit.uac
+                    key = unit[2].uac
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val)
+                    else
+                        temp_dict[key] = [output_val]
                     end
                 end
-                append!(all_output_keys_incl_flows, output_keys(components, temp_dict_incl_flows))
             end
-            if plot_all_excluding_flows
-                temp_dict_excl_flows = Dict{String,Any}()
-                for output_val in output_vals
-                    if startswith(output_val, "EnergyFlow")
-                        continue
-                    elseif startswith(output_val, "TemperatureFlow")
-                        continue
-                    else
-                        key = unit[2].uac
-                        if haskey(temp_dict_excl_flows, key)
-                            push!(temp_dict_excl_flows[key], output_val)
-                        else
-                            temp_dict_excl_flows[key] = [output_val]
-                        end
-                    end
-                end
-                append!(all_output_keys_excl_flows, output_keys(components, temp_dict_excl_flows))
-            end
+            append!(all_keys, output_keys(components, temp_dict))
         end
-        # sort keys
-        function sort_by(output_key)
-            any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
-            # flows after others: primary = medium (always present), secondary
-            lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
-            # default: primary = unit.uac, secondary = medium (if present), tertiary
-            lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
+
+        sort!(all_keys; by=sort_by)
+        return all_keys
+    end
+
+    # Select keys for a channel, given its parsed mode and custom inputs
+    #TODO not used right now
+    function select_keys_for_channel(do_create::Bool,
+                                     mode::Symbol,
+                                     setting_name::String,
+                                     all_excl::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                     all_incl::Union{Nothing,Vector{EnergySystems.OutputKey}};
+                                     custom_extractor::Function)
+        if !do_create
+            return nothing
         end
-        if plot_all_excluding_flows
-            sort!(all_output_keys_excl_flows; by=sort_by)
-        end
-        if plot_all_including_flows
-            sort!(all_output_keys_incl_flows; by=sort_by)
+
+        if mode == :all_incl_flows
+            return all_incl
+        elseif mode == :all_excl_flows
+            return all_excl
+        else
+            return custom_extractor(io_settings[setting_name])
         end
     end
 
-    # collect output keys for lineplot and csv output
-    if do_create_plot  # line plot
-        if do_plot_all_outputs_incl_flows
+    # Economy and emissions filter
+    function is_economic_emissions_key(ok::EnergySystems.OutputKey)
+        occursin("OUT", ok.value_key) ||
+        occursin("IN", ok.value_key) ||
+        occursin("Supply", ok.value_key) ||
+        occursin("Demand", ok.value_key)
+    end
+
+    # get requirements
+    do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
+    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
+    do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
+    do_optimize = !isnothing(optimizer_parameters)
+
+    # Decide if we need all-keys lists
+    need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy_emissions
+    need_all_incl = do_plot_all_incl || do_csv_all_incl
+
+    all_output_keys_excl_flows = need_all_excl ? collect_all_output_keys(components; include_flows=false) : nothing
+    all_output_keys_incl_flows = need_all_incl ? collect_all_output_keys(components; include_flows=true) : nothing
+
+    # Lineplot keys
+    if do_create_plot
+        if do_plot_all_incl
             output_keys_lineplot = all_output_keys_incl_flows
-        elseif do_plot_all_outputs_excl_flows
+        elseif do_plot_all_excl
             output_keys_lineplot = all_output_keys_excl_flows
         else
             output_keys_lineplot = Vector{EnergySystems.OutputKey}()
-            for plot in io_settings["output_plot"]
-                key = plot[2]["key"]
-                append!(output_keys_lineplot, output_keys(components, key))
+            for (_, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                append!(output_keys_lineplot, output_keys(components, plot["key"]))
             end
         end
     else
         output_keys_lineplot = nothing
     end
 
-    if do_write_CSV  # csv export
-        if do_write_all_CSV_outputs_incl_flows
+    # CSV keys
+    if do_write_CSV
+        if do_csv_all_incl
             output_keys_to_csv = all_output_keys_incl_flows
-        elseif do_write_all_CSV_outputs_excl_flows
+        elseif do_csv_all_excl
             output_keys_to_csv = all_output_keys_excl_flows
-        else  # get only requested output keys from input file for CSV-export
+        else
             output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
         end
     else
         output_keys_to_csv = nothing
     end
 
-    #TODO also handle emission and economy keys here
-    if do_return_data  # return data from funtion
-        if do_return_all_outputs_incl_flows
-            output_keys_return = all_output_keys_incl_flows
-        elseif do_return_all_outputs_excl_flows
-            output_keys_return = all_output_keys_excl_flows
-        else  # get all keys that are defined on how to be accumulated in input_file
-            output_keys_sum = output_keys(components, project_config["optimizer"]["total_output_keys"]["sum"])
-            output_keys_mean = output_keys(components, project_config["optimizer"]["total_output_keys"]["mean"])
-            output_keys_return = vcat(output_keys_sum, output_keys_mean)
-        end
+    # Economy or emissions keys
+    if do_economy_emissions
+        # Use excl_flows "all" as base
+        output_keys_economic_emissions = copy(all_output_keys_excl_flows)
+        filter!(is_economic_emissions_key, output_keys_economic_emissions)
+        # keep stable ordering (all_output_keys_excl_flows is already sorted)
     else
-        output_keys_return = nothing
+        output_keys_economic_emissions = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv, output_keys_return
+    # Optimizer keys
+    if do_optimize
+        #TODO is order relevant?
+        output_keys_optimize = output_keys(components, optimizer["objective_params"])
+    else
+        output_keys_optimize = nothing
+    end
+
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_optimize
 end
 
 """
@@ -420,7 +417,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
     return outputs
 end
 
-function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})
+function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})::Array{String}
     keys = Array{String}(undef, length(output_keys))
     for (idx, outkey) in enumerate(output_keys)
         if outkey.medium === nothing
@@ -436,7 +433,7 @@ function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})
     return keys
 end
 
-function parse_outkeys(output_keys::AbstractDict{String,Any})
+function parse_outkeys(output_keys::AbstractDict{String,Any})::Array{String}
     keys = Array{String}(undef, 0)
     for (uac, values) in pairs(output_keys)
         for entry in values
