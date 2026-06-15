@@ -326,7 +326,7 @@ function base_order(components_by_function)
     # process flexible sources/sinks
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
-            if isa(unit, EnergySystems.GridConnection)
+            if isa(unit, EnergySystems.GridInput) || isa(unit, EnergySystems.GridOutput)
                 # skip grid connections here to place them after general flexible sources/sinks
                 continue
             end
@@ -337,7 +337,7 @@ function base_order(components_by_function)
     # process grids
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
-            if !isa(unit, EnergySystems.GridConnection)
+            if !(isa(unit, EnergySystems.GridInput) || isa(unit, EnergySystems.GridOutput))
                 # ignore general flexible sources/sinks here as they are already added
                 continue
             end
@@ -2621,7 +2621,7 @@ end
 function has_grid_input(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
         inface !== nothing && inface.is_secondary_interface && continue
-        if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
+        if inface !== nothing && isa(inface.source, EnergySystems.GridInput)
             input_idx = bus.balance_table_inputs[inface.source.uac].priority
             output_idx = bus.balance_table_outputs[output_interface_uac].priority
             if (bus.connectivity.energy_flow === nothing ||
@@ -2636,7 +2636,7 @@ end
 function has_grid_output(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
         outface !== nothing && outface.is_secondary_interface && continue
-        if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
+        if outface !== nothing && isa(outface.target, EnergySystems.GridOutput)
             input_idx = bus.balance_table_inputs[input_interface_uac].priority
             output_idx = bus.balance_table_outputs[outface.target.uac].priority
             if (bus.connectivity.energy_flow === nothing ||

@@ -24,10 +24,9 @@ function load_order_of_operation()
             "scale" => 6000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",

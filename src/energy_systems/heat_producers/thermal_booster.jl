@@ -1,7 +1,7 @@
 using ..Resie: get_run
 
 #! format: off
-const THERMAL_BOOSTER_PARAMETERS = Dict(
+const THERMAL_BOOSTER_COMPONENT_PARAMETERS = Dict(
     "m_el_in" => (
         default="m_e_ac_230v",
         description="Electrical input medium",
@@ -161,6 +161,37 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const THERMAL_BOOSTER_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 18,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const THERMAL_BOOSTER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 18,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -181,6 +212,9 @@ mutable struct ThermalBooster <: Component
     m_el_in::Symbol
     m_heat_out::Symbol
     m_heat_in::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     output_temperature::Temperature
     input_temperature::Temperature
@@ -203,13 +237,23 @@ mutable struct ThermalBooster <: Component
     losses_power::Float64
     losses_heat::Float64
 
+    balance::Float64
+
     function ThermalBooster(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         return new(SSOT_parameter_constructor(ThermalBooster, uac, config, sim_params)...)
     end
 end
 
-function component_parameters(x::Type{ThermalBooster})::Dict{String,NamedTuple}
-    return deepcopy(THERMAL_BOOSTER_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{ThermalBooster})::Dict{String,Any}
+    return deepcopy(THERMAL_BOOSTER_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{ThermalBooster}, config::Dict{String,Any}, param_name::String,
@@ -224,8 +268,17 @@ function extract_parameter(x::Type{ThermalBooster}, config::Dict{String,Any}, pa
 end
 
 function validate_config(x::Type{ThermalBooster}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(ThermalBooster))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(ThermalBooster)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(ThermalBooster)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(ThermalBooster)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{String,Any},
@@ -245,6 +298,8 @@ function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{Str
             m_el_in,
             m_heat_out,
             m_heat_in,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             params["output_temperature"],
             params["input_temperature"],
             params["power_losses_factor"],
@@ -261,7 +316,8 @@ function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{Str
             Float64[],     # intermediate_temperature_energies
             0.0,           # losses
             0.0,           # losses_power
-            0.0)           # losses_heat
+            0.0,           # losses_heat
+            0.0)           # balance
 end
 
 mutable struct TBEnergies
@@ -927,6 +983,12 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     # calculate mean intermediate temperature
     unit.mean_intermediate_temperature = sum(unit.intermediate_temperatures .* unit.intermediate_temperature_energies) /
                                          sum(unit.intermediate_temperature_energies)
+
+    # calculate energy balance of the thermal booster 
+    unit.balance = el_in +       # input boost energy
+                   sum(energies.slices_heat_in; init=0.0) -  # input heat in
+                   heat_out -    # outputs
+                   unit.losses   # losses
 end
 
 # ThermalBooster has its own reset function as here more parameters are present 
@@ -938,6 +1000,11 @@ function reset(unit::ThermalBooster)
     unit.losses = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
+    unit.balance = 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::ThermalBooster)
+    return unit.power_el # [Wh]
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}

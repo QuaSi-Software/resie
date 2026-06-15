@@ -147,9 +147,6 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_optimize = output_keys_optimize !== nothing
 
     # Initialize the arrays for output
-    output_data_lineplot = do_create_plot_data ?
-                           zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_lineplot)) :
-                           nothing
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
@@ -185,7 +182,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(project_config, components, operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, operations, sim_params)
 
     @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
@@ -272,7 +269,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                    /
                    sim_params["step_info_interval"])
             @info "Progress: $(steps)/$(sim_params["number_of_time_steps"]) in" *
-                  " $(seconds(now() - start)) s. ETA: $(@sprintf("%.4f", eta)) s"
+                  " $(seconds(now() -  start)) s. ETA: $(@sprintf("%.4f", eta)) s"
             start = now()
         end
     end
@@ -352,11 +349,13 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
+        output_data_lineplot = Matrix(view(output_data_all_requested, :,
+                                           time_and_subset_cols(key_indexes, output_keys_lineplot)))
         create_profile_line_plots(output_data_lineplot,
                                   output_keys_lineplot,
                                   output_weather_lineplot,
                                   weather_data_keys,
-                                  project_config,
+                                  io_settings,
                                   sim_params)
         filepath = sim_params["run_path"](io_settings["output_plot_file"])
         @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
@@ -376,7 +375,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # plot additional figures potentially available from components after simulation
-    if default(io_settings, "auxiliary_plots", false)
+    if io_settings["auxiliary_plots"]
         component_list = []
         output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
         for component in components

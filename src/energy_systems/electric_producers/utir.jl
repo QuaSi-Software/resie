@@ -1,6 +1,6 @@
 
 #! format: off
-const UTIR_PARAMETERS = Dict(
+const UTIR_COMPONENT_PARAMETERS = Dict(
     "m_el_in" => (
         description="Electricity input medium",
         display_name="Medium el_in",
@@ -85,6 +85,37 @@ const UTIR_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const UTIR_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 10,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.05,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.05,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const UTIR_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 10,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -106,6 +137,9 @@ mutable struct UTIR <: Component
     m_el_in::Symbol
     m_el_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -124,8 +158,16 @@ mutable struct UTIR <: Component
     end
 end
 
-function component_parameters(x::Type{UTIR})::Dict{String,NamedTuple}
-    return deepcopy(UTIR_PARAMETERS) # Return a copy to prevent external modification
+function component_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{UTIR})::Dict{String,Any}
+    return deepcopy(UTIR_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{UTIR}, config::Dict{String,Any}, param_name::String,
@@ -134,8 +176,17 @@ function extract_parameter(x::Type{UTIR}, config::Dict{String,Any}, param_name::
 end
 
 function validate_config(x::Type{UTIR}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(UTIR))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(UTIR)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(UTIR)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(UTIR)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{UTIR}, uac::String, params::Dict{String,Any},
@@ -159,6 +210,8 @@ function init_from_params(x::Type{UTIR}, uac::String, params::Dict{String,Any},
             InterfaceMap(m_el_out => nothing),
             m_el_in,
             m_el_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             params["power"] / efficiencies[Symbol("el_out")](1.0),
             linear_interface,
             params["min_power_fraction"],
@@ -226,10 +279,16 @@ function process(unit::UTIR, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_el_out], energies[2])
 
     unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::UTIR)
     return unit.min_power_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::UTIR)
+    return unit.power # [W]
 end
 
 function output_values(unit::UTIR)::Vector{String}

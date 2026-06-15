@@ -16,10 +16,9 @@ function get_demand_energy_system_config()
             "scale" => 1,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GB_01"],
-            "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -443,16 +442,14 @@ function test_CHPP_el_eff_plrd()
             "scale" => 1000.0,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_CHP_01"],
-            "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_e_ac_230v",
             "output_refs" => [],
-            "is_source" => false,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
@@ -560,22 +557,19 @@ function test_electrolyser_dispatch_units()
             "scale" => 500.0,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_ELY_01"],
-            "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_h2",
             "output_refs" => [],
-            "is_source" => false,
         ),
         "TST_GRO_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "output_refs" => [],
-            "is_source" => false,
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",

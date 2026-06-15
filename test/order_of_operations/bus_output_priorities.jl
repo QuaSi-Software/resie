@@ -8,10 +8,9 @@ include("../test_util.jl")
 function test_ooo_bus_output_priorities()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_01"],
-            "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "FuelBoiler",

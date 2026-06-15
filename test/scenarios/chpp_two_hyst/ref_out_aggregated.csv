@@ -1,0 +1,6 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+m_h_w_ht1 EnergyFlow TST_CHP_01->TST_BT_01;energy;sum;671;68176,1274002956;0,0;444,7447335789;68,1761274003;0,0681761274
+m_h_w_ht1 EnergyFlow TST_CHP_01->TST_DEM_01;energy;sum;671;62363,7636592083;0,0;483,5526315789;62,3637636592;0,0623637637
+m_h_w_ht1 EnergyFlow TST_CHP_01->TST_GRO_01;energy;sum;671;28969,667685565;0,0;429,8766453278;28,9696676856;0,0289696677
+m_h_w_ht1 TemperatureFlow TST_CHP_01->TST_BT_01;intensive;mean;283;60,0;60,0;60,0;;
+m_h_w_ht1 TemperatureFlow TST_CHP_01->TST_DEM_01;intensive;mean;330;60,0;60,0;60,0;;

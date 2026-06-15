@@ -8,10 +8,9 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
-            "is_source" => true,
         ),
         "TST_PVP_01" => Dict{String,Any}(
             "type" => "PVPlant",

@@ -4,20 +4,25 @@ using Random
 using CSV
 
 """
-get_output_keys(config[io_settings], components)
+    get_output_keys(io_settings, components)
 
-This function determines both for the lineplot and the csv output if
-they should be created:
-    - if not, "nothing" will be returned as key list
-    - if yes, the key lists of the outputs will be returned, either containing
-        - all possible keys (in-/excluding flows) if this is requested in the input file or
-        - only the requested keys as requested in the input file
+Determines output keys for:
+  - lineplot
+  - csv export
+  - economic output (filtered to value_key containing "OUT" or "IN")
+
+For each output channel:
+  - if not requested, returns `nothing`
+  - if requested, returns either:
+      - all possible keys (in-/excluding flows), or
+      - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
                          economic_parameters::Union{Nothing,AbstractDict{String,Any}},
                          emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
                          optimizer_parameters::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
     function parse_all_mode(io_settings, setting_name::String)
@@ -39,6 +44,22 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                 throw(InputError())
             end
         end
+
+        return do_create, do_all_excl, do_all_incl
+    end
+
+    # Sorting the keys
+    function sort_by(output_key)
+        any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
+        # flows after others: primary = medium (always present), secondary
+        lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
+        # default: primary = unit.uac, secondary = medium (if present), tertiary
+        lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
+    end
+
+    # Build "all outputs" once per include/exclude flows
+    function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
+        all_keys = Vector{EnergySystems.OutputKey}()
 
         return do_create, do_all_excl, do_all_incl
     end
@@ -345,12 +366,12 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
     end
     all_current_media = unique(all_current_media)
 
-    for key in keys(from_config)
+    for (key, _) in sort(collect(from_config); by=k -> k[1])
         if key in keys(components)
             unit_key = key
             unit = components[unit_key]
 
-            for entry in from_config[unit_key]
+            for entry in sort(from_config[unit_key])
                 splitted = split(String(entry), ":")
                 if length(splitted) > 1
                     medium_key = splitted[1]
@@ -378,7 +399,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
         elseif key in all_current_media
             media_key = key
             medium = Symbol(String(media_key))
-            for value_key in from_config[media_key]
+            for value_key in sort(from_config[media_key])
                 success = false
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
@@ -505,30 +526,33 @@ function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKe
                         sim_params::Dict{String,Any},
                         csv_time_unit::String)
     row = Array{Union{Float64, String}}(undef, 0)
-    if csv_time_unit !== nothing
-        if csv_time_unit == "seconds"
-            time = sim_params["time_since_output"]
-        elseif csv_time_unit == "minutes"
-            time = sim_params["time_since_output"] / 60
-        elseif csv_time_unit == "hours"
-            time = sim_params["time_since_output"] / 60 / 60
-        elseif csv_time_unit == "date"
-            time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
-        end
+    if csv_time_unit == "seconds"
+        time = sim_params["time_since_output"]
+    elseif csv_time_unit == "minutes"
+        time = sim_params["time_since_output"] / 60
+    elseif csv_time_unit == "hours"
+        time = sim_params["time_since_output"] / 60 / 60
+    elseif csv_time_unit == "date"
+        time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+    end
 
-        push!(row, string(time))
+    push!(row, string(time))
+
+    interpolator = v -> "$v"
+    if io_settings["fixed_output_precision"] > 0
+        interpolator = v -> "$(round(v; digits=io_settings["fixed_output_precision"]))"
     end
 
     if output_keys !== nothing
         for outkey in output_keys
             value = output_value(outkey.unit, outkey)
-            push!(row, string(value))
+            push!(row, interpolator(value))
         end
     end
     if weather_data_keys !== nothing
         for key in weather_data_keys
             value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-            push!(row, string(value))
+            push!(row, interpolator(value))
         end
     end
 
@@ -559,20 +583,20 @@ function listify_operations(operations::OrderOfOperations)::String
 end
 
 """
-    dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
+function dump_auxiliary_outputs(io_settings::Dict{String,Any},
                                 components::Grouping,
                                 order_of_operations::OrderOfOperations,
                                 sim_params::Dict{String,Any})
     # export order of operations
-    if default(project_config["io_settings"], "auxiliary_info", false)
-        aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
+    if io_settings["auxiliary_info"]
+        aux_info_file_path = io_settings["auxiliary_info_file"]
         open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
@@ -600,11 +624,9 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     end
 
     # plot additional figures potentially available from components after initialisation
-    if default(project_config["io_settings"], "auxiliary_plots", false)
-        aux_plots_output_path = sim_params["run_path"](default(project_config["io_settings"],
-                                                               "auxiliary_plots_path",
-                                                               "./output/"))
-        aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+    if io_settings["auxiliary_plots"]
+        aux_plots_output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        aux_plots_formats = io_settings["auxiliary_plots_formats"]
         aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
@@ -635,18 +657,18 @@ function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::
 end
 
 """
-create_profile_line_plots(data, keys, user_input)
+    create_profile_line_plots(data, keys, weather_data, weather_keys, io_settings, sim_params)
 
-create a line plot with data and label. user_input is dict from input file
+Creates the line plots for the given output configuration.
 """
 function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                                    outputs_plot_weather::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_weather_keys::Union{Nothing,Vector{String}},
-                                   project_config::AbstractDict{AbstractString,Any},
+                                   io_settings::Dict{String,Any},
                                    sim_params::Dict{String,Any})
-    plot_all = isa(project_config["io_settings"]["output_plot"], String) &&
-               project_config["io_settings"]["output_plot"][1:3] == "all"
+    plot_all = isa(io_settings["output_plot"], String) &&
+               io_settings["output_plot"][1:3] == "all"
     plot_data = outputs_plot_data !== nothing
     plot_weather = outputs_plot_weather !== nothing
 
@@ -674,40 +696,40 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         unit = String[]
         scale_fact = Float64[]
         if plot_data
-            for plot in project_config["io_settings"]["output_plot"]
-                if occursin("->", first(plot[2]["key"])[2][1])
+            for (nr, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                if occursin("->", first(plot["key"])[2][1])
                     # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
                     # temperature should be plotted
-                    if !isa(plot[2]["axis"], AbstractVector) || length(plot[2]["axis"]) !== 2 ||
-                       !isa(plot[2]["unit"], AbstractVector) || length(plot[2]["unit"]) !== 2 ||
-                       !isa(plot[2]["scale_factor"], AbstractVector) || length(plot[2]["scale_factor"]) !== 2
+                    if !isa(plot["axis"], AbstractVector) || length(plot["axis"]) !== 2 ||
+                       !isa(plot["unit"], AbstractVector) || length(plot["unit"]) !== 2 ||
+                       !isa(plot["scale_factor"], AbstractVector) || length(plot["scale_factor"]) !== 2
                         # only one set of meta information given. Use the given one both for energy and temperature flow
-                        push!(axis, isa(plot[2]["axis"], AbstractVector) ? plot[2]["axis"][1] : plot[2]["axis"])
-                        push!(unit, isa(plot[2]["unit"], AbstractVector) ? plot[2]["unit"][1] : plot[2]["unit"])
+                        push!(axis, isa(plot["axis"], AbstractVector) ? plot["axis"][1] : plot["axis"])
+                        push!(unit, isa(plot["unit"], AbstractVector) ? plot["unit"][1] : plot["unit"])
                         push!(scale_fact,
-                              isa(plot[2]["scale_factor"], AbstractVector) ? plot[2]["scale_factor"][1] :
-                              plot[2]["scale_factor"])
+                              isa(plot["scale_factor"], AbstractVector) ? plot["scale_factor"][1] :
+                              plot["scale_factor"])
 
                         push!(axis, "nothing")
                         push!(unit, "nothing")
                         push!(scale_fact, NaN)
-                        @info "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
+                        @info "For the generation of the output plot, the meta information for entry $nr " *
                               "do not contain two values. Therefore, only energy values will be output. If you want " *
                               "to output also a corresponding temperature, provide two meta information: " *
                               "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
                     else
-                        push!(axis, string(plot[2]["axis"][1]))
-                        push!(unit, string(plot[2]["unit"][1]))
-                        push!(scale_fact, plot[2]["scale_factor"][1])
+                        push!(axis, string(plot["axis"][1]))
+                        push!(unit, string(plot["unit"][1]))
+                        push!(scale_fact, plot["scale_factor"][1])
 
-                        push!(axis, string(plot[2]["axis"][2]))
-                        push!(unit, string(plot[2]["unit"][2]))
-                        push!(scale_fact, plot[2]["scale_factor"][2])
+                        push!(axis, string(plot["axis"][2]))
+                        push!(unit, string(plot["unit"][2]))
+                        push!(scale_fact, plot["scale_factor"][2])
                     end
                 else
-                    push!(axis, string(plot[2]["axis"]))
-                    push!(unit, string(plot[2]["unit"]))
-                    push!(scale_fact, plot[2]["scale_factor"])
+                    push!(axis, string(plot["axis"]))
+                    push!(unit, string(plot["unit"]))
+                    push!(scale_fact, plot["scale_factor"])
                 end
             end
         end
@@ -774,13 +796,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             end
         end
     end
-    output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
-                            project_config["io_settings"]["output_plot_time_unit"] : "date"
-    if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
-        @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
-              "It will be set to `date` as default."
-        output_plot_time_unit = "date"
-    end
+    output_plot_time_unit = io_settings["output_plot_time_unit"]
     if output_plot_time_unit == "seconds"
         x = time_x
     elseif output_plot_time_unit == "minutes"
@@ -799,6 +815,11 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     y = hcat(plot_data ? outputs_plot_data[:, 2:end] : zeros(Float64, size(outputs_plot_weather, 1), 0),
              plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
+
+    if io_settings["fixed_output_precision"] > 0
+        y = round.(y; digits=io_settings["fixed_output_precision"])
+    end
+
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
@@ -839,14 +860,13 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     p = plot(traces, layout)
 
-    file_path = sim_params["run_path"](default(project_config["io_settings"],
-                                               "output_plot_file",
-                                               "./output/output_plot.html"))
+    file_path = sim_params["run_path"](io_settings["output_plot_file"])
     savefig(p, file_path)
 end
 
 """
-create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
+    create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values,
+                  medium_of_interfaces, nr_of_interfaces, io_settings, sim_params)
 
 create a sankey plot. 
 Inputs:
@@ -860,7 +880,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::AbstractDict{String,Any},
+                       io_settings::Dict{String,Any},
                        sim_params::Dict{String,Any})
 
     # sum up data of each interface
@@ -896,7 +916,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
             ||
             (medium_of_interfaces[interface_new] == "hide_medium"
              &&
-             output_all_value_sum[interface_new] == output_all_value_sum[interface_new - 1]))
+             (abs(output_all_value_sum[interface_new] - output_all_value_sum[interface_new - 1])) <
+             sim_params["epsilon"]))
             # end of condition 
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
@@ -908,6 +929,11 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         interface_new += 1
     end
     interface_new -= 1
+
+    # apply fixed precision before adding for non-zero as it may otherwise be rounded to zero again
+    if io_settings["fixed_output_precision"] > 0
+        output_all_value_sum = round.(output_all_value_sum; digits=io_settings["fixed_output_precision"])
+    end
 
     # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
     output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
@@ -923,34 +949,41 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
 
-    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], AbstractDict{})
-        if length(unique_medium_labels) > 1
-            colors = get(ColorSchemes.roma,
-                         (0:(length(unique_medium_labels) - 1)) ./ (length(unique_medium_labels) - 1))
-            color_map = Dict(zip(unique_medium_labels, colors))
-        else
-            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
-        end
-    else
-        color_map = Dict{String,Any}(io_settings["sankey_plot"])
-        for (medium, color) in color_map
+    if io_settings["sankey_plot"] == "default" || io_settings["sankey_plot"] == "custom"
+        # in both cases of "default" or "custom", the setting sankey_plot_spec already
+        # contains a color map definition, but it may not cover all media, thus we randomly
+        # assign colors to the missing media
+        color_map = Dict{String,Any}()
+        for label in unique_medium_labels
+            color = RGB(0, 0, 0)
             try
-                color_entry = Colors.color_names[color]
-                color_map[medium] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
-            catch e
-                @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
-                       "The following error occurred: $e\n" *
-                       "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                if haskey(io_settings["sankey_plot_spec"], label)
+                    color_entry = Colors.color_names[io_settings["sankey_plot_spec"][label]]
+                    color = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
+                else
+                    # use deterministic random color based on label hash. colors are drawn
+                    # from the roma color scheme
+                    rng = Random.MersenneTwister(hash(label))
+                    color = get(ColorSchemes.roma, rand(rng))
+                end
+            catch
+                @error "The given color '$(io_settings["sankey_plot_spec"][label])' of " *
+                       "medium '$label' for the sankey plot is not one of the available " *
+                       "colors in `Colors.color_names`"
                 throw(InputError())
             end
+            color_map[label] = color
         end
+
         for medium in unique_medium_labels
             if medium in keys(color_map)
                 continue
             elseif medium == "hide_medium"
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
-                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                @error "The color for the medium '$medium' for the sankey could not be " *
+                       "found in the input file. Please add the medium and its color in " *
+                       "IO setting 'sankey_plot_spec'."
                 throw(InputError())
             end
         end
@@ -999,8 +1032,281 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
+    file_path = sim_params["run_path"](io_settings["sankey_plot_file"])
     savefig(p, file_path)
+end
+
+"""
+    aggregate_csv(input_path, output_path, output_keys, weather_data_keys,
+                  energy_terms, cumulative_terms, zero_as_missing_terms,
+                  time_columns, separator, threshold, fixed_output_precision)
+
+Create a summary CSV from a time-series CSV result file.
+
+The input CSV is expected to contain one header row and one column per logged
+parameter. Time columns are ignored. The classification of component and flow
+outputs is based on the corresponding `OutputKey.value_key` entries in
+`output_keys`, not on the CSV column names. This avoids incorrect classifications
+caused by component names, media names or user-defined UACs.
+
+Columns matching `cumulative_terms` are treated as cumulative time series and
+represented by their last valid value. Columns matching `energy_terms` are
+summed. Weather data and all other numeric columns are treated as intensive
+quantities and averaged.
+
+Empty values, non-numeric values, `NaN` and infinite values are ignored. For
+columns matching `zero_as_missing_terms`, zero values are ignored as well, e.g.
+for COP-like quantities where zero means inactive or undefined.
+
+Returns `true` if the summary CSV was created successfully and `false` otherwise.
+"""
+function aggregate_csv(input_path::AbstractString,
+                       output_path::AbstractString,
+                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                       weather_data_keys::Union{Nothing,Vector{String}},
+                       energy_terms::Vector{String},
+                       cumulative_terms::Vector{String},
+                       zero_as_missing_terms::Vector{String},
+                       time_columns::Vector{String},
+                       separator::Char,
+                       threshold::Float64,
+                       fixed_output_precision::Int)::Bool
+    if !isfile(input_path)
+        @info "No summary CSV could be created, as the CSV result file could not be found at: $(input_path)"
+        return false
+    end
+
+    # identify columns that should not be aggregated
+    function is_time_column(output_key::AbstractString)::Bool
+        col = strip(output_key)
+        return col in time_columns || startswith(lowercase(col), "time")
+    end
+
+    # identify cumulative time series for which the last value is used
+    function is_cumulative_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), cumulative_terms)
+    end
+
+    # identify extensive energy-related quantities that should be summed
+    function is_energy_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), energy_terms)
+    end
+
+    # identify intensive quantities where zero represents an invalid value
+    function is_zero_as_missing_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), zero_as_missing_terms)
+    end
+
+    # identify weather quantities that should be summed
+    function is_weather_energy_column(weather_key::AbstractString)::Bool
+        # hardcoded at this point as they will probably not change...
+        weather_energy_terms = ["beamHorIrr",
+                                "difHorIrr",
+                                "globHorIrr",
+                                "longWaveIrr"]
+        return any(term -> occursin(term, weather_key), weather_energy_terms)
+    end
+
+    # parse numbers with German decimal comma and tolerate simple thousands separators
+    function parse_decimal_number(value::AbstractString)::Union{Float64,Missing}
+        s = strip(value)
+
+        if isempty(s)
+            return missing
+        end
+
+        s = replace(s, "\ufeff" => "")
+        s = replace(s, "\u00a0" => "")
+        s = replace(s, " " => "")
+
+        x = tryparse(Float64, replace(s, "," => "."))
+        if x !== nothing
+            return x
+        end
+
+        if occursin(",", s)
+            s2 = replace(s, "." => "")
+            s2 = replace(s2, "," => ".")
+
+            x = tryparse(Float64, s2)
+            if x !== nothing
+                return x
+            end
+        end
+
+        return missing
+    end
+
+    # avoid very small numerical residuals in the summary output
+    function clean_small_value(value::Float64)::Float64
+        return abs(value) < threshold ? 0.0 : value
+    end
+
+    # write numbers with decimal comma for consistency with the ReSiE CSV format
+    function decimal_string(value::Real)::String
+        # apply fixed precision to the summary output
+        if fixed_output_precision > 0
+            s = string(round(Float64(value); digits=fixed_output_precision))
+        else
+            s = string(Float64(value))
+        end
+        return replace(s, "." => ",")
+    end
+
+    # escape fields only if required by the CSV format
+    function csv_escape(value::AbstractString)::String
+        s = String(value)
+
+        if occursin(string(separator), s) || occursin("\"", s) ||
+           occursin("\n", s) || occursin("\r", s)
+            return "\"" * replace(s, "\"" => "\"\"") * "\""
+        end
+
+        return s
+    end
+
+    function write_csv_row(io, row::AbstractVector{<:AbstractString})::Nothing
+        println(io, join(csv_escape.(row), string(separator)))
+        return nothing
+    end
+
+    csv = CSV.File(input_path;
+                   delim=separator,
+                   header=1,
+                   normalizenames=false,
+                   stringtype=String,
+                   types=String)
+
+    if length(csv) < 1
+        @info "No summary CSV could be created, as the CSV result file contains no data rows: $(input_path)"
+        return false
+    end
+
+    # Get column names in CSV order.
+    csv_column_names = collect(propertynames(first(csv)))
+
+    # Clean header names for output and time-column checks.
+    headers = [String(strip(replace(String(name), "\ufeff" => "")))
+               for name in csv_column_names]
+
+    # create classification keys in the same order as the CSV columns
+    classification_keys = String["Time"]
+
+    if output_keys !== nothing
+        append!(classification_keys, [outkey.value_key for outkey in output_keys])
+    end
+
+    if weather_data_keys !== nothing
+        append!(classification_keys, ["Weather " * key for key in weather_data_keys])
+    end
+
+    if length(classification_keys) != length(headers)
+        @info "No summary CSV could be created, as the number of output keys does not match the number of CSV columns."
+        return false
+    end
+
+    # ignore time columns and process all remaining columns alphabetically
+    data_indices = [j for j in eachindex(headers)
+                    if !is_time_column(headers[j])]
+
+    sort!(data_indices; by=j -> lowercase(headers[j]))
+
+    open(output_path, "w") do io
+        write_csv_row(io,
+                      ["Parameter",
+                       "Type",
+                       "Aggregation",
+                       "Values used",
+                       "Value",
+                       "Min",
+                       "Max",
+                       "Value kWh",
+                       "Value MWh"])
+
+        for j in data_indices
+            column_name = headers[j]
+            values = Float64[]
+            classification_key = classification_keys[j]
+
+            column = csv[csv_column_names[j]]
+
+            for raw_value in column
+                if raw_value === missing
+                    continue
+                end
+
+                parsed = parse_decimal_number(String(raw_value))
+
+                if parsed !== missing && isfinite(parsed)
+                    if is_zero_as_missing_column(classification_key) && parsed == 0.0
+                        continue
+                    end
+
+                    push!(values, parsed)
+                end
+            end
+            if isempty(values)
+                continue
+            end
+
+            n = length(values)
+
+            if is_cumulative_column(classification_key)
+                # cumulative columns are already integrated over time
+                value_wh = clean_small_value(values[end])
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "cumulative",
+                               "last",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            elseif is_energy_column(classification_key) || is_weather_energy_column(classification_key)
+                # energy columns contain timestep values and are therefore summed
+                value_wh = clean_small_value(sum(values))
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "energy",
+                               "sum",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            else
+                # remaining numeric columns are interpreted as intensive quantities
+                mean_value = sum(values) / n
+                min_value = minimum(values)
+                max_value = maximum(values)
+                aggregation = is_zero_as_missing_column(classification_key) ? "mean_excluding_zero" : "mean"
+
+                write_csv_row(io,
+                              [column_name,
+                               "intensive",
+                               aggregation,
+                               string(n),
+                               decimal_string(mean_value),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               "",
+                               ""])
+            end
+        end
+    end
+
+    return true
 end
 
 # create matrix with 2d plots with each parameter over each other parameter and show "objective" as color 

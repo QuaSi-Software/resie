@@ -662,7 +662,7 @@ OUTPUT_SPECIFICATION_SETTINGS = [
 
 Read and parse the JSON-encoded Dict in the given file.
 """
-function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
+function read_JSON(filepath::String)::OrderedDict{String,Any}
     open(filepath, "r") do file_handle
         content = read(file_handle, String)
         return JSON.parse(content; dicttype=OrderedDict)
@@ -1044,8 +1044,10 @@ function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
                                     for i in 1:length(bus.output_interfaces)])
 
     # Input side: include is_secondary_interface in the key
-    component_key(uac::AbstractString, is_secondary_interface::Bool) = is_secondary_interface ?
-                                                                       string(uac, "#secondary") : uac
+    function component_key(uac::AbstractString, is_secondary_interface::Bool)
+        is_secondary_interface ?
+        string(uac, "#secondary") : uac
+    end
     input_perm_indices = sortperm([input_order_dict[component_key(bus.input_interfaces[i].source.uac,
                                                                   bus.input_interfaces[i].is_secondary_interface)]
                                    for i in eachindex(bus.input_interfaces)])
@@ -1115,6 +1117,139 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
         throw(InputError())
     end
     return UInt(time_step), start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output
+end
+
+"""
+    get_economic_parameters(project_config, sim_params)
+
+Extract economic parameters form input file.
+
+Args:
+-`project_config::Dict{String,Any}`: The project config data
+-`sim_params::Dict{String,Any}`: Simulation parameters, that have been extracted so far
+Return:
+-`Dict{String,Any}`: The economic parameters from the input file. If none are given,
+    calculate_economy will be set to false.
+"""
+function get_economic_parameters(project_config::AbstractDict{String,Any},
+                                 sim_params::Dict{String,Any})::Dict{String,Any}
+    if !haskey(project_config, "economic_parameters")
+        return Dict{String,Any}(
+            "calculate_economy" => false,
+        )
+    end
+
+    economic_parameters = Dict{String,Any}()
+    for (name, param_def) in pairs(ECONOMIC_PARAMETERS_DEF)
+        economic_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                                    project_config["economic_parameters"],
+                                                                    name,
+                                                                    param_def,
+                                                                    sim_params,
+                                                                    "Economic parameters")
+    end
+
+    EnergySystems.validate_config(EnergySystems.Component, economic_parameters, "Economic parameters",
+                                  sim_params, ECONOMIC_PARAMETERS_DEF)
+
+    economic_parameters["repeat_period"], economic_parameters["repeat_method"] = get_repeat_period(economic_parameters["repeat_method"],
+                                                                                                   sim_params,
+                                                                                                   "economic")
+
+    return economic_parameters
+end
+
+"""
+    get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
+
+Get the repeat period as Dates module object (Day or similar) from the given repeat method.
+
+# Arguments
+-`repeat_method::String`: The repeat method from the settings
+-`sim_params::Dict{String,Any}`: Simulation parameters
+-`type::String`: The type (economic or emissions), used for error messages.
+# Returns
+-`Any`: An object of the Dates module, typically Day
+"""
+function get_repeat_period(repeat_method::String, sim_params::Dict{String,Any}, type::String)
+    if repeat_method == "all"
+        # With repeat method "all", the whole  profile is taken as it is and it is repeated until the 
+        # observation_period_in_years is reached.
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+    elseif repeat_method == "last_year"
+        repeat_period = Day(365)
+    elseif repeat_method == "last_month"
+        repeat_period = Day(30)
+    elseif repeat_method == "last_week"
+        repeat_period = Day(7)
+    end
+    if sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+       Second(sim_params["time_step_seconds"]) < repeat_period
+        @warn "In $type calculation, the repeat_method that defines the method for energy and price profile repetitions " *
+              "was set to 'all' as the given repeat_method is longer than the simulation period."
+        repeat_period = sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date_output"]) +
+                        Millisecond(Second(sim_params["time_step_seconds"]))
+        repeat_method = "all"
+    end
+    return repeat_period, repeat_method
+end
+
+"""
+    get_emissions_parameters(project_config)
+
+Extract emissions parameters form input file.
+
+Args:
+-`project_config::Dict{String,Any}`: The project config data
+-`sim_params::Dict{String,Any}`: Simulation parameters, that have been extracted so far
+Return:
+-`Dict{String,Any}`: The emissions parameters from the input file. If none are given,
+    calculate_emissions will be set to false.
+"""
+function get_emissions_parameters(project_config::AbstractDict{String,Any},
+                                  sim_params::Dict{String,Any})::Dict{String,Any}
+    if !haskey(project_config, "emissions_parameters")
+        return Dict{String,Any}(
+            "calculate_emissions" => false,
+        )
+    end
+
+    emissions_parameters = Dict{String,Any}()
+    for (name, param_def) in pairs(EMISSIONS_PARAMATERS_DEF)
+        emissions_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                                     project_config["emissions_parameters"],
+                                                                     name,
+                                                                     param_def,
+                                                                     sim_params,
+                                                                     "Emissions parameters")
+    end
+
+    EnergySystems.validate_config(EnergySystems.Component, emissions_parameters, "Emissions parameters",
+                                  sim_params, EMISSIONS_PARAMATERS_DEF)
+
+    emissions_parameters["repeat_period"], emissions_parameters["repeat_method"] = get_repeat_period(emissions_parameters["repeat_method"],
+                                                                                                     sim_params,
+                                                                                                     "emissions")
+
+    return emissions_parameters
+end
+
+"""
+    all_general_parameters()::Dict{String,Any}
+
+Lists all general, non-component parameters for the simulation engine.
+
+# Returns
+-`Dict{String,Any}`: The parameter definitions
+"""
+function all_general_parameters()::Dict{String,Any}
+    return Dict{String,Any}(
+        "simulation" => SIMULATION_PARAMETERS_DEF,
+        "io_settings" => IO_SETTINGS_DEF,
+        "economic" => ECONOMIC_PARAMETERS_DEF,
+        "emissions" => EMISSIONS_PARAMATERS_DEF,
+    )
 end
 
 # calculation of the order of operations has its own include files due to its complexity

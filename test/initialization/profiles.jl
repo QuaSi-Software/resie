@@ -9,10 +9,9 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
-            "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -48,6 +47,8 @@ function test_profile_aggregation_two()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -94,6 +95,8 @@ function test_profile_aggregation_four()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -136,6 +139,8 @@ function test_profile_segmentation_half()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -219,6 +224,8 @@ function test_profile_segmentation_third()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -306,10 +313,9 @@ end
 function energy_system_linear_classic()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
-            "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -345,6 +351,8 @@ function test_profile_segmentation_half_linear_classic()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -428,6 +436,8 @@ function test_profile_segmentation_third_linear_classic()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -513,10 +523,9 @@ end
 function energy_system_linear_time_preserving()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
-            "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -552,6 +561,8 @@ function test_profile_segmentation_half_linear_time_preserving()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -635,6 +646,8 @@ function test_profile_segmentation_third_linear_time_preserving()
         "run_path" => function (path)
             return path
         end,
+        "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
+        "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

@@ -1,0 +1,42 @@
+﻿Emissions results
+Note: Positive values are emissions, negative values are credits / avoided emissions.
+Total emissions:;1393954,44;kg CO₂e
+Energy emissions:;1393954,44;kg CO₂e
+Embodied emissions:;0,00;kg CO₂e
+
+Yearly emissions in [kg CO₂e/year]:
+;2024;2025;2026;2027;2028;2029;2030;2031;2032;2033;2034;2035;2036;2037;2038;2039;2040;2041;2042;2043
+Building_A_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_A_PV - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+Building_A_el_GRI - energy_emissions_per_year:;20205,01;19598,86;19010,89;18440,57;17887,35;17350,73;16830,21;16325,30;15835,54;15360,48;14899,66;14452,67;14019,09;13598,52;13190,56;12794,85;12411,00;12038,67;11677,51;11327,19
+Building_A_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_A_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_A_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_B_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_B_PV_east - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+Building_B_PV_west - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+Building_B_el_GRI - energy_emissions_per_year:;46177,91;44792,57;43448,80;42145,33;40880,97;39654,54;38464,91;37310,96;36191,63;35105,88;34052,71;33031,13;32040,19;31078,99;30146,62;29242,22;28364,95;27514,00;26688,58;25887,93
+Building_B_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_B_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_B_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Grid_NaturalGas - energy_emissions_per_year:;5264,61;5167,89;5071,16;4974,44;4877,72;4786,36;4712,20;4638,03;4563,86;4489,70;4415,53;4341,37;4267,20;4193,03;4118,87;4041,16;3952,11;3863,05;3774,00;3684,95
+River_water_HP_Grid_el - energy_emissions_per_year:;19417,67;18835,14;18270,09;17721,98;17190,32;16674,61;16174,38;15689,14;15218,47;14761,92;14319,06;13889,49;13472,80;13068,62;12676,56;12296,26;11927,38;11569,55;11222,47;10885,79
+River_water_thermal_source - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+
+Emissions breakdown per component:
+Building_A_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_A_PV - emissions_energy:;0,00;kg CO₂e
+Building_A_el_GRI - emissions_energy:;307254,67;kg CO₂e
+Building_A_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
+Building_A_el_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_A_heating_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_B_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_B_PV_east - emissions_energy:;0,00;kg CO₂e
+Building_B_PV_west - emissions_energy:;0,00;kg CO₂e
+Building_B_el_GRI - emissions_energy:;702220,83;kg CO₂e
+Building_B_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
+Building_B_el_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_B_heating_demand - emissions_credits_energy:;0,00;kg CO₂e
+Grid_NaturalGas - emissions_energy:;89197,23;kg CO₂e
+River_water_HP_Grid_el - emissions_energy:;295281,71;kg CO₂e
+River_water_thermal_source - emissions_energy:;0,00;kg CO₂e

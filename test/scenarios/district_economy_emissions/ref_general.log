@@ -1,0 +1,68 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, the daylight saving has been converted to local standard time.
+[Info] In the profile at .\profiles\examples\district\electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, the daylight saving has been converted to local standard time.
+[Info] In the profile at .\profiles\examples\district\electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\demand_heating_living_commercial_4860_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_heating_living_commercial_4860_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] In the profile at .\profiles\examples\district\demand_DHW_living_commercial_4860_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_DHW_living_commercial_4860_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at .\profiles\examples\district\PV_Stuttgart_30_south_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at .\profiles\examples\district\PV_Stuttgart_10_east_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] In the profile at .\profiles\examples\district\demand_electricity_living_commercial_4860_square_meter.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\demand_electricity_living_commercial_4860_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_electricity_living_commercial_4860_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at .\profiles\examples\district\PV_Stuttgart_10_west_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] In the profile at .\profiles\examples\district\demand_electricity_living_2690_square_meter.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\demand_electricity_living_2690_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_electricity_living_2690_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\electricity_price_day_ahead_DE_LU_2024_EUR_per_MWh.prf, the daylight saving has been converted to local standard time.
+[Info] In the profile at .\profiles\examples\district\electricity_emissions_consumption_lifecycle_DE_2024_g_CO2eq_per_kWh.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\demand_heating_EH55_living_2690_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_heating_EH55_living_2690_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] In the profile at .\profiles\examples\district\river_water_temperature_mean_values_2010-2021.prf, a leap day has been removed.
+[Info] In the profile at .\profiles\examples\district\river_water_temperature_mean_values_2010-2021.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\river_water_temperature_mean_values_2010-2021.prf was shortened to a multiple of the simulation time (from 2024-12-31 23:00 to 2024-12-31 23:45)
+[Info] The profile at .\profiles\examples\district\river_water_temperature_mean_values_2010-2021.prf (intensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at .\profiles\examples\district\gas_emissions_2020_2070.prf was shortened to a multiple of the simulation time (from 2069-12-31 23:00 to 2070-01-01 00:00)
+[Info] The profile at .\profiles\examples\district\gas_emissions_2020_2070.prf (intensive profile) was converted from the profile timestep 31622400 seconds to the simulation timestep of 3600 seconds using linear_classic interpolation.
+[Info] In the profile at .\profiles\examples\district\demand_DHW_living_2690_square_meter.prf, the daylight saving has been converted to local standard time.
+[Info] The profile at .\profiles\examples\district\demand_DHW_living_2690_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] Auxiliary info dumped to file .\test\scenarios\district_economy_emissions\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 438/8760 in 10.897 s. ETA: 207.0430 s
+[Info] Progress: 876/8760 in 4.011 s. ETA: 72.1980 s
+[Info] Progress: 1314/8760 in 5.572 s. ETA: 94.7240 s
+[Info] Progress: 1752/8760 in 3.965 s. ETA: 63.4400 s
+[Info] Progress: 2190/8760 in 3.295 s. ETA: 49.4250 s
+[Info] Progress: 2628/8760 in 3.182 s. ETA: 44.5340 s
+[Info] Progress: 3066/8760 in 3.475 s. ETA: 45.1620 s
+[Info] Progress: 3504/8760 in 3.769 s. ETA: 45.2280 s
+[Info] Progress: 3942/8760 in 2.478 s. ETA: 27.2580 s
+[Info] Progress: 4380/8760 in 5.358 s. ETA: 53.5800 s
+[Info] Progress: 4818/8760 in 8.507 s. ETA: 76.5630 s
+[Info] Progress: 5256/8760 in 6.428 s. ETA: 51.4240 s
+[Info] Progress: 5694/8760 in 5.677 s. ETA: 39.7390 s
+[Info] Progress: 6132/8760 in 5.349 s. ETA: 32.0940 s
+[Info] Progress: 6570/8760 in 4.032 s. ETA: 20.1600 s
+[Info] Progress: 7008/8760 in 4.146 s. ETA: 16.5840 s
+[Info] Progress: 7446/8760 in 3.564 s. ETA: 10.6920 s
+[Info] Progress: 7884/8760 in 2.763 s. ETA: 5.5260 s
+[Info] Progress: 8322/8760 in 2.326 s. ETA: 2.3260 s
+[Info] Progress: 8760/8760 in 4.048 s. ETA: 0.0000 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to .\test\scenarios\district_economy_emissions\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\district_economy_emissions\sankey_plot.html
+[Info] Economy plot created and saved to .\test\scenarios\district_economy_emissions\economic_results_cashflows.html
+[Info] Economy plot created and saved to .\test\scenarios\district_economy_emissions\economic_results_present_values.html
+[Info] Economic results exported to .\test\scenarios\district_economy_emissions\economic_results.csv
+[Info] Emissions plot created and saved to .\test\scenarios\district_economy_emissions\emissions_plot.html
+[Info] Emissions results exported to .\test\scenarios\district_economy_emissions\emissions_results.csv
+[Info] general log saved to .\test\scenarios\district_economy_emissions\general.log
