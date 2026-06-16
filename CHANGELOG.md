@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.2
+* Fix order of operations for transformers with active part load connected to middle busses with both input and output branch: additional potential steps are now added where required
+* Fix heat pump behaviour with secondary output interfaces in cases with zero energy demand on the interface with the higher bus priority
+* Fix error message in heat pump slice splitting for primary and secondary output interfaces
+* Update scenario `secondary_interfaces` to reflect corrected heat pump output temperatures in secondary interfaces
+
 ### Version 0.14.1
 * add two new examples and scenarios for a multi-family house and a district, both with economic evaluation and GHG emissions
 * add the generation of a summary CSV (`write_summary_CSV`) that calculates means, sums, minimums, and maximums of all outputs with auto-detection of the parameter type
