@@ -184,7 +184,8 @@ function init_from_params(x::Type{GridOutput}, uac::String, params::Dict{String,
 end
 
 function initialise!(unit::GridOutput, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.input_interfaces[unit.medium], unload_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 end
 
 function control(unit::GridOutput, components::Grouping, sim_params::Dict{String,Any})

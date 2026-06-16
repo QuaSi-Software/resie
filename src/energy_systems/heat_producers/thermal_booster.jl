@@ -393,11 +393,11 @@ end
 
 function initialise!(unit::ThermalBooster, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+                          unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 end
 
 function control(unit::ThermalBooster, components::Grouping, sim_params::Dict{String,Any})

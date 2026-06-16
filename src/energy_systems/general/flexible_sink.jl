@@ -232,7 +232,7 @@ end
 
 function initialise!(unit::FlexibleSink, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.medium],
-                          unload_storages(unit.controller, unit.medium))
+                          unload_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 end
 
 function control(unit::FlexibleSink,

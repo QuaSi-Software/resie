@@ -973,10 +973,10 @@ end
 function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     if unit.regeneration
         set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                              unload_storages(unit.controller, unit.m_heat_in))
+                              unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     end
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     # calculate diameters of pipe
     unit.pipe_d_i = 2 * unit.pipe_radius_outer - (2 * unit.pipe_thickness)
