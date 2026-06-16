@@ -140,7 +140,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
     do_write_summary_CSV = io_settings["write_summary_CSV"]
-    csv_output_file_path = io_settings["csv_output_file"]
+    csv_file_path = io_settings["csv_output_file"]
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
@@ -163,14 +163,13 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     if do_write_CSV
         header = get_output_header(output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
         # Reset the output file and add headers for the given outputs.
-        open(sim_params["run_path"](csv_output_file_path), "w") do file_handle
+        open(sim_params["run_path"](csv_file_path), "w") do file_handle
             write(file_handle, join(header, ';') * "\n")
         end
     end
 
     # check if sankey should be plotted
-    do_create_sankey = haskey(io_settings, "sankey_plot") && 
-                       io_settings["sankey_plot"] !== "nothing"
+    do_create_sankey = io_settings["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get information about all interfaces for Sankey
         nr_of_interfaces,
@@ -231,7 +230,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                 row[2:end] = replace.(row[2:end], '.' => ',')
                 if do_write_CSV_continuously
                     # Write row to the output file
-                    open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+                    open(sim_params["run_path"](csv_file_path), "a") do file_handle
                         write(file_handle, join(row, ';') * "\n")
                     end
                 else
@@ -295,8 +294,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     if do_optimize
+        optim_results = Dict{String,Any}()
         # create keys consistent with csv_output for return data for return Dict
-        output_data_header = get_output_header(output_data_all_requested, nothing, csv_time_unit)
+        output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
         output_data = OrderedDict{String, AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
         for key in parse_outkeys(optimizer["output_keys_sum"])
             optim_results[key] = sum(output_data[key])
@@ -319,7 +319,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         if do_write_CSV_continuously
             @info "CSV-file with outputs continuously written to $(csv_file_path)"
         else
-            open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+            open(sim_params["run_path"](csv_file_path), "a") do file_handle
                 for row_idx in 1:size(output_csv)[1]
                     write(file_handle, join(output_csv[row_idx, :], ";") * "\n")
                 end
@@ -484,21 +484,18 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
     @globalInfo "-- Now preparing inputs"
 
+    # establish overarching locks for parallelization
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
     results_lock = ReentrantLock()
 
-    #TODO there may be better way to do this; maybe take some general parts of prepare_inputs 
-    # and put them here
     io_settings = get_io_settings(project_config)
     sim_params = get_simulation_params(project_config, io_settings)
-    
-    #TODO discuss if the total_results should be overwritten made individual with e.g. timestamp
-    #TODO default of processed_results_path set in single source of truth as "./output/total_results.csv" for "processed_results" parameter
-    proccesed_results_path = sim_params["run_path"](io_settings["processed_results"])
-    open(proccesed_results_path, "w") do f end #TODO maybe remove
 
     if haskey(project_config, "optimizer")
+        optim_results_path = sim_params["run_path"](io_settings["optimization_csv_file_path"])
+        open(optim_results_path, "w") do f end #TODO maybe remove
+
         #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
         optimizer = load_optimizer(project_config["optimizer"])
 
@@ -518,7 +515,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                 # decide which algorithm to run based on type of optimizer
                 if optimizer["type"] == "parametervariation"
                     sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
-                    results = run_sample(io_settings, sim_params, proccesed_results_path, 
+                    results = run_sample(io_settings, sim_params, optim_results_path, 
                                          project_config, optimizer, sample_params, sample_ID, 
                                          run_lock, output_lock)
                     lock(results_lock) do 
@@ -527,7 +524,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
                 elseif optimizer["type"] == "monte_carlo_annealing"
                     monte_carlo_annealing!(all_results, obj, obj_lock, 
-                                           sim_params, proccesed_results_path, project_config, 
+                                           sim_params, optim_results_path, project_config, 
                                            optimizer, sample_values, sample_ID, 
                                            run_lock, output_lock, results_lock)
                 end
@@ -540,12 +537,12 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             start_time = now()
             #TODO replace optimize and bboptimize with Optimization.jl interface
             if optimizer["type"] == "Optim"
-                optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, proccesed_results_path, 
+                optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
                                                       project_config, optimizer, sample_values, 
                                                       run_lock, output_lock, results_lock), 
                          optimizer["args"]...)
             elseif optimizer["type"] == "BlackBoxOptim"
-                bboptimize(sample_values -> optim_func!(all_results, io_settings, sim_params, proccesed_results_path, 
+                bboptimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
                                                         project_config, optimizer, sample_values, 
                                                         run_lock, output_lock, results_lock),
                            optimizer["args"]...; optimizer["kwargs"]...)
@@ -554,8 +551,8 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
         end
 
-        if !optimizer["continuous_output"]
-            open(proccesed_results_path, "w") do file_handle
+        if !io_settings["write_optimization_csv_continuously"]
+            open(optim_results_path, "w") do file_handle
                 # write header
                 header = join(collect(keys(all_results[1])), ';') * "\n"
                 write(file_handle, header)
@@ -573,7 +570,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             create_matrix_plot(all_results, optimizer, sim_params)
         end
     else
-        _ = run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
+        _ = run_sample(io_settings, sim_params, nothing, project_config, 
                        nothing, nothing, run_ID, run_lock, output_lock)
     end
 
@@ -582,7 +579,7 @@ end
 
 #TODO move everything connected to optimization to new file
 function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
-                                proccesed_results_path, project_config, optimizer, idx,
+                                optim_results_path, project_config, optimizer, idx,
                                 run_ID, run_lock, output_lock, results_lock)
     # temperature schedule is simple inverse logistic curve
     temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimizer["iterator"]) - 0.5)))
@@ -611,7 +608,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 
     # run sim and calculate objective results
-    results = run_sample(io_settings, sim_params, proccesed_results_path, project_config,
+    results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          optimizer, sample_params, run_ID, run_lock, output_lock)
 
     # calculate minimum of results
@@ -633,12 +630,12 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 end
 
-function optim_func!(all_results, io_settings, sim_params, proccesed_results_path, project_config, 
+function optim_func!(all_results, io_settings, sim_params, optim_results_path, project_config, 
                      optimizer, sample_values, run_lock, output_lock, results_lock)
 
     sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
     run_ID = uuid4()
-    results = run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
+    results = run_sample(io_settings, sim_params, optim_results_path, project_config, 
                          optimizer, sample_params, run_ID, run_lock, output_lock)
 
     lock(results_lock) do 
@@ -648,7 +645,7 @@ function optim_func!(all_results, io_settings, sim_params, proccesed_results_pat
     return results["objective"]
 end
 
-function run_sample(io_settings, sim_params, proccesed_results_path, project_config, 
+function run_sample(io_settings, sim_params, optim_results_path, project_config, 
                     optimizer, sample_params, run_ID, run_lock, output_lock)
     start = now()
     if sample_params !== nothing
@@ -658,12 +655,11 @@ function run_sample(io_settings, sim_params, proccesed_results_path, project_con
     results = OrderedDict()
 
     try
-        sim_params, components, operations, 
-        economy_params, emission_params = prepare_inputs(project_config, run_ID)
+        sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
         @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
         lock(run_lock) do 
-            current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+            current_runs[run_ID] = SimulationRun(sim_params, io_settings, components, operations)
         end
 
         start = now()
@@ -675,40 +671,39 @@ function run_sample(io_settings, sim_params, proccesed_results_path, project_con
             end 
         end
 
-        sim_output = run_simulation_loop(project_config, sim_params, components, operations, optimizer)
+        sim_output = run_simulation_loop(sim_params, io_settings, components, operations, optimizer)
         for (key, value) in pairs(sim_output)
             results[key] = value
         end
  
         results["error"] = ""
-
-        #TODO move objective calculation into run_simulation_loop
-        if !isnothing(optimizer) 
-            # TODO for validation
-            if !isnothing(findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]))
-                results["hours_to_full"] = findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
-            else 
-                results["hours_to_full"] = NaN
-            end
-            if !isnothing(findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]))
-                results["hours_to_empty"] = findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
-            else
-                results["hours_to_empty"] = NaN
-            end
-            results["Eigennutzungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_PV_Freiflaeche Supply"])
-            results["Eigenversorgungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_WP m_e_ac_230v IN"])
-            if haskey(sim_output, "Grid_Price_IN Temperature")
-                results["energy_cost_grid"] = sum(sim_output["Hafner_Stromnetz_IN m_e_ac_230v OUT"] .* sim_output["Grid_Price_IN Temperature"] ./ 10^6)
-                results["energy_cost_pv"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) .* 0.08 ./ 10^3
-                results["energy_cost_wp_total"] = results["energy_cost_grid"] + results["energy_cost_pv"]
-                results["objective"] = results["energy_cost_wp_total"]
-            else
-                results["objective"] = results["Eigenversorgungsgrad"]
-            end
-        end
+        
+        # TODO for validation
+        # if !isnothing(optimizer) 
+        #     if !isnothing(findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]))
+        #         results["hours_to_full"] = findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+        #     else 
+        #         results["hours_to_full"] = NaN
+        #     end
+        #     if !isnothing(findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]))
+        #         results["hours_to_empty"] = findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+        #     else
+        #         results["hours_to_empty"] = NaN
+        #     end
+        #     results["Eigennutzungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_PV_Freiflaeche Supply"])
+        #     results["Eigenversorgungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_WP m_e_ac_230v IN"])
+        #     if haskey(sim_output, "Grid_Price_IN Temperature")
+        #         results["energy_cost_grid"] = sum(sim_output["Hafner_Stromnetz_IN m_e_ac_230v OUT"] .* sim_output["Grid_Price_IN Temperature"] ./ 10^6)
+        #         results["energy_cost_pv"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) .* 0.08 ./ 10^3
+        #         results["energy_cost_wp_total"] = results["energy_cost_grid"] + results["energy_cost_pv"]
+        #         results["objective"] = results["energy_cost_wp_total"]
+        #     else
+        #         results["objective"] = results["Eigenversorgungsgrad"]
+        #     end
+        # end
 
     catch e
-        if !isnothing(proccesed_results_path) && filesize(proccesed_results_path) == 0
+        if !isnothing(optim_results_path) && filesize(optim_results_path) == 0
             throw(e)
         end
         # save excact error message to output file
@@ -730,20 +725,20 @@ function run_sample(io_settings, sim_params, proccesed_results_path, project_con
         end
     end
 
-    if !isnothing(optimizer) && optimizer["continuous_output"]
+    if !isnothing(optimizer) && io_settings["write_optimization_csv_continuously"]
         # Write results to seperate file after all simulations are finished.
         row = join(collect(values(results)), ';') * "\n"
         row = replace(row, '.' => ',')
         # Lock the file writing
         lock(output_lock) do 
             # create header if file is empty
-            if filesize(proccesed_results_path) == 0
+            if filesize(optim_results_path) == 0
                 header = join(collect(keys(results)), ';') * "\n"
-                open(proccesed_results_path, "w") do file_handle
+                open(optim_results_path, "w") do file_handle
                     write(file_handle, header)
                 end
             end
-            open(proccesed_results_path, "a") do file_handle
+            open(optim_results_path, "a") do file_handle
                 write(file_handle, row)
             end
         end
@@ -765,8 +760,8 @@ function run_sample(io_settings, sim_params, proccesed_results_path, project_con
     return results
 end
 
-function create_variant(io_settings::Dict{String,Any} , sim_params::Dict{String, Any}, 
-                        project_config::AbstractDict{AbstractString,Any}, 
+function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, Any}, 
+                        project_config::OrderedDict{String,Any}, 
                         sample_params::Dict{String,Any})
     cfg = deepcopy(project_config)
 

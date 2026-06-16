@@ -191,7 +191,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # Optimizer keys
     if do_optimize
         #TODO is order relevant?
-        output_keys_optimize = output_keys(components, optimizer["objective_params"])
+        output_keys_optimize = output_keys(components, optimizer_parameters["objective_params"])
     else
         output_keys_optimize = nothing
     end
