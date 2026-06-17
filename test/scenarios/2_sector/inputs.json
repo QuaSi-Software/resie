@@ -23,6 +23,7 @@
             "TST_01_ELT_01_GRI": ["m_e_ac_230v:OUT"],
             "TST_01_ELT_01_GRO": ["m_e_ac_230v:IN"]
         },
+        "csv_output": "custom",
         "csv_output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1:OUT"],

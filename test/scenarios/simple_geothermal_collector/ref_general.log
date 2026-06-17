@@ -16,28 +16,29 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\simple_geothermal_collector\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 37/744 in 0.724 s. ETA: 13.8343 s
-[Info] Progress: 74/744 in 0.08 s. ETA: 1.4486 s
-[Info] Progress: 111/744 in 0.051 s. ETA: 0.8725 s
-[Info] Progress: 148/744 in 0.059 s. ETA: 0.9504 s
-[Info] Progress: 185/744 in 0.051 s. ETA: 0.7705 s
-[Info] Progress: 222/744 in 0.068 s. ETA: 0.9594 s
-[Info] Progress: 259/744 in 0.059 s. ETA: 0.7734 s
-[Info] Progress: 296/744 in 0.052 s. ETA: 0.6296 s
-[Info] Progress: 333/744 in 0.044 s. ETA: 0.4888 s
-[Info] Progress: 370/744 in 0.053 s. ETA: 0.5357 s
-[Info] Progress: 407/744 in 0.056 s. ETA: 0.5101 s
-[Info] Progress: 444/744 in 0.063 s. ETA: 0.5108 s
-[Info] Progress: 481/744 in 0.049 s. ETA: 0.3483 s
-[Info] Progress: 518/744 in 0.05 s. ETA: 0.3054 s
-[Info] Progress: 555/744 in 0.048 s. ETA: 0.2452 s
-[Info] Progress: 592/744 in 0.069 s. ETA: 0.2835 s
-[Info] Progress: 629/744 in 0.053 s. ETA: 0.1647 s
-[Info] Progress: 666/744 in 0.058 s. ETA: 0.1223 s
-[Info] Progress: 703/744 in 0.037 s. ETA: 0.0410 s
-[Info] Progress: 740/744 in 0.048 s. ETA: 0.0052 s
+[Info] Progress: 37/744 in 1.569 s. ETA: 29.9806 s
+[Info] Progress: 74/744 in 0.137 s. ETA: 2.4808 s
+[Info] Progress: 111/744 in 0.17 s. ETA: 2.9084 s
+[Info] Progress: 148/744 in 0.133 s. ETA: 2.1424 s
+[Info] Progress: 185/744 in 0.121 s. ETA: 1.8281 s
+[Info] Progress: 222/744 in 0.167 s. ETA: 2.3561 s
+[Info] Progress: 259/744 in 0.171 s. ETA: 2.2415 s
+[Info] Progress: 296/744 in 0.124 s. ETA: 1.5014 s
+[Info] Progress: 333/744 in 0.13 s. ETA: 1.4441 s
+[Info] Progress: 370/744 in 0.187 s. ETA: 1.8902 s
+[Info] Progress: 407/744 in 0.143 s. ETA: 1.3025 s
+[Info] Progress: 444/744 in 0.125 s. ETA: 1.0135 s
+[Info] Progress: 481/744 in 0.149 s. ETA: 1.0591 s
+[Info] Progress: 518/744 in 0.13 s. ETA: 0.7941 s
+[Info] Progress: 555/744 in 0.123 s. ETA: 0.6283 s
+[Info] Progress: 592/744 in 0.157 s. ETA: 0.6450 s
+[Info] Progress: 629/744 in 0.143 s. ETA: 0.4445 s
+[Info] Progress: 666/744 in 0.143 s. ETA: 0.3015 s
+[Info] Progress: 703/744 in 0.126 s. ETA: 0.1396 s
+[Info] Progress: 740/744 in 0.139 s. ETA: 0.0150 s
 [Info] -- Finished time step loop
+[Info] CSV-file with outputs written to .\test\scenarios\simple_geothermal_collector\out.csv
+[Info] Summary CSV-file with outputs created and written to .\test\scenarios\simple_geothermal_collector\out_aggregated.csv
 [Info] Line plot created and saved to .\test\scenarios\simple_geothermal_collector\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\simple_geothermal_collector\sankey_plot.html
-[Info] CSV-file with outputs written to ./test/scenarios/simple_geothermal_collector/out.csv
 [Info] general log saved to .\test\scenarios\simple_geothermal_collector\general.log

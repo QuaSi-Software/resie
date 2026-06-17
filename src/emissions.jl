@@ -160,7 +160,7 @@ function calculate_embodied_emissions(component::EnergySystems.Component, sim_pa
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("embodied_emissions" => component_embodied_emissions,
-                           "embodied_emissions_per_year" => embodied_emissions_per_year
+                           "embodied_emissions_per_year" => embodied_emissions_per_year,
                            ))
 
     return embodied_emissions, breakdown
@@ -182,7 +182,8 @@ function get_embodied_emissions_from_component(component::EnergySystems.Componen
     emissions_per_year = zeros(Float64, observation_period)
 
     # calculate initial emissions
-    emissions_first_year = component.emissions_parameters["embodied_emissions_specific"](emissions_reference) # € at time 0
+    emissions_first_year = component.emissions_parameters["embodied_emissions_specific"](component.emissions_parameters["embodied_emissions_specific_scale"] *
+                                                                                         emissions_reference) # € at time 0
     emissions_per_year[1] = emissions_first_year
 
     # calculate emissions of replacements and treat them as credits
@@ -283,7 +284,7 @@ function plot_emissions_results(result::EmissionsResult,
     isempty(series) && return false
 
     # Optional fixed output precision for plotted values.
-    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; sigdigits=fixed_output_precision) : v
 
     # net and cumulative emissions
     net = zeros(observation_period_in_years)

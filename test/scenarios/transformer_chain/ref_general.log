@@ -7,27 +7,29 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\transformer_chain\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/671 in 0.067 s. ETA: 1.2953 s
-[Info] Progress: 66/671 in 0.015 s. ETA: 0.2750 s
-[Info] Progress: 99/671 in 0.016 s. ETA: 0.2773 s
-[Info] Progress: 132/671 in 0.016 s. ETA: 0.2613 s
-[Info] Progress: 165/671 in 0.016 s. ETA: 0.2453 s
-[Info] Progress: 198/671 in 0.012 s. ETA: 0.1720 s
-[Info] Progress: 231/671 in 0.005 s. ETA: 0.0667 s
-[Info] Progress: 264/671 in 0.016 s. ETA: 0.1973 s
-[Info] Progress: 297/671 in 0.017 s. ETA: 0.1927 s
-[Info] Progress: 330/671 in 0.017 s. ETA: 0.1757 s
-[Info] Progress: 363/671 in 0.016 s. ETA: 0.1493 s
-[Info] Progress: 396/671 in 0.017 s. ETA: 0.1417 s
-[Info] Progress: 429/671 in 0.017 s. ETA: 0.1247 s
-[Info] Progress: 462/671 in 0.026 s. ETA: 0.1647 s
-[Info] Progress: 495/671 in 0.016 s. ETA: 0.0853 s
-[Info] Progress: 528/671 in 0.015 s. ETA: 0.0650 s
-[Info] Progress: 561/671 in 0.016 s. ETA: 0.0533 s
-[Info] Progress: 594/671 in 0.029 s. ETA: 0.0677 s
-[Info] Progress: 627/671 in 0.015 s. ETA: 0.0200 s
-[Info] Progress: 660/671 in 0.028 s. ETA: 0.0093 s
+[Info] Progress: 33/671 in 0.144 s. ETA: 2.7840 s
+[Info] Progress: 66/671 in 0.064 s. ETA: 1.1733 s
+[Info] Progress: 99/671 in 0.045 s. ETA: 0.7800 s
+[Info] Progress: 132/671 in 0.048 s. ETA: 0.7840 s
+[Info] Progress: 165/671 in 0.067 s. ETA: 1.0273 s
+[Info] Progress: 198/671 in 0.067 s. ETA: 0.9603 s
+[Info] Progress: 231/671 in 0.06 s. ETA: 0.8000 s
+[Info] Progress: 264/671 in 0.057 s. ETA: 0.7030 s
+[Info] Progress: 297/671 in 0.059 s. ETA: 0.6687 s
+[Info] Progress: 330/671 in 0.085 s. ETA: 0.8783 s
+[Info] Progress: 363/671 in 0.073 s. ETA: 0.6813 s
+[Info] Progress: 396/671 in 0.088 s. ETA: 0.7333 s
+[Info] Progress: 429/671 in 0.066 s. ETA: 0.4840 s
+[Info] Progress: 462/671 in 0.081 s. ETA: 0.5130 s
+[Info] Progress: 495/671 in 0.205 s. ETA: 1.0933 s
+[Info] Progress: 528/671 in 0.06 s. ETA: 0.2600 s
+[Info] Progress: 561/671 in 0.058 s. ETA: 0.1933 s
+[Info] Progress: 594/671 in 0.047 s. ETA: 0.1097 s
+[Info] Progress: 627/671 in 0.065 s. ETA: 0.0867 s
+[Info] Progress: 660/671 in 0.071 s. ETA: 0.0237 s
 [Info] -- Finished time step loop
+[Info] CSV-file with outputs written to .\test\scenarios\transformer_chain\out.csv
+[Info] Summary CSV-file with outputs created and written to .\test\scenarios\transformer_chain\out_aggregated.csv
 [Info] Line plot created and saved to .\test\scenarios\transformer_chain\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\transformer_chain\sankey_plot.html
 [Info] general log saved to .\test\scenarios\transformer_chain\general.log

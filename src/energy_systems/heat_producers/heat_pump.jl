@@ -329,6 +329,7 @@ const HEAT_PUMP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer"
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.015,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -347,6 +348,7 @@ const HEAT_PUMP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transforme
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -1201,6 +1203,12 @@ function calculate_slices(unit::HeatPump,
             continue
         end
 
+        # move to next output slice if no energy is requested here. This can happen with secondary interfaces.
+        if energies.available_heat_out[snk_idx] < EPS
+            snk_idx += 1
+            continue
+        end
+
         # check and determine input temperature of layer, also skip if it's not in the list
         # of indices to be used (this is used by the mechanism for transformer chains and
         # is controlled by arguments fixed_heat_in and fixed_heat_out)
@@ -1673,7 +1681,11 @@ function split_slices_primary_secondary(unit::HeatPump,
             is_secondary = src in secondary_uac
 
             if is_primary && is_secondary
-                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
+                @error "In heat pump $(unit.uac), the source '$src' is both in primary_uac and secondary_uac, choose one!"
+                throw(InputError())
+            elseif !is_primary && !is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac!"
+                throw(InputError())
             end
 
             # scale energy quantities

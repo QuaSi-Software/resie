@@ -548,6 +548,7 @@ const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_param
     Dict{String,Any}(
             "lifetime_years" => 50,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.01,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -566,6 +567,7 @@ const SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS = get_emissions_standard_par
     Dict{String,Any}(
         "lifetime_years" => 50,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
