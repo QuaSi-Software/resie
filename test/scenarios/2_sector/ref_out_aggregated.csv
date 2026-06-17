@@ -1,5 +1,5 @@
 Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
-TST_01_HZG_01_BFT Load;intensive;mean;672;21398,6235119048;2375,0;37250,0;;
+TST_01_HZG_01_BFT Load;intensive;mean;672;21398,62351;2375,0;37250,0;;
 TST_01_HZG_01_BUS Balance;energy;sum;672;0,0;0,0;0,0;0,0;0,0
 TST_01_HZG_01_CHP m_h_w_ht1 OUT;energy;sum;672;871875,0;0,0;1875,0;871,875;0,871875
 TST_01_HZG_01_DEM m_h_w_ht1 IN;energy;sum;672;990500,0;500,0;3750,0;990,5;0,9905
