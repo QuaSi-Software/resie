@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.3
+* Change fixed output precision to use significant digits for rounding instead of decimal digits
+* Update all scenario outputs due to to changes in the fixed output precision
+* Add check and error message to scenario CLI if the given scenario does not exist
+* Fix wrong conditional in GeothermalHeatCollector
+
 ### Version 0.14.2
 * Fix order of operations for transformers with active part load connected to middle busses with both input and output branch: additional potential steps are now added where required
 * Fix heat pump behaviour with secondary output interfaces in cases with zero energy demand on the interface with the higher bus priority
