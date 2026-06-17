@@ -160,7 +160,7 @@ function calculate_embodied_emissions(component::EnergySystems.Component, sim_pa
 
     add_to_breakdown!(breakdown, component.uac,
                       Dict("embodied_emissions" => component_embodied_emissions,
-                           "embodied_emissions_per_year" => embodied_emissions_per_year
+                           "embodied_emissions_per_year" => embodied_emissions_per_year,
                            ))
 
     return embodied_emissions, breakdown
@@ -284,7 +284,7 @@ function plot_emissions_results(result::EmissionsResult,
     isempty(series) && return false
 
     # Optional fixed output precision for plotted values.
-    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; sigdigits=fixed_output_precision) : v
 
     # net and cumulative emissions
     net = zeros(observation_period_in_years)
