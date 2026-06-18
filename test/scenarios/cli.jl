@@ -458,6 +458,11 @@ function main()
         return
     end
 
+    if scenario_name !== nothing && !isdir(joinpath(scenarios_dir, scenario_name))
+        println("Given scenario $(scenario_name) does not exist")
+        return
+    end
+
     for name in readdir(scenarios_dir)
         if scenario_name !== nothing && scenario_name != name
             continue

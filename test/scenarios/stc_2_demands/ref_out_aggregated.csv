@@ -1,16 +1,16 @@
 Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
-TST_BUS_01 Balance;energy;sum;672;-67370,832720464;-562,5;0,0;-67,3708327205;-0,0673708327
+TST_BUS_01 Balance;energy;sum;672;-67370,83272;-562,5;0,0;-67,37083272;-0,06737083272
 TST_DEM_01 Demand;energy;sum;672;30100,0;18,75;187,5;30,1;0,0301
 TST_DEM_01 m_h_w_ht1 IN;energy;sum;672;5700,0;0,0;37,5;5,7;0,0057
 TST_DEM_01 Temperature;intensive;mean;672;5,0;5,0;5,0;;
 TST_DEM_02 Demand;energy;sum;672;60200,0;37,5;375,0;60,2;0,0602
-TST_DEM_02 m_h_w_ht1 IN;energy;sum;672;17229,167279536;0,0;187,5546910746;17,2291672795;0,0172291673
+TST_DEM_02 m_h_w_ht1 IN;energy;sum;672;17229,16728;0,0;187,5546911;17,22916728;0,01722916728
 TST_DEM_02 Temperature;intensive;mean;672;4,0;4,0;4,0;;
-TST_STC_01 beam_solar_irradiance_in_plane;intensive;mean;672;24,8188559258;0,0;390,6274000037;;
-TST_STC_01 delta_T;intensive;mean;672;0,5311977359;0,0;2,9198808968;;
-TST_STC_01 diffuse_solar_irradiance_in_plane;intensive;mean;672;20,4841455367;0,0;131,647913397;;
-TST_STC_01 direct_normal_irradiance;intensive;mean;672;38,0612813998;0,0;601,322810826;;
-TST_STC_01 m_h_w_ht1 OUT;energy;sum;672;22929,167279536;0,0;187,5546910746;22,9291672795;0,0229291673
-TST_STC_01 spec_flow_rate;intensive;mean;672;1,3869e-6;0,0;4,0e-6;;
-TST_STC_01 Temperature_Mean_Collector;intensive;mean;672;3,3039380296;0,8607773007;4,8804677921;;
-TST_STC_01 Temperature_Output;intensive;mean;672;3,5558837961;0,8607773007;4,8804677921;;
+TST_STC_01 beam_solar_irradiance_in_plane;intensive;mean;672;24,81885593;0,0;390,6274;;
+TST_STC_01 delta_T;intensive;mean;672;0,531197736;0,0;2,919880897;;
+TST_STC_01 diffuse_solar_irradiance_in_plane;intensive;mean;672;20,48414554;0,0;131,6479134;;
+TST_STC_01 direct_normal_irradiance;intensive;mean;672;38,0612814;0,0;601,3228108;;
+TST_STC_01 m_h_w_ht1 OUT;energy;sum;672;22929,16728;0,0;187,5546911;22,92916728;0,02292916728
+TST_STC_01 spec_flow_rate;intensive;mean;672;1,386904762e-6;0,0;4,0e-6;;
+TST_STC_01 Temperature_Mean_Collector;intensive;mean;672;3,30393803;0,8607773007;4,880467792;;
+TST_STC_01 Temperature_Output;intensive;mean;672;3,555883796;0,8607773007;4,880467792;;
