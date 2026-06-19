@@ -20,7 +20,7 @@ For each output channel:
 function get_output_keys(io_settings::AbstractDict{String,Any},
                          economic_parameters::Union{Nothing,AbstractDict{String,Any}},
                          emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
-                         optimizer_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         optimiser_parameters::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
@@ -140,7 +140,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
     do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
-    do_optimize = !isnothing(optimizer_parameters)
+    do_optimise = optimiser_parameters["run_optimisation"]
+    do_matrix_plot = io_settings["matrix_plot"] == "custom"
 
     # Decide if we need all-keys lists
     need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy_emissions
@@ -188,15 +189,24 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         output_keys_economic_emissions = nothing
     end
 
-    # Optimizer keys
-    if do_optimize
+    # optimiser keys
+    if do_optimise
         #TODO is order relevant?
-        output_keys_optimize = output_keys(components, optimizer_parameters["objective_params"])
+        output_keys_optimise = output_keys(components, optimiser_parameters["objective_keys_sum_mean"])
+        if do_matrix_plot
+            for (func, spec) in pairs(io_settings["matrix_plot_spec"])
+                if func == "sum" || func == "mean"
+                    matrix_keys = output_keys(components, spec)
+                    append!(output_keys_optimise, matrix_keys)
+                end
+            end
+        end
+        output_keys_optimise = unique(output_keys_optimise)
     else
-        output_keys_optimize = nothing
+        output_keys_optimise = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_optimize
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_optimise
 end
 
 """
@@ -658,18 +668,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     # set Axis, unit and scale factor if given
     if plot_all  # plot all outputs. Here no units or scaling factors are available.
-        labels = String[]
-        n = 1
-        for outkey in outputs_plot_keys
-            if outkey.medium === nothing
-                push!(labels, string("$(outkey.unit.uac) $(outkey.value_key)"))
-            elseif startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
-                push!(labels, string("$(outkey.medium) $(outkey.value_key)"))
-            else
-                push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"))
-            end
-            n += 1
-        end
+        labels = parse_outkeys(outputs_plot_keys)
         if plot_weather
             for outkey in outputs_plot_weather_keys
                 push!(labels, string("Weather $(outkey)"))
@@ -726,23 +725,12 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
         # create legend entries
         labels = String[]
-        n = 1
         if plot_data
-            for outkey in outputs_plot_keys
-                if outkey.medium === nothing
-                    push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
-                elseif startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
-                    push!(labels, string("$(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
-                else
-                    push!(labels,
-                          string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
-                end
-                n += 1
-            end
+            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .* axis[1:length(outputs_plot_keys)] .* ")"
         end
         if plot_weather
             for outkey in outputs_plot_weather_keys
-                push!(labels, string("Weather $(outkey) [($(axis[n]))"))
+                push!(labels, string("Weather $(outkey) [($(axis[end]))"))
             end
         end
     end
@@ -843,7 +831,6 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     end
 
     p = plot(traces, layout)
-
     file_path = sim_params["run_path"](io_settings["output_plot_file"])
     savefig(p, file_path)
 end
@@ -1294,12 +1281,21 @@ function aggregate_csv(input_path::AbstractString,
 end
 
 # create matrix with 2d plots with each parameter over each other parameter and show "objective" as color 
-function create_matrix_plot(results::Vector{Any}, optimizer::Dict{String,Any}, sim_params::Dict{String,Any})
-    param_names = collect(keys(optimizer["optim_params"]))
+function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any}, sim_params::Dict{String,Any})
+    if io_settings["matrix_plot"] == "default"
+        obj_key = "objective"
+    elseif io_settings["matrix_plot"] == "custom"
+        func, spec = first(pairs(io_settings["matrix_plot_spec"]))
+        if func == "sum" || func == "mean"
+            obj_key = func * " " * parse_outkeys(spec)[1]
+        elseif func == "economic" || func == "emissions"
+            obj_key = func * " " * spec[1]
+        end
+    end
+    param_names = collect(keys(sim_params["optimisation"]["optim_params"]))
     N = length(param_names)
-
     results_dict = Dict(k => [d[k] for d in results] for k in keys(results[1]))
-    objective = results_dict[optimizer["matrix_plot_objective"]]
+    objective = results_dict[obj_key]
     objective = replace(objective, NaN=>missing)
     min_obj = minimum(skipmissing(objective))
     low_quartile_obj = sort(objective)[length(objective) ÷ 4]
@@ -1311,16 +1307,14 @@ function create_matrix_plot(results::Vector{Any}, optimizer::Dict{String,Any}, s
                       cmax=low_quartile_obj,
                       showscale=true,
                       line=attr(color="red", width=objective.==min_obj * 1),
-                      colorbar=attr(title=optimizer["matrix_plot_objective"])
+                      colorbar=attr(title=obj_key)
                       ),
         text = string.(objective),
         hovertemplate = "%{x}, %{y}, %{text}"
         )
     p = plot(scatter_traces)
     
-    file_path = sim_params["run_path"](default(optimizer, 
-                                               "matrix_plot_file",
-                                               "./output/matrix_plot.html"))
+    file_path = sim_params["run_path"](io_settings["matrix_plot_file"])
     savefig(p, file_path)
 end
 

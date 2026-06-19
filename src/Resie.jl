@@ -100,7 +100,7 @@ using JSON
 using Dates
 
 """
-    run_simulation_loop(sim_params, io_settings, components, operations, optimizer)
+    run_simulation_loop(sim_params, io_settings, components, operations)
 
 Performs the simulation as loop over time steps and records outputs.
 
@@ -109,28 +109,25 @@ Performs the simulation as loop over time steps and records outputs.
 -`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
 -`operations::OrderOfOperations`: Order of operations
--`optimizer::Dict{String,Any}`: Definition of optimizer parameters
 """
 function run_simulation_loop(sim_params::Dict{String,Any},
                              io_settings::Dict{String,Any},
                              components::Grouping,
-                             operations::OrderOfOperations,
-                             optimizer::Dict{String,Any})
+                             operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    #TODO add optimizer to get_output_keys()
     output_keys_lineplot,
     output_keys_to_CSV,
     output_keys_economic_emissions,
-    output_keys_optimize = get_output_keys(io_settings,
+    output_keys_optimise = get_output_keys(io_settings,
                                            sim_params["economic_parameters"],
                                            sim_params["emissions_parameters"],
-                                           optimizer,
+                                           sim_params["optimisation"],
                                            components)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
                                                                                   something(output_keys_economic_emissions,
                                                                                             String[]),
-                                                                                  something(output_keys_optimize,
+                                                                                  something(output_keys_optimise,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -144,7 +141,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
-    do_optimize = output_keys_optimize !== nothing
+    do_optimise = sim_params["optimisation"]["run_optimisation"]
 
     # Initialize the arrays for output
     output_weather_lineplot = do_create_plot_weather ?
@@ -247,7 +244,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
             # gather output data of each component for line plot, economy and emissions
-            if do_create_plot_data || do_calculate_economy || do_calculate_emissions || do_optimize
+            if do_create_plot_data || do_calculate_economy || do_calculate_emissions || do_optimise
                 output_data_all_requested[output_steps, :] = gather_output_data(all_requested_output_keys,
                                                                                 sim_params["time_since_output"])
             end
@@ -275,7 +272,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     @info "-- Finished time step loop"
 
     # extract output data per category including the time step in the first column
-    # TODO replace with parse_outkeys() or use this approach in do_optimize
+    # TODO replace with parse_outkeys() or use this approach in do_optimise
     output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
     function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
         keys === nothing && return Int[]
@@ -293,25 +290,71 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
     end
 
-    if do_optimize
+    if do_optimise
         optim_results = Dict{String,Any}()
         # create keys consistent with csv_output for return data for return Dict
         output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
         output_data = OrderedDict{String, AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
-        for key in parse_outkeys(optimizer["output_keys_sum"])
-            optim_results[key] = sum(output_data[key])
-        end
-        for key in parse_outkeys(optimizer["output_keys_mean"])
-            optim_results[key] = sum(output_data[key]) / length(output_data[key])
-        end 
-        if haskey(optimizer, "objective_function")
-            obj_param_keys = parse_outkeys(optimizer["objective_params"])
-            obj_input = zeros(length(obj_param_keys))
-            for (idx, key) in enumerate(obj_param_keys)
-                obj_input[idx] = optim_results[key]
+
+        function write_optim_results!(params::Dict{String,Any}, 
+                                      output_data::OrderedDict{String, AbstractArray}, 
+                                      res::Dict{String,Any})::Dict{String,Any}
+            for (func, spec) in pairs(params)
+                if func == "sum"
+                    keys = parse_outkeys(spec)
+                    for key in keys
+                        res["sum $key"] = sum(output_data[key])
+                    end
+                elseif func == "mean"
+                    keys = parse_outkeys(spec)
+                    for key in keys                    
+                        res["mean $key"] = sum(output_data[key]) / length(output_data[key])
+                    end
+                elseif func == "economic"
+                    for key in spec
+                        res["$func $key"] = getfield(economic_result, Symbol(key))
+                    end
+                elseif func == "emissions"
+                    for key in spec
+                        res["$func $key"] = getfield(emissions_result, Symbol(key))
+                    end
+                end
             end
-            optim_results["objective"] = optimizer["objective_function"](obj_input...)
+            return res
         end
+
+        # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
+        write_optim_results!(sim_params["optimisation"]["objective_params"], output_data, 
+                             optim_results)
+        # calculate objective from the results 
+        optim_results["objective"] = sim_params["optimisation"]["objective_function"](values(optim_results))
+        
+        # write necessary values for matrix_plot in the global result dictionary that is returned by run_simulation_loop()
+        if io_settings["matrix_plot"] == "custom"
+            write_optim_results!(io_settings["matrix_plot_spec"], output_data, 
+                                 optim_results)
+        end
+        # TODO for validation/ test with Hafner
+        # if !isnothing(findfirst(x -> x > 99.0, output_data["Hafner_Puffer_gross Load%"]))
+        #     results["hours_to_full"] = findfirst(x -> x > 99.0, output_data["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+        # else 
+        #     results["hours_to_full"] = NaN
+        # end
+        # if !isnothing(findfirst(isequal(0.0), output_data["Hafner_Puffer_gross Load%"]))
+        #     results["hours_to_empty"] = findfirst(isequal(0.0), output_data["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
+        # else
+        #     results["hours_to_empty"] = NaN
+        # end
+        # results["Eigennutzungsgrad"] = sum(output_data["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(output_data["Hafner_PV_Freiflaeche Supply"])
+        # results["Eigenversorgungsgrad"] = sum(output_data["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(output_data["Hafner_WP m_e_ac_230v IN"])
+        # if haskey(output_data, "Grid_Price_IN Temperature")
+        #     results["energy_cost_grid"] = sum(output_data["Hafner_Stromnetz_IN m_e_ac_230v OUT"] .* output_data["Grid_Price_IN Temperature"] ./ 10^6)
+        #     results["energy_cost_pv"] = sum(output_data["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) .* 0.08 ./ 10^3
+        #     results["energy_cost_wp_total"] = results["energy_cost_grid"] + results["energy_cost_pv"]
+        #     results["objective"] = results["energy_cost_wp_total"]
+        # else
+        #     results["objective"] = results["Eigenversorgungsgrad"]
+        # end
     end
 
     # write output to CSV if not done continuously
@@ -439,7 +482,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         success && @info "Utilized price and emission profiles exported as plot to $filepath"
     end
 
-    return do_optimize ? optim_results : nothing
+    return do_optimise ? optim_results : nothing
 end
 
 """
@@ -492,66 +535,66 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     io_settings = get_io_settings(project_config)
     sim_params = get_simulation_params(project_config, io_settings)
 
-    if haskey(project_config, "optimizer")
-        optim_results_path = sim_params["run_path"](io_settings["optimization_csv_file_path"])
+    if sim_params["optimisation"]["run_optimisation"]
+        optim_results_path = sim_params["run_path"](io_settings["optimisation_csv_file_path"])
         open(optim_results_path, "w") do f end #TODO maybe remove
-
-        #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
-        optimizer = load_optimizer(project_config["optimizer"])
+        optimiser = sim_params["optimisation"]
 
         all_results = []
-        if optimizer["type"] == "monte_carlo_annealing"
-            obj = Array{Union{Float64,Nothing}}(nothing, length(parse_outkeys(optimizer["objective_params"])))
+        if optimiser["type"] == "monte_carlo_annealing"
+            obj = Array{Union{Float64,Nothing}}(nothing)
             obj_lock = ReentrantLock()
         end
-
+        nr_runs = Atomic{Int}(1)
         @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
         #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
-        if length(optimizer["iterator"]) > 1
-            @threads for sample_values in collect(optimizer["iterator"])
+        if length(optimiser["iterator"]) > 1
+            @threads for sample_values in collect(optimiser["iterator"])
+                run_nr = nr_runs[]
+                atomic_add!(nr_runs, 1)
                 sample_ID = uuid4()
                 start_time = now()
 
-                # decide which algorithm to run based on type of optimizer
-                if optimizer["type"] == "parametervariation"
-                    sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
+                # decide which algorithm to run based on type of optimiser
+                if optimiser["type"] == "parametervariation"
+                    sample_params = Dict{String, Any}(zip(optimiser["optim_params_keys"], sample_values))
                     results = run_sample(io_settings, sim_params, optim_results_path, 
-                                         project_config, optimizer, sample_params, sample_ID, 
+                                         project_config, sample_params, sample_ID, 
                                          run_lock, output_lock)
                     lock(results_lock) do 
                         push!(all_results, results) 
                     end
 
-                elseif optimizer["type"] == "monte_carlo_annealing"
+                elseif optimiser["type"] == "monte_carlo_annealing"
                     monte_carlo_annealing!(all_results, obj, obj_lock, 
                                            sim_params, optim_results_path, project_config, 
-                                           optimizer, sample_values, sample_ID, 
+                                           sample_values, sample_ID, 
                                            run_lock, output_lock, results_lock)
                 end
                 runtime = round(Int, seconds(now() - start_time))
-                max_runs = length(optimizer["iterator"])
-                eta = round(Int, (max_runs - length(all_results)) * runtime / Threads.nthreads() / 60)
-                @globalInfo "[$(length(all_results))/$max_runs] → completed in $runtime s. ETA: $eta min"
+                max_runs = length(optimiser["iterator"])
+                eta = round(Int, (max_runs - run_nr) * runtime / Threads.nthreads() / 60)
+                @globalInfo "[$run_nr/$max_runs] → completed in $runtime s. ETA: $eta min"
             end
         else
             start_time = now()
-            #TODO replace optimize and bboptimize with Optimization.jl interface
-            if optimizer["type"] == "Optim"
+            #TODO evtl. replace optimize and bboptimize with Optimization.jl interface
+            if optimiser["type"] == "Optim"
                 optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                                      project_config, optimizer, sample_values, 
+                                                      project_config, sample_values, 
                                                       run_lock, output_lock, results_lock), 
-                         optimizer["args"]...)
-            elseif optimizer["type"] == "BlackBoxOptim"
+                         optimiser["args"]...)
+            elseif optimiser["type"] == "BlackBoxOptim"
                 bboptimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                                        project_config, optimizer, sample_values, 
+                                                        project_config, sample_values, 
                                                         run_lock, output_lock, results_lock),
-                           optimizer["args"]...; optimizer["kwargs"]...)
+                           optimiser["args"]...; optimiser["kwargs"]...)
             end
             runtime = round(Int, seconds(now() - start_time))
-            @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
+            @globalInfo "[$(length(total_results)) runs → completed in $runtime s."
         end
 
-        if !io_settings["write_optimization_csv_continuously"]
+        if !io_settings["write_optimisation_csv_continuously"]
             open(optim_results_path, "w") do file_handle
                 # write header
                 header = join(collect(keys(all_results[1])), ';') * "\n"
@@ -566,28 +609,29 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         end
 
-        if !isnothing(optimizer["matrix_plot_objective"])
-            create_matrix_plot(all_results, optimizer, sim_params)
+        if io_settings["matrix_plot"] != "nothing"
+            create_matrix_plot(all_results, io_settings, sim_params)
         end
     else
         _ = run_sample(io_settings, sim_params, nothing, project_config, 
-                       nothing, nothing, run_ID, run_lock, output_lock)
+                       nothing, run_ID, run_lock, output_lock)
     end
 
     return true
 end
 
-#TODO move everything connected to optimization to new file
+#TODO move everything connected to optimisation to new file
 function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
-                                optim_results_path, project_config, optimizer, idx,
+                                optim_results_path, project_config, idx,
                                 run_ID, run_lock, output_lock, results_lock)
+    optimiser = sim_params["optimisation"]
     # temperature schedule is simple inverse logistic curve
-    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimizer["iterator"]) - 0.5)))
+    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimiser["iterator"]) - 0.5)))
 
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
         sample_params = Dict{String, Any}()
-        for (key, param) in pairs(optimizer["optim_params"])
+        for (key, param) in pairs(optimiser["optim_params"])
             #TODO maybe define optim params also as ranges but use minimum(range) and maximum(range) as limits
             sample_params[key] = rand(range(start=param["min"], stop=param["max"], length=100))
         end
@@ -600,8 +644,8 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
         sample = all_results[sample_idx]
         
         sample_params = Dict{String, Any}()
-        for (key, param) in pairs(optimizer["optim_params"])
-            range = optimizer["nbh_scale"] * temperature * (param["max"] - param["min"])
+        for (key, param) in pairs(optimiser["optim_params"])
+            range = optimiser["nbh_scale"] * temperature * (param["max"] - param["min"])
             value = sample[key] + rand((-0.5 * range):(0.5 * range))
             sample_params[key] = clamp(value, param["min"], param["max"])
         end
@@ -609,7 +653,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
 
     # run sim and calculate objective results
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
-                         optimizer, sample_params, run_ID, run_lock, output_lock)
+                         sample_params, run_ID, run_lock, output_lock)
 
     # calculate minimum of results
     if any(!isnothing(obj))
@@ -624,19 +668,19 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
 
         # calculate global measure and sort by it
         for res in all_results
-            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(parse_outkeys(optimizer["objective_params"]), obj))
+            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(parse_outkeys(optimiser["objective_params"]), obj))
         end
         sort!(all_results; by=x -> x["gm"])
     end
 end
 
 function optim_func!(all_results, io_settings, sim_params, optim_results_path, project_config, 
-                     optimizer, sample_values, run_lock, output_lock, results_lock)
-
-    sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
+                     sample_values, run_lock, output_lock, results_lock)
+    #TODO implement batch evaluation for Metaheuristics e.g. if size(sample_values) then @threads?
+    sample_params = Dict{String, Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config, 
-                         optimizer, sample_params, run_ID, run_lock, output_lock)
+                         sample_params, run_ID, run_lock, output_lock)
 
     lock(results_lock) do 
         push!(all_results, results)
@@ -646,7 +690,7 @@ function optim_func!(all_results, io_settings, sim_params, optim_results_path, p
 end
 
 function run_sample(io_settings, sim_params, optim_results_path, project_config, 
-                    optimizer, sample_params, run_ID, run_lock, output_lock)
+                    sample_params, run_ID, run_lock, output_lock)
     start = now()
     if sample_params !== nothing
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
@@ -671,36 +715,14 @@ function run_sample(io_settings, sim_params, optim_results_path, project_config,
             end 
         end
 
-        sim_output = run_simulation_loop(sim_params, io_settings, components, operations, optimizer)
-        for (key, value) in pairs(sim_output)
-            results[key] = value
+        sim_output = run_simulation_loop(sim_params, io_settings, components, operations)
+        if !isnothing(sim_output)
+            for (key, value) in pairs(sim_output)
+                results[key] = value
+            end
         end
  
         results["error"] = ""
-        
-        # TODO for validation
-        # if !isnothing(optimizer) 
-        #     if !isnothing(findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]))
-        #         results["hours_to_full"] = findfirst(x -> x > 99.0, sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
-        #     else 
-        #         results["hours_to_full"] = NaN
-        #     end
-        #     if !isnothing(findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]))
-        #         results["hours_to_empty"] = findfirst(isequal(0.0), sim_output["Hafner_Puffer_gross Load%"]) * sim_params["time_step_seconds"] / 3600
-        #     else
-        #         results["hours_to_empty"] = NaN
-        #     end
-        #     results["Eigennutzungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_PV_Freiflaeche Supply"])
-        #     results["Eigenversorgungsgrad"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) / sum(sim_output["Hafner_WP m_e_ac_230v IN"])
-        #     if haskey(sim_output, "Grid_Price_IN Temperature")
-        #         results["energy_cost_grid"] = sum(sim_output["Hafner_Stromnetz_IN m_e_ac_230v OUT"] .* sim_output["Grid_Price_IN Temperature"] ./ 10^6)
-        #         results["energy_cost_pv"] = sum(sim_output["m_e_ac_230v EnergyFlow Hafner_PV_Freiflaeche->Hafner_WP"]) .* 0.08 ./ 10^3
-        #         results["energy_cost_wp_total"] = results["energy_cost_grid"] + results["energy_cost_pv"]
-        #         results["objective"] = results["energy_cost_wp_total"]
-        #     else
-        #         results["objective"] = results["Eigenversorgungsgrad"]
-        #     end
-        # end
 
     catch e
         if !isnothing(optim_results_path) && filesize(optim_results_path) == 0
@@ -712,20 +734,20 @@ function run_sample(io_settings, sim_params, optim_results_path, project_config,
         @globalInfo full_error_message
         results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
 
-        if !isnothing(optimizer) 
-            for key in parse_outkeys(optimizer["output_keys_sum"])
+        if sim_params["optimisation"]["run_optimisation"]
+            for key in parse_outkeys(sim_params["optimisation"]["output_keys_sum"])
                 results[key] = NaN
             end
-            for key in parse_outkeys(optimizer["output_keys_mean"])
+            for key in parse_outkeys(sim_params["optimisation"]["output_keys_mean"])
                 results[key] = NaN
             end 
-            if haskey(optimizer, "objective_function")
+            if haskey(sim_params["optimisation"], "objective_function")
                 results["objective"] = NaN
             end
         end
     end
 
-    if !isnothing(optimizer) && io_settings["write_optimization_csv_continuously"]
+    if sim_params["optimisation"]["run_optimisation"] && io_settings["write_optimisation_csv_continuously"]
         # Write results to seperate file after all simulations are finished.
         row = join(collect(values(results)), ';') * "\n"
         row = replace(row, '.' => ',')
@@ -749,14 +771,6 @@ function run_sample(io_settings, sim_params, optim_results_path, project_config,
         close_run(run_ID)
     end
 
-    if !isnothing(optimizer) &&
-       !isnothing(optimizer["matrix_plot_objective"]) && 
-       !in(optimizer["matrix_plot_objective"], keys(results))
-        @error "Chosen objective $(optimizer["matrix_plot_objective"]) for matrix_plot is" * 
-               " not in results. Current available options are $(keys(results))." *
-               " Other values can be added by use of objective_params."
-        throw(InputError())
-    end
     return results
 end
 
@@ -792,7 +806,7 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, 
     end
 
     #TODO maybe this should be moved to profile processing to allow the profiles to be 
-    # defined with "profiles" group, scale and addon without optimizer
+    # defined with "profiles" group, scale and addon without optimiser
     if haskey(cfg, "profiles")
         profile_paths = Dict{String,String}()
         profile_scales = Dict{String,Float64}()
@@ -843,174 +857,6 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, 
     end
 
     return cfg
-end
-
-#TODO whole function may be better suited for project_loading.jl
-function load_optimizer(optimizer_config::OrderedDict{String,Any})::Dict{String,Any}
-    optimizer = Dict{String,Any}()
-    optimizer["type"] = optimizer_config["type"]
-
-    optim_params = Dict()
-    for (category, uacs) in pairs(optimizer_config["optim_params"])
-        for (uac, params) in pairs(uacs)
-            for (key_param, def) in pairs(params)
-                if haskey(def, "values")
-                    optim_params[category * " " * uac * " " * key_param] = def["values"]
-                elseif haskey(def, "min") && haskey(def, "max")
-                    optim_params[category * " " * uac * " " * key_param] = def
-                else
-                    def = Dict(Symbol(k) => v for (k, v) in def)
-                    optim_params[category * " " *uac * " " * key_param] = range(; def...)
-                end
-            end
-        end
-    end
-    optimizer["optim_params"] = optim_params
-    
-    optimizer["output_keys_sum"] = Dict{String,Any}()
-    optimizer["output_keys_mean"] = Dict{String,Any}()
-    if haskey(optimizer_config, "objective_params")
-        if haskey(optimizer_config["objective_params"], "sum")
-            optimizer["output_keys_sum"] = optimizer_config["objective_params"]["sum"]
-        end
-        if haskey(optimizer_config["objective_params"], "mean")
-            optimizer["output_keys_mean"] = optimizer_config["objective_params"]["mean"]
-        end
-    end
-    optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
-
-    optimizer["continuous_output"] = default(optimizer_config, "continuous_output", true)
-    if haskey(optimizer_config, "matrix_plot") && optimizer_config["matrix_plot"] !== "nothing"
-        if optimizer_config["matrix_plot"] != "objective"
-            optimizer["matrix_plot_objective"] = parse_outkeys(optimizer_config["matrix_plot"])[1]
-        else
-            optimizer["matrix_plot_objective"] = "objective"
-        end
-        optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
-    else
-        optimizer["matrix_plot_objective"] = nothing
-    end
-
-    if optimizer_config["type"] == "parametervariation"
-
-        # May be unnecessary but added to make sure the order of keys and values is the same
-        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
-        optimizer["iterator"] = default(optimizer_config, "iterator", "product")
-        if optimizer["iterator"] == "product"
-            optimizer["iterator"] = Iterators.product(values(optimizer["optim_params"])...)
-        elseif optimizer["iterator"] == "zip"
-            optimizer["iterator"] = zip(values(optimizer["optim_params"])...)
-        elseif split(optimizer["iterator"], "_")[1] == "random" 
-            iter = Iterators.product(values(optimizer["optim_params"])...)
-            n_samples = max(split(optimizer["iterator"], "_")[2], length(iter))
-            optimizer["iterator"] = rand(collect(iter), n_samples)
-        end
-
-    elseif optimizer_config["type"] == "monte_carlo_annealing"
-        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-
-        optimizer["iterator"] = range(1, optimizer_config["max_runs"]; step=1)
-        optimizer["nbh_scale"] = default(optimizer_config, "nbh_scale", 0.5)
-
-    elseif optimizer_config["type"] == "Optim"
-        upper_bounds = zeros(length(optimizer["optim_params"]))
-        lower_bounds = zeros(length(optimizer["optim_params"]))
-        start_values = zeros(length(optimizer["optim_params"]))
-        for (idx, param) in enumerate(values(optimizer["optim_params"]))
-            if haskey(param, "max")
-                upper_bounds[idx] = param["max"]
-            end
-            if haskey(param, "min")
-                lower_bounds[idx] = param["min"]
-            end
-            start_values[idx] = param["start"]
-        end
-
-        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
-
-        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-
-        optimizer["iterator"] = [1]
-
-        optimizer["args"] = []
-
-        if optimizer_config["algorithm"] == "NelderMead"
-            alg = NelderMead()
-
-        elseif optimizer_config["algorithm"] == "SimulatedAnnealing"
-            alg = SimulatedAnnealing()
-
-        elseif optimizer_config["algorithm"] == "SAMIN"
-            alg = SAMIN()
-            push!(optimizer["args"], lower_bounds)
-            push!(optimizer["args"], upper_bounds)
-
-        elseif optimizer_config["algorithm"] == "ParticleSwarm"
-            alg = ParticleSwarm(; upper=upper_bounds, lower=lower_bounds)
-        else
-            @error "For optimization type 'Optim' the algorithm has to be one of " *
-            "'NelderMead', 'SimulatedAnnealing', 'SAMIN', 'ParticleSwarm'."
-            throw(InputError())
-        end
-
-        push!(optimizer["args"], start_values)
-        push!(optimizer["args"], alg)
-        
-        optimizer["kwargs"] = Dict{Symbol,Any}()
-        optimizer["kwargs"][Symbol("show_trace")] = true
-        if haskey(optimizer_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimizer_config["optim_kwargs"])
-                optimizer["kwargs"][Symbol(keyword)] = val
-            end
-        end
-        if haskey(optimizer_config, "max_runs")
-            optimizer["kwargs"][Symbol("iterations")] = optimizer_config["max_runs"]
-        end
-        if !isempty(optimizer["kwargs"])
-            push!(optimizer["args"], Optim.Options(; optimizer["kwargs"]...))
-        end
-
-    elseif optimizer_config["type"] == "BlackBoxOptim"
-        bounds = Array{Tuple{Float64, Float64}, 1}()
-        start_values = Array{Float64, 1}()
-        for param in values(optimizer["optim_params"])
-            if haskey(param, "max") && haskey(param, "min")
-                push!(bounds, (param["min"], param["max"]))
-            end
-            push!(start_values, param["start"])
-        end
-
-        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
-
-        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-
-        optimizer["iterator"] = [1]
-
-        alg = Symbol(optimizer_config["algorithm"])
-
-        optimizer["args"] = [start_values]
-
-        optimizer["kwargs"] = Dict{Symbol,Any}()
-        optimizer["kwargs"][:Method] = alg
-        if !isempty(bounds)
-            optimizer["kwargs"][:SearchRange] = bounds
-        end
-        optimizer["kwargs"][:NumDimensions] = length(start_values)
-        optimizer["kwargs"][:NThreads] = Threads.nthreads() - 1
-        if haskey(optimizer_config, "max_runs")
-            optimizer["kwargs"][:MaxFuncEvals] = optimizer_config["max_runs"]
-        end
-        if haskey(optimizer_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimizer_config["optim_kwargs"])
-                optimizer["kwargs"][Symbol(keyword)] = val
-            end
-        end
-
-    else
-        #TODO parse_objective_function and parameters for more complicated algorithms
-    end
-
-    return optimizer
 end
 
 end # module

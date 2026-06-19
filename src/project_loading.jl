@@ -47,7 +47,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
                     "time step. Activating this functionality will ensure partial output " *
                     "if the simulation fails during execution, however it also incurs a " *
                     "substantial performance penalty due to frequent file access.",
-        display_name="Write CSV continously?",
+        display_name="Write CSV continuously?",
         required=false,
         type=Bool,
         json_type="boolean",
@@ -376,6 +376,70 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="number",
         unit="-"
     ),
+    "output_optimisation_csv" => (
+        default=true,
+        description="Toggle if a csv with the optimisation results should be created",
+        display_name="Output optimisation csv?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "optimisation_csv_file_path" => (
+        default="./output/optim_results.csv",
+        description="File path to where the optimisation results are written to csv",
+        display_name="optimisation csv file path",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "write_optimisation_csv_continuously" => (
+        default=false,
+        description="Toggle if csv output of optimisation will be written continuously, " * 
+                    "meaning after every run. Activating this functionality will ensure " * 
+                    "partial output if the optimisation is stopped during execution. " *
+                    "It incurs a slight performance penalty depending on the run time of " *
+                    "one simulation and the number of parallel runs, since the threads " *
+                    "might have to wait for write access.", 
+        display_name="Write optimisation csv continuously?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),   
+    "matrix_plot" => (
+        default="default",
+        description="Sets the mode of the matrix plot, switching between several default " *
+                    "and custom behaviour modes as well an option of not creating a plot " *
+                    "file at all.",
+        display_name="Matrix plot mode",
+        options=["custom", "default", "nothing"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "matrix_plot_spec" => (
+        default=nothing,
+        description="Specification for the matrix plot in custom mode. See documentation " *
+                    "for how this needs to be structured.",
+        display_name="Matrix plot specification",
+        required=false,
+        conditionals=[("matrix_plot", "is", "custom")],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+    "matrix_plot_file" => (
+        default="./output/matrix_plot.html",
+        description="File path to where the matrix plot will be written",
+        display_name="Matrix plot file",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
 )
 
 const SIMULATION_PARAMETERS_DEF = Dict{String,Any}(
@@ -654,7 +718,91 @@ OUTPUT_SPECIFICATION_SETTINGS = [
     ("output_plot", "output_plot_spec"),
     ("sankey_plot", "sankey_plot_spec"),
     ("csv_output", "csv_output_keys"),
+    ("matrix_plot", "matrix_plot_spec")
 ]
+
+OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
+    "run_optimisation" => (
+        default=false,
+        description="If set to true, executes multiple runs with the chosen optimisation" *
+                    "algorithm.",
+        display_name="Run optimisation?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "type" => (
+        default="nothing",
+        description="Sets type of optimisation algorithm",
+        display_name="optimisation type",
+        required=true,
+        conditionals=["run_optimisation", "is", true],
+        options=["parametervariation", "monte_carlo_annealing", "Optim", "BlackBoxOptim"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "iterator" => (
+        default="product",
+        description="Selects the iterator to combine the optim_params. Can be one of " *
+                    "`product`, `zip` or `random_*` where the star is an integer " *
+                    "defining how many combinations are randomly chosen.",
+        display_name="Iterator for parametervariation",
+        required=false,
+        #TODO check if this is functioning like expected
+        options=["product", "zip", r"^random_\d+$"],
+        conditionals=[("type", "is", "parametervariation")],
+        type=String,
+        json_type="object",
+        unit="-"
+    ),
+    "optim_params" => (
+        default=nothing,
+        description="Defines which parameters of which components should be varied in " *
+                    "the optimisation. Definition follows the definition of components. " *
+                    "See the documentation for more details.",
+        display_name="optimisation parameters",
+        required=true,
+        conditionals=[("type", "is_not_nothing")],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+    "algorithm" => (
+        default="NelderMead",
+        description="Optimisation algorithm that is used from packages `Optim` and " *
+                    "`BlackBoxOptim`",
+        display_name="Optimisation algorithm",
+        required=true,
+        conditionals=[("type", "is_one_of", ("Optim", "BlackBoxOptim"))],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "objective_params" => (
+        default=nothing,
+        description="Defines which parameters are set as the objective. Definition " *
+                    "follows the definition of components. See the documentation for " *
+                    "more details.",
+        display_name="Objective parameters",
+        required=false,
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-"
+    ),
+    "objective_function" => (
+        default="sum",
+        description="The function which is used to combine multiple objective_params. " *
+                    "Currently only `sum` and `poly-2` are implemented. " *
+                    "See the documentation for more details.",
+        display_name="Objective function",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
 #! format: on
 
 """
@@ -684,7 +832,7 @@ function get_io_settings(project_config::AbstractDict{String,Any})::Dict{String,
     # (even though we are not checking components...)
     io_settings = Dict{String,Any}()
     for (name, param_def) in pairs(IO_SETTINGS_DEF)
-        if name in ["sankey_plot_spec", "output_plot_spec", "csv_output_keys"]
+        if name in last.(OUTPUT_SPECIFICATION_SETTINGS)
             continue
         end
         io_settings[name] = EnergySystems.extract_parameter(EnergySystems.Component, project_config["io_settings"],
@@ -787,6 +935,7 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
 
     sim_params["economic_parameters"] = get_economic_parameters(project_config, sim_params)
     sim_params["emissions_parameters"] = get_emissions_parameters(project_config, sim_params)
+    sim_params["optimisation"] = get_optimisation_parameters(project_config, sim_params)
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
     # of the simulation as the duration required for the conversion.
@@ -1235,6 +1384,29 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
     return emissions_parameters
 end
 
+function get_optimisation_parameters(project_config::AbstractDict{String,Any},
+                                     sim_params::Dict{String,Any})::Dict{String,Any}
+    if !haskey(project_config, "optimisation_parameters")
+        return Dict{String,Any}("run_optimisation" => false,)
+    end
+    optimiser_config = Dict{String,Any}()
+    for (name, param_def) in pairs(OPTIMISATION_PARAMATERS_DEF)
+        optimiser_config[name] = EnergySystems.extract_parameter(EnergySystems.Component,
+                                                                 project_config["optimisation_parameters"],
+                                                                 name,
+                                                                 param_def,
+                                                                 sim_params,
+                                                                 "optimisation parameters")
+    end
+
+    EnergySystems.validate_config(EnergySystems.Component, optimiser_config, "Optimisation parameters",
+                                  sim_params, OPTIMISATION_PARAMATERS_DEF)
+
+    optimiser = load_optimiser(optimiser_config)
+
+    return optimiser
+end
+
 """
     all_general_parameters()::Dict{String,Any}
 
@@ -1249,38 +1421,185 @@ function all_general_parameters()::Dict{String,Any}
         "io_settings" => IO_SETTINGS_DEF,
         "economic" => ECONOMIC_PARAMETERS_DEF,
         "emissions" => EMISSIONS_PARAMATERS_DEF,
+        "optimisation" => OPTIMISATION_PARAMATERS_DEF
     )
 end
 
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")
 
+function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
+    optimiser = Dict{String,Any}()
+    optimiser["type"] = optimiser_config["type"]
+    optimiser["run_optimisation"] = true
+    
+    # read and parse optim_params
+    optim_params = Dict{String,Any}()
+    for (category, uacs) in pairs(optimiser_config["optim_params"])
+        for (uac, params) in pairs(uacs)
+            for (key_param, def) in pairs(params)
+                if haskey(def, "values")
+                    optim_params[category * " " * uac * " " * key_param] = def["values"]
+                elseif haskey(def, "min") && haskey(def, "max")
+                    optim_params[category * " " * uac * " " * key_param] = def
+                else
+                    def = Dict(Symbol(k) => v for (k, v) in def)
+                    optim_params[category * " " *uac * " " * key_param] = range(; def...)
+                end
+            end
+        end
+    end
+    optimiser["optim_params"] = optim_params
+    # May be unnecessary but added to make sure the order of keys and values is the same
+    optimiser["optim_params_keys"] = keys(optimiser["optim_params"])
+    
+    # read and parse objective_params
+    optimiser["objective_keys_sum_mean"] = Dict{String,Any}()
+    optimiser["objective_params"] = Dict{String,Any}()
+    if !isnothing(optimiser_config["objective_params"])
+        for (obj, value) in pairs(optimiser_config["objective_params"])
+            optimiser["objective_params"][obj] =value
+            if obj == "sum" || obj == "mean"
+                optimiser["objective_keys_sum_mean"] = value
+            elseif obj != "economic" && obj != "emissions"
+                @error "Objective parameter {$obj: $value} could not be read. $obj has " *
+                        "to be one of 'sum', 'mean', 'economic', 'emissions'."
+                throw(InputError())
+            end
+        end
+        optimiser["objective_function"] = parse_objective_function(optimiser_config["objective_function"])
+    end
 
-function parse_optimizer_function(eff_def::String)::Function
+    if optimiser_config["type"] == "parametervariation"
+        if optimiser_config["iterator"] == "product"
+            optimiser["iterator"] = Iterators.product(values(optimiser["optim_params"])...)
+        elseif optimiser_config["iterator"] == "zip"
+            optimiser["iterator"] = zip(values(optimiser["optim_params"])...)
+        elseif split(optimiser_config["iterator"], "_")[1] == "random" 
+            iter = Iterators.product(values(optimiser["optim_params"])...)
+            n_samples = max(split(optimiser["iterator"], "_")[2], length(iter))
+            optimiser["iterator"] = rand(collect(iter), n_samples)
+        end
+
+    elseif optimiser_config["type"] == "monte_carlo_annealing"
+
+        optimiser["iterator"] = range(1, optimiser_config["max_runs"]; step=1)
+        optimiser["nbh_scale"] = default(optimiser_config, "nbh_scale", 0.5)
+
+    elseif optimiser_config["type"] == "Optim"
+        upper_bounds = zeros(length(optimiser["optim_params"]))
+        lower_bounds = zeros(length(optimiser["optim_params"]))
+        start_values = zeros(length(optimiser["optim_params"]))
+        for (idx, param) in enumerate(values(optimiser["optim_params"]))
+            if haskey(param, "max")
+                upper_bounds[idx] = param["max"]
+            end
+            if haskey(param, "min")
+                lower_bounds[idx] = param["min"]
+            end
+            start_values[idx] = param["start"]
+        end
+
+        optimiser["iterator"] = [1]
+
+        optimiser["args"] = []
+
+        if optimiser_config["algorithm"] == "NelderMead"
+            alg = NelderMead()
+
+        elseif optimiser_config["algorithm"] == "SimulatedAnnealing"
+            alg = SimulatedAnnealing()
+
+        elseif optimiser_config["algorithm"] == "SAMIN"
+            alg = SAMIN()
+            push!(optimiser["args"], lower_bounds)
+            push!(optimiser["args"], upper_bounds)
+
+        elseif optimiser_config["algorithm"] == "ParticleSwarm"
+            alg = ParticleSwarm(; upper=upper_bounds, lower=lower_bounds)
+        else
+            @error "For optimisation type 'Optim' the algorithm has to be one of " *
+            "'NelderMead', 'SimulatedAnnealing', 'SAMIN', 'ParticleSwarm'."
+            throw(InputError())
+        end
+
+        push!(optimiser["args"], start_values)
+        push!(optimiser["args"], alg)
+        
+        optimiser["kwargs"] = Dict{Symbol,Any}()
+        optimiser["kwargs"][Symbol("show_trace")] = true
+        if haskey(optimiser_config, "optim_kwargs")
+            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
+                optimiser["kwargs"][Symbol(keyword)] = val
+            end
+        end
+        if haskey(optimiser_config, "max_runs")
+            optimiser["kwargs"][Symbol("iterations")] = optimiser_config["max_runs"]
+        end
+        if !isempty(optimiser["kwargs"])
+            push!(optimiser["args"], Optim.Options(; optimiser["kwargs"]...))
+        end
+
+    elseif optimiser_config["type"] == "BlackBoxOptim"
+        bounds = Array{Tuple{Float64, Float64}, 1}()
+        start_values = Array{Float64, 1}()
+        for param in values(optimiser["optim_params"])
+            if haskey(param, "max") && haskey(param, "min")
+                push!(bounds, (param["min"], param["max"]))
+            end
+            push!(start_values, param["start"])
+        end
+
+        optimiser["iterator"] = [1]
+
+        alg = Symbol(optimiser_config["algorithm"])
+
+        optimiser["args"] = [start_values]
+
+        optimiser["kwargs"] = Dict{Symbol,Any}()
+        optimiser["kwargs"][:Method] = alg
+        if !isempty(bounds)
+            optimiser["kwargs"][:SearchRange] = bounds
+        end
+        optimiser["kwargs"][:NumDimensions] = length(start_values)
+        optimiser["kwargs"][:NThreads] = Threads.nthreads() - 1
+        if haskey(optimiser_config, "max_runs")
+            optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
+        end
+        if haskey(optimiser_config, "optim_kwargs")
+            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
+                optimiser["kwargs"][Symbol(keyword)] = val
+            end
+        end
+    else
+        #TODO implement more packages notebly 
+        # - Metaheuristics for CMA-ES and wide range of BB algorithms
+        # - NLOPT for Pawel algorithms BOBYQA, COBYLA, ... and wide range of other algorithms
+        # - NOMAD for MADS (mesh adaptive direct search) algorithm thats supposedly good for heavy problems
+        # - GlobalSensitivity for sensitivity analysis
+    end
+
+    return optimiser
+end
+
+function parse_objective_function(eff_def::String)::Function
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
         method = lowercase(splitted[1])
         data = splitted[2]
-
-        #TODO get more function definitions analog to different optimization packages
-        if method == "poly-2"
-            params = parse.(Float64, split(data, ","))
-            return function (x, y)
-                return params[1] +
-                       params[2] * x +
-                       params[3] * y +
-                       params[4] * x * x +
-                       params[5] * x * y +
-                       params[6] * y * y +
-                       params[7] * x * x * x +
-                       params[8] * x * x * y +
-                       params[9] * x * y * y +
-                       params[10] * y * y * y
-            end
-        end
+    else
+        method = eff_def
     end
 
-    @error "Cannot parse 2-dimensional function from: $eff_def"
-    return (x, y) -> 0.0
+    #TODO get more function definitions analog to different optimisation packages
+    if method == "sum"
+        return x -> sum(x) 
+    elseif method == "linear"
+        params = parse.(Float64, split(data, ","))
+        return x -> sum(x .* params)
+    end
+
+    @error "Cannot parse function from: $eff_def"
+    return x -> 0.0
 end
