@@ -71,7 +71,6 @@ const GEOTHERMAL_HEAT_COLLECTOR_COMPONENT_PARAMETERS = Dict(
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
-            ("consider_losses", "is_true"),
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],

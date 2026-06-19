@@ -533,7 +533,7 @@ function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKe
 
     interpolator = v -> "$v"
     if io_settings["fixed_output_precision"] > 0
-        interpolator = v -> "$(round(v; digits=io_settings["fixed_output_precision"]))"
+        interpolator = v -> "$(round(v; sigdigits=io_settings["fixed_output_precision"]))"
     end
 
     if output_keys !== nothing
@@ -788,7 +788,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
              plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
 
     if io_settings["fixed_output_precision"] > 0
-        y = round.(y; digits=io_settings["fixed_output_precision"])
+        y = round.(y; sigdigits=io_settings["fixed_output_precision"])
     end
 
     traces = GenericTrace[]
@@ -902,7 +902,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
 
     # apply fixed precision before adding for non-zero as it may otherwise be rounded to zero again
     if io_settings["fixed_output_precision"] > 0
-        output_all_value_sum = round.(output_all_value_sum; digits=io_settings["fixed_output_precision"])
+        output_all_value_sum = round.(output_all_value_sum; sigdigits=io_settings["fixed_output_precision"])
     end
 
     # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
@@ -1116,7 +1116,7 @@ function aggregate_csv(input_path::AbstractString,
     function decimal_string(value::Real)::String
         # apply fixed precision to the summary output
         if fixed_output_precision > 0
-            s = string(round(Float64(value); digits=fixed_output_precision))
+            s = string(round(Float64(value); sigdigits=fixed_output_precision))
         else
             s = string(Float64(value))
         end

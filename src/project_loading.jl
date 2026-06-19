@@ -365,11 +365,11 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "fixed_output_precision" => (
         default=0,
-        description="If given a non-zero value, uses this many digits as the fixed " *
-                    "precision for float outputs in CSV and plot files. It is not " *
-                    "recommended to use this setting. It is intended for making the " *
-                    "output perfectly repeatable, which is useful for testing but not in " *
-                    "normal simuation.",
+        description="If given a non-zero value, uses this many significant digits as the " *
+                    "fixed precision for float outputs in CSV and plot files. It is not " *
+                    "recommended to use this setting in normal simulation. It's intended " *
+                    "for making the output perfectly repeatable, which is useful for " *
+                    "testing but changes the results.",
         display_name="Fixed output precision",
         required=false,
         type=Integer,

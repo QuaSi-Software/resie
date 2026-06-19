@@ -1203,11 +1203,8 @@ function calculate_slices(unit::HeatPump,
             continue
         end
 
-        # check if heat is available for specific src_idx and snk_idx
-        if energies.available_heat_in[src_idx] == 0 && unit.cop != 1.0
-            src_idx += 1
-            continue
-        elseif energies.available_heat_out[snk_idx] == 0
+        # move to next output slice if no energy is requested here. This can happen with secondary interfaces.
+        if energies.available_heat_out[snk_idx] < EPS
             snk_idx += 1
             continue
         end
@@ -1684,7 +1681,11 @@ function split_slices_primary_secondary(unit::HeatPump,
             is_secondary = src in secondary_uac
 
             if is_primary && is_secondary
-                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
+                @error "In heat pump $(unit.uac), the source '$src' is both in primary_uac and secondary_uac, choose one!"
+                throw(InputError())
+            elseif !is_primary && !is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac!"
+                throw(InputError())
             end
 
             # scale energy quantities
