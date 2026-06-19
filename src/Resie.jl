@@ -537,7 +537,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
     if sim_params["optimisation"]["run_optimisation"]
         optim_results_path = sim_params["run_path"](io_settings["optimisation_csv_file_path"])
-        open(optim_results_path, "w") do f end #TODO maybe remove
+        open(optim_results_path, "w") do f end
         optimiser = sim_params["optimisation"]
 
         all_results = []
@@ -578,7 +578,6 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         else
             start_time = now()
-            #TODO evtl. replace optimize and bboptimize with Optimization.jl interface
             if optimiser["type"] == "Optim"
                 optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
                                                       project_config, sample_values, 
@@ -600,7 +599,8 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                 header = join(collect(keys(all_results[1])), ';') * "\n"
                 write(file_handle, header)
 
-                # write rows TODO can probably speed up by collecting data and writing once
+                # write rows 
+                #TODO can probably speed up by collecting data and writing once
                 for results in all_results            
                     row = join(collect(values(results)), ';') * "\n"
                     row = replace(row, '.' => ',')
@@ -676,7 +676,7 @@ end
 
 function optim_func!(all_results, io_settings, sim_params, optim_results_path, project_config, 
                      sample_values, run_lock, output_lock, results_lock)
-    #TODO implement batch evaluation for Metaheuristics e.g. if size(sample_values) then @threads?
+    #TODO implement batch evaluation for Metaheuristics e.g. if size(sample_values) > 1 then @threads return Vector
     sample_params = Dict{String, Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config, 

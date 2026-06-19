@@ -191,7 +191,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
 
     # optimiser keys
     if do_optimise
-        #TODO is order relevant?
         output_keys_optimise = output_keys(components, optimiser_parameters["objective_keys_sum_mean"])
         if do_matrix_plot
             for (func, spec) in pairs(io_settings["matrix_plot_spec"])

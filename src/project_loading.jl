@@ -1477,7 +1477,8 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             optimiser["iterator"] = zip(values(optimiser["optim_params"])...)
         elseif split(optimiser_config["iterator"], "_")[1] == "random" 
             iter = Iterators.product(values(optimiser["optim_params"])...)
-            n_samples = max(split(optimiser["iterator"], "_")[2], length(iter))
+            n_samples = min(parse(Int, split(optimiser_config["iterator"], "_")[2]), 
+                            length(iter))
             optimiser["iterator"] = rand(collect(iter), n_samples)
         end
 
@@ -1572,7 +1573,7 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             end
         end
     else
-        #TODO implement more packages notebly 
+        #TODO implement more packages notably 
         # - Metaheuristics for CMA-ES and wide range of BB algorithms
         # - NLOPT for Pawel algorithms BOBYQA, COBYLA, ... and wide range of other algorithms
         # - NOMAD for MADS (mesh adaptive direct search) algorithm thats supposedly good for heavy problems
