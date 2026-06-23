@@ -1,5 +1,5 @@
 #! format: off
-const CHPP_PARAMETERS = Dict(
+const CHPP_COMPONENT_PARAMETERS = Dict(
     "m_fuel_in" => (
         default="m_c_g_natgas",
         description="Fuel input medium",
@@ -114,6 +114,37 @@ const CHPP_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const CHPP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 15,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.0,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.06,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  100,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const CHPP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 15,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -143,6 +174,9 @@ mutable struct CHPP <: Component
     m_heat_out::Symbol
     m_el_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -162,8 +196,16 @@ mutable struct CHPP <: Component
     end
 end
 
-function component_parameters(x::Type{CHPP})::Dict{String,NamedTuple}
-    return deepcopy(CHPP_PARAMETERS) # Return a copy to prevent external modification
+function component_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{CHPP})::Dict{String,Any}
+    return deepcopy(CHPP_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{CHPP}, config::Dict{String,Any}, param_name::String,
@@ -172,8 +214,17 @@ function extract_parameter(x::Type{CHPP}, config::Dict{String,Any}, param_name::
 end
 
 function validate_config(x::Type{CHPP}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(CHPP))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(CHPP)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(CHPP)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(CHPP)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{CHPP}, uac::String, params::Dict{String,Any},
@@ -200,6 +251,8 @@ function init_from_params(x::Type{CHPP}, uac::String, params::Dict{String,Any},
             m_fuel_in,
             m_heat_out,
             m_el_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             params["power_el"] / efficiencies[Symbol("el_out")](1.0),
             linear_interface,
             params["min_power_fraction"],
@@ -213,11 +266,11 @@ end
 
 function initialise!(unit::CHPP, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_fuel_in],
-                          unload_storages(unit.controller, unit.m_fuel_in))
+                          unload_storages(unit.controller, unit.m_fuel_in), unit.uac, unit.m_fuel_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
     set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
-                          load_storages(unit.controller, unit.m_el_out))
+                          load_storages(unit.controller, unit.m_el_out), unit.uac, unit.m_el_out)
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
@@ -271,10 +324,16 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[3], nothing, unit.output_temperature)
 
     unit.losses = check_epsilon(energies[1] - energies[2] - energies[3], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::CHPP)
     return unit.min_power_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::CHPP)
+    return unit.power # [W]
 end
 
 function output_values(unit::CHPP)::Vector{String}

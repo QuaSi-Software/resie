@@ -1,5 +1,5 @@
 #! format: off
-const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
+const GENERIC_HEAT_SOURCE_COMPONENT_PARAMETERS = Dict(
     "medium" => (
         description="Medium of the heat source",
         display_name="Medium",
@@ -142,6 +142,49 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         unit="K"
     ),
 )
+
+const GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS = get_economic_standard_params("connection", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.02,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
+    ),
+    Dict{String,Any}(            
+        "capex_specific" => "€/(constant_power or scale)"
+    ),
+)
+
+const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
+    Dict{String,Any}(
+        "energy_emissions_profile_file_path" => nothing,
+        "energy_emissions_profile_scale" => 1.0,
+        "constant_energy_emissions" => nothing,
+        "energy_emissions_change_rate_per_year" =>  0.0,
+    
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/(constant_power or scale)"
+    )
+)
 #! format: on
 
 """
@@ -160,6 +203,9 @@ mutable struct GenericHeatSource <: Component
 
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     max_power_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
@@ -182,8 +228,16 @@ mutable struct GenericHeatSource <: Component
     end
 end
 
-function component_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTuple}
-    return deepcopy(GENERIC_HEAT_SOURCE_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GenericHeatSource})::Dict{String,Any}
+    return deepcopy(GENERIC_HEAT_SOURCE_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{GenericHeatSource})::Dict{String,Any}
+    return deepcopy(GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{GenericHeatSource})::Dict{String,Any}
+    return deepcopy(GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{GenericHeatSource}, config::Dict{String,Any}, param_name::String,
@@ -200,8 +254,17 @@ function extract_parameter(x::Type{GenericHeatSource}, config::Dict{String,Any},
 end
 
 function validate_config(x::Type{GenericHeatSource}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GenericHeatSource))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(GenericHeatSource)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(GenericHeatSource)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(GenericHeatSource)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{GenericHeatSource}, uac::String, params::Dict{String,Any},
@@ -219,6 +282,8 @@ function init_from_params(x::Type{GenericHeatSource}, uac::String, params::Dict{
             medium,
             InterfaceMap(medium => nothing),
             InterfaceMap(medium => nothing),
+            params["economic_parameters"],
+            params["emissions_parameters"],
             max_power_profile,
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],
@@ -236,7 +301,7 @@ end
 
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     if unit.temperature_reduction_model == "lmtd"
         if unit.min_source_in_temperature === nothing && unit.temperature_profile !== nothing
@@ -302,6 +367,14 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
 
     if sum(energy_demand; init=0.0) < 0.0
         add!(outface, abs.(energy_demand), temperature_min, temperature_max)
+    end
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::GenericHeatSource)
+    if unit.constant_power !== nothing
+        return unit.max_energy
+    else
+        return unit.scaling_factor
     end
 end
 

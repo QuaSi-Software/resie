@@ -8,10 +8,9 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
-            "is_source" => true,
         ),
         "TST_PVP_01" => Dict{String,Any}(
             "type" => "PVPlant",
@@ -55,8 +54,7 @@ function test_load_no_connections()
         @test bus.connectivity.energy_flow === nothing
     catch e
         exception_occured = true
-        @test e isa MethodError
-        @test String(nameof(e.f)) == "set_storage_transfer!"
+        @test e isa Resie.EnergySystems.InputError
     end
 
     @test exception_occured
@@ -83,8 +81,7 @@ function test_load_given_lists_empty()
         @test bus.connectivity.energy_flow === nothing
     catch e
         exception_occured = true
-        @test e isa MethodError
-        @test String(nameof(e.f)) == "set_storage_transfer!"
+        @test e isa Resie.EnergySystems.InputError
     end
 
     @test exception_occured

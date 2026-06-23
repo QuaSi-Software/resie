@@ -1,0 +1,24 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+TST_DEM_01 Demand;energy;sum;744;2,855139395e7;3098,559138;93046,41028;28551,39395;28,55139395
+TST_DEM_01 m_h_w_ht1 IN;energy;sum;744;2,855139395e7;3098,559138;93046,41028;28551,39395;28,55139395
+TST_DEM_01 Temperature;intensive;mean;744;55,0;55,0;55,0;;
+TST_GRI_01 m_e_ac_230v OUT;energy;sum;744;1,026793141e7;1042,856847;32865,74333;10267,93141;10,26793141
+TST_GRI_01 Output_sum;cumulative;last;744;-1,026793141e7;-1,026793141e7;-5545,512588;-10267,93141;-10,26793141
+TST_GTC_01 alpha_fluid_pipe;intensive;mean;744;61,57138343;56,34283282;69,11260955;;
+TST_GTC_01 ambient_temperature;intensive;mean;744;2,354099462;-10,55;11,95;;
+TST_GTC_01 fluid_reynolds_number;intensive;mean;744;467,7304502;39,12644169;1167,620873;;
+TST_GTC_01 fluid_temperature;intensive;mean;744;6,69329218;1,25361678;14,26028246;;
+TST_GTC_01 global_radiation_power;intensive;mean;744;39,94489247;0,0;374,0;;
+TST_GTC_01 m_h_w_lt1 OUT;energy;sum;744;1,828346254e7;2055,702291;61346,77212;18283,46254;18,28346254
+TST_HP_01 Avg_PLR;intensive;mean_excluding_zero;744;0,1705579089;0,01377137394;0,4135396012;;
+TST_HP_01 COP;intensive;mean_excluding_zero;744;2,812725439;2,512327015;3,454210526;;
+TST_HP_01 Effective_COP;intensive;mean_excluding_zero;744;2,812725439;2,512327015;3,454210526;;
+TST_HP_01 Losses_heat;energy;sum;744;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 Losses_power;energy;sum;744;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 LossesGains;energy;sum;744;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 m_e_ac_230v IN;energy;sum;744;1,026793141e7;1042,856847;32865,74333;10267,93141;10,26793141
+TST_HP_01 m_h_w_ht1 OUT;energy;sum;744;2,855139395e7;3098,559138;93046,41028;28551,39395;28,55139395
+TST_HP_01 m_h_w_lt1 IN;energy;sum;744;1,828346254e7;2055,702291;61346,77212;18283,46254;18,28346254
+TST_HP_01 MixingTemperature_Input;intensive;mean_excluding_zero;744;8,208465084;2,75361678;17,0;;
+TST_HP_01 MixingTemperature_Output;intensive;mean_excluding_zero;744;55,0;55,0;55,0;;
+TST_HP_01 Time_active;intensive;mean_excluding_zero;744;0,1705579089;0,01377137394;0,4135396012;;

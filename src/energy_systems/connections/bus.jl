@@ -155,8 +155,6 @@ Base.@kwdef mutable struct Bus <: Component
     output_interfaces::Vector{SystemInterface}
     connectivity::ConnectionMatrix
 
-    remainder::Float64
-
     balance_table_inputs::Dict{String,BTInputRow}
     balance_table_outputs::Dict{String,BTOutputRow}
     balance_table::Array{Union{Nothing,Float64},2}
@@ -215,7 +213,6 @@ function Bus(uac::String,
                [],                                           # input_interfaces
                [],                                           # output_interfaces
                ConnectionMatrix([], [], nothing),            # connectivity
-               0.0,                                          # remainder
                Dict{String,BTInputRow}(),                    # balance_table_inputs
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table
@@ -226,8 +223,8 @@ function Bus(uac::String,
                epsilon)
 end
 
-function component_parameters(x::Type{Bus})::Dict{String,NamedTuple}
-    return deepcopy(BUS_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{Bus})::Dict{String,Any}
+    return deepcopy(BUS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -236,7 +233,7 @@ function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::S
 end
 
 function validate_config(x::Type{Bus}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
     validate_config(Component, extracted, uac, sim_params, component_parameters(Bus))
 end
 
@@ -252,7 +249,6 @@ function init_from_params(x::Type{Bus}, uac::String, params::Dict{String,Any}, r
             [],                                           # input_interfaces
             [],                                           # output_interfaces,
             ConnectionMatrix(raw_params),                 # connectivity
-            0.0,                                          # remainder
             Dict{String,BTInputRow}(),                    # balance_table_inputs
             Dict{String,BTOutputRow}(),                   # balance_table_outputs
             Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
@@ -291,8 +287,6 @@ function reset(unit::Bus)
         reset!(outface)
     end
 
-    unit.remainder = 0.0
-
     for row in values(unit.balance_table_inputs)
         reset!(row)
     end
@@ -330,14 +324,18 @@ function balance_direct(unit::Bus)::Float64
         end
     end
 
-    return blnc + unit.remainder
+    return blnc
 end
 
 function balance(unit::Bus)::Float64
     # if there is a proxy bus, the balance is only correct on its calculation, which happens
     # separately. if there is no proxy, there are also no bus components connected to the
     # given bus
-    return balance_direct(unit)
+    if startswith(unit.uac, "Proxy-")
+        return 0.0
+    else
+        return balance_direct(unit)
+    end
 end
 
 """
@@ -1211,22 +1209,20 @@ function distribute!(unit::Bus)
     # balance_on
     inner_distribute!(unit::Bus)
 
-    # if there is a balance unequal zero remaining, this means the energy balance across
-    # the chain of buses was not upheld. we save the balance in the remainder such that
-    # subsequent calls to balance consider the missing/extra energy accordingly
-    unit.remainder = balance_direct(unit)
-
-    # reset all principal non-bus input interfaces from the original busses
+    # update all principal non-bus input interfaces from the original busses
     for inface in filter_inputs(unit, sf_bus, false)
-        principal = inface.source.output_interfaces[adjust_name_if_secondary(unit.medium,
-                                                                             inface.is_secondary_interface)]
-        set!(principal, 0.0)
+        medium_name = adjust_name_if_secondary(unit.medium, inface.is_secondary_interface)
+        source_uac = adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+        principal = inface.source.output_interfaces[medium_name]
+        energy_drawn = sum(unit.balance_table[unit.balance_table_inputs[source_uac].priority, 1:2:end])
+        sub!(principal, energy_drawn; final=true)
     end
 
-    # reset all principal non-bus output interfaces from the original busses
+    # update all principal non-bus output interfaces from the original busses
     for outface in filter_outputs(unit, sf_bus, false)
         principal = outface.target.input_interfaces[unit.medium]
-        set!(principal, 0.0)
+        energy_delivered = sum(unit.balance_table[:, (unit.balance_table_outputs[outface.target.uac].priority * 2 - 1)])
+        add!(principal, energy_delivered; final=true)
     end
 end
 
@@ -1236,6 +1232,12 @@ function output_values(unit::Bus)::Vector{String}
                        for outface in unit.output_interfaces
                        if outface.target.sys_function == sf_bus]
 
+    # balance only for non-proxy busses of single busses
+    if startswith(unit.uac, "Proxy-")
+        balance = []
+    else
+        balance = ["Balance"]
+    end
     # energyFlow between inputs and outputs, only for proxy busses or busses without a proxy and for
     # allowed connections
     if unit.proxy === nothing
@@ -1271,9 +1273,9 @@ function output_values(unit::Bus)::Vector{String}
                                             unit.balance_table_outputs[o]) &&
                      unit.balance_table_inputs[i].is_secondary_interface)])
 
-        return ["Balance"; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
+        return [balance; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
     else
-        return ["Balance"; outputs_proxies]
+        return [balance; outputs_proxies]
     end
 end
 

@@ -14,7 +14,7 @@ using LinearAlgebra
 using GLMakie
 
 #! format: off
-const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
+const SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for loading)",
@@ -544,6 +544,38 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     )
 )
 
+const SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 50,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.01,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.02,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m^3"
+    )
+)
+
+const SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 50,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/m^3"
+    ),
+)
+#! format: on
+
 mutable struct SeasonalThermalStorage <: Component
     # Note: layer numbering within the STES starts at the bottom with index 1 and ends at
     # the top with index number_of_layer_total
@@ -552,11 +584,13 @@ mutable struct SeasonalThermalStorage <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
-
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ## geometry and physical properties
     # capacity of the STES [Wh]
@@ -725,8 +759,16 @@ mutable struct SeasonalThermalStorage <: Component
     end
 end
 
-function component_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
-    return deepcopy(SEASONAL_THERMAL_STORAGE_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{SeasonalThermalStorage})::Dict{String,Any}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, param_name::String,
@@ -743,8 +785,17 @@ function extract_parameter(x::Type{SeasonalThermalStorage}, config::Dict{String,
 end
 
 function validate_config(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(SeasonalThermalStorage))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(SeasonalThermalStorage)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(SeasonalThermalStorage)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(SeasonalThermalStorage)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::Dict{String,Any},
@@ -759,6 +810,8 @@ function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
 
             # geometry and physical properties
             0.0, # capacity
@@ -885,9 +938,9 @@ end
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # Hook up input/output flow control
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+                          unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     # set temperature vector: assuming a uniform temperature profile (mixed storage)
     mean_temperature = unit.initial_load * (unit.high_temperature - unit.low_temperature) + unit.low_temperature
@@ -1858,7 +1911,7 @@ convert_mass_in_energy(mass, temp_low, temp_high, cp)
 - `mass::Float64`: mass to convert [kg]
 - `temp_low::Temperature`: lower temperature [°C]
 - `temp_high::Temperature`: upper temperature [°C]
-- `cp::Float64`: specific heat capacity [kJ/KgK]
+- `cp::Float64`: specific heat capacity [J/KgK]
 
 """
 function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
@@ -2258,7 +2311,7 @@ end
 
 function handle_component_update!(unit::SeasonalThermalStorage, step::String, sim_params::Dict{String,Any})
     if unit.capacity <= sim_params["epsilon"]
-        return 
+        return
     end
     if step == "process"
         unit.process_done = true
@@ -2414,6 +2467,10 @@ function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real
     Tr1 = (1 - alpha) * T11 + alpha * T12
     Tr2 = (1 - alpha) * T21 + alpha * T22
     return (1 - β) * Tr1 + β * Tr2
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::SeasonalThermalStorage)
+    return unit.volume # [m^3]
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}

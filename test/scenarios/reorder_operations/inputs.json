@@ -3,12 +3,14 @@
         "csv_output_file": "./test/scenarios/reorder_operations/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/reorder_operations/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/reorder_operations/sankey_plot.html",
         "output_plot_file": "./test/scenarios/reorder_operations/output_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "nothing",
-        "output_plot": {
+        "csv_output": "nothing",
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"Grid_IN": ["m_power:OUT"]},
                 "axis": "left",
@@ -149,10 +151,9 @@
             "constant_power": 1e8
         },
         "Grid_OUT": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_power",
-            "is_source": false
+            "medium": "m_power"
         },
         "Photovoltaic": {
             "type": "PVPlant",

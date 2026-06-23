@@ -4,6 +4,61 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.4
+* Improve error handling during project loading and component operation
+  * Add clearer error messages for unknown component types
+  * Add clearer error messages for invalid calls to `set_storage_transfer!()`due to empty interfaces
+* Add missing CSV reference output for scenario `chpp_two_hyst`
+
+### Version 0.14.3
+* Change fixed output precision to use significant digits for rounding instead of decimal digits
+* Update all scenario outputs due to to changes in the fixed output precision
+* Add check and error message to scenario CLI if the given scenario does not exist
+* Fix wrong conditional in GeothermalHeatCollector
+
+### Version 0.14.2
+* Fix order of operations for transformers with active part load connected to middle busses with both input and output branch: additional potential steps are now added where required
+* Fix heat pump behaviour with secondary output interfaces in cases with zero energy demand on the interface with the higher bus priority
+* Fix error message in heat pump slice splitting for primary and secondary output interfaces
+* Update scenario `secondary_interfaces` to reflect corrected heat pump output temperatures in secondary interfaces
+
+### Version 0.14.1
+* add two new examples and scenarios for a multi-family house and a district, both with economic evaluation and GHG emissions
+* add the generation of a summary CSV (`write_summary_CSV`) that calculates means, sums, minimums, and maximums of all outputs with auto-detection of the parameter type
+* add emissions and economic outputs and summary CSV outputs to the scenario comparison and reference results, as well as several missing CSV outputs
+* add the parameter `capex_specific_scale` for convenient scaling of investment cost functions
+* clarify the installation instructions for ReSiE in the README
+* align the formatting of file paths in log output
+
+### Version 0.14.0
+
+#### Major feature: Costs and emissions
+* Add optional economic and GHG emissions calculations
+  * Includes component-specific investment costs, operating costs, energy prices, subsidies, embodied emissions, emission factors, emissions credits and unmet-energy costs
+  * Add CSV and plot outputs for economic and GHG emissions results
+  * Add different repetition methods of price and emission profiles using the parameter `repeat_method` 
+
+#### Breaking changes
+* Rework IO settings for CSV output, output plots and Sankey plots by splitting output mode and custom output specification
+  * This changes the project file syntax for custom output definitions. Please check the documentation for how the new format works.
+  * Update default Sankey colours and improve handling of incomplete custom colour specifications. Unknown media are now assigned random colours, but these colours are consistent between runs.
+* Change handling of unmet demands and surplus supplies so they are assigned to sinks and sources and no longer to busses
+  * Improve handling of unmet energies in single and connected busses
+  * Change output of balance warnings to a new format: Balance warnings are now separated into interface balance warnings and component balance errors; proxy busses no longer create duplicate balance warnings
+  * Update Sankey plotting to display unmet energies more reliably and consistently
+* Remove legacy component type GridConnection
+  * Please use GridInput and GridOutput instead, which function the same, except they do not require setting the parameter `is_source`.
+
+#### Minor changes / fixes
+* Fix multiple issues in profile repetition, profile trimming, output paths, line plot ordering, optional parameter validation and unit descriptions
+* Add IO setting `fixed_output_precision` to make CSV, plot, Sankey, economic and emissions outputs perfectly reproducible. This is mostly used for testing.
+
+#### Internal changes
+* Refactor simulation parameters, IO settings, economic parameters, emissions parameters, control parameters and control modules to use SSOT parameter definitions
+* Improve scenario tooling and update scenario reference files
+  * The scenario command `compare_ooo` is replaced by `compare`, which compares all relevant output files. This includes automatically ignoring expected differences in execution time and timestamps.
+  * The new compare tool can be used to quickly check all scenarios for any difference at all.
+
 ### Version 0.13.12
 * Simplify internal use of COP functions with constant value
 * Simplify internal loading of optional profiles and constant values for all components
@@ -22,7 +77,7 @@ As per the definition of semantic versioning and the reality of early developmen
   * This is prepatory work for optimisation and parameter studies, where a component might be reduced to zero sizing while still maintaining its place in the energy system (whereas completely removing the component is much more complicated)
 * Fix rare race condition with multithreading when module-global variable EnergySystems.medium_categories is checked during output generation.
 
-## Version 0.13.11
+### Version 0.13.11
 * Changed transformer potential handling so `MaxEnergy` is no longer updated in interfaces toward (proxy) buses and is instead written only to the bus balance table, allowing `balance_on()` of the bus to correctly handle multiple transformers with multiple potential steps; linked interfaces remain an exception and still require to update `MaxEnergy` in the interfaces during potential step for correct communication.
 * Fixed `inner_distribute` in buses to avoid `Inf - Inf`, which previously produced `NaN` values in the bus balance table in some rare cases
 

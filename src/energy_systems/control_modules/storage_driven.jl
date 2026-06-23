@@ -1,10 +1,67 @@
+#! format: off
+CONMOD_STORAGE_DRIVEN_PARAMS = Dict(
+    "storage_uac" => (
+        default=nothing,
+        description="UAC of the storage component.",
+        display_name="Storage UAC",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "low_threshold" => (
+        default=0.2,
+        description="Lower relative storage level at which the storage should begin to " *
+                    "be filled.",
+        display_name="Lower threshold",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lt_num", 1.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "high_threshold" => (
+        default=0.95,
+        description="Upper relative storage level at which the storage should stop " *
+                    "being filled.",
+        display_name="Lower threshold",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 1.0),
+            ("self", "value_gt_rel", "low_threshold"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "min_run_time" => (
+        default=1800,
+        description="Minimum run time of the hysteresis in the 'on' condition. This will " *
+                    "override the upper threshold, but will in turn be overridden if the " *
+                    "storage is completely full. Should ideally be a multiple of the " *
+                    "simulation time step, as fractional time steps are not considered.",
+        display_name="Min. run time",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="s"
+    ),
+)
+#! format: on
+
 """
 Control module for running a component depending on the state of a linked storage component.
 In particular it switches to a state of allowing operation of the component when the load
 of the linked storage falls below the lower threshold. The module stays in this state until
 the load has reached the upper threshold and the minimum run time has passed.
 """
-
 mutable struct CM_StorageDriven <: ControlModule
     name::String
     parameters::Dict{String,Any}
@@ -71,6 +128,9 @@ end
 
 # method for control module name on type-level
 control_module_name(::Type{CM_StorageDriven})::String = "storage_driven"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_StorageDriven})::Dict{String,NamedTuple} = CONMOD_STORAGE_DRIVEN_PARAMS
 
 function has_method_for(mod::CM_StorageDriven, func::ControlModuleFunction)::Bool
     return func == cmf_upper_plr_limit

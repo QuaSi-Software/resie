@@ -3,9 +3,12 @@
         "csv_output_file": "./test/scenarios/transformer_chain/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/transformer_chain/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/transformer_chain/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": {},
+        "csv_output": "all_incl_flows",
+        "csv_output_weather": true,
+        "plot_weather_data": true,
         "output_plot_file": "./test/scenarios/transformer_chain/output_plot.html",
         "output_plot": "all_incl_flows"
     },
@@ -43,28 +46,25 @@
             "constant_temperature": 20
         },
         "TST_GRI_natgas": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_c_natgas",
             "output_refs": [
                 "TST_CHP_01"
-            ],
-            "is_source": true
+            ]
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"
-            ],
-            "is_source": true
+            ]
         },
         "TST_GRI_02": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "medium": "m_e_ac_230v",
             "input_refs": [
                 "TST_BUS_EL"
-            ],
-            "is_source": false
+            ]
         },
         "TST_HP_01": {
             "type": "HeatPump",

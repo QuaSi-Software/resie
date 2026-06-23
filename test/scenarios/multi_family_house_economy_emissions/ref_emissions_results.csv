@@ -1,0 +1,24 @@
+﻿Emissions results
+Note: Positive values are emissions, negative values are credits / avoided emissions.
+Total emissions:;391651,79;kg CO₂e
+Energy emissions:;391651,79;kg CO₂e
+Embodied emissions:;0,00;kg CO₂e
+
+Yearly emissions in [kg CO₂e/year]:
+;2024;2025;2026;2027;2028;2029;2030;2031;2032;2033;2034;2035;2036;2037;2038;2039;2040;2041;2042;2043
+Ambient_heat - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+Building_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_PV - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
+Building_el_GRI - energy_emissions_per_year:;25754,95;24982,30;24232,83;23505,85;22800,67;22116,65;21453,15;20809,56;20185,27;19579,71;18992,32;18422,55;17869,88;17333,78;16813,77;16309,35;15820,07;15345,47;14885,11;14438,55
+Building_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+Building_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
+
+Emissions breakdown per component:
+Ambient_heat - emissions_energy:;0,00;kg CO₂e
+Building_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_PV - emissions_energy:;0,00;kg CO₂e
+Building_el_GRI - emissions_energy:;391651,79;kg CO₂e
+Building_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
+Building_el_demand - emissions_credits_energy:;0,00;kg CO₂e
+Building_heating_demand - emissions_credits_energy:;0,00;kg CO₂e

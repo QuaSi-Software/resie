@@ -3,10 +3,11 @@
         "csv_output_file": "./test/scenarios/p2h_stes_stc/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/p2h_stes_stc/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/p2h_stes_stc/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "all_excl_flows",
+        "csv_output": "all_excl_flows",
         "output_plot_file": "./test/scenarios/p2h_stes_stc/output_plot.html",
         "output_plot": "all_incl_flows"
     },
@@ -143,10 +144,9 @@
             "scale": 200000.0
         },
         "TST_GRO_01": {
-            "type": "GridConnection",
+            "type": "GridOutput",
             "output_refs": [],
-            "medium": "m_e_ac_230v",
-            "is_source": false
+            "medium": "m_e_ac_230v"
         },
         "TST_HP_01": {
             "type": "HeatPump",
@@ -175,12 +175,11 @@
             "nr_optimisation_passes": 10
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "output_refs": [
                 "TST_BUS_02"
             ],
-            "medium": "m_e_ac_230v",
-            "is_source": true
+            "medium": "m_e_ac_230v"
         },
         "TST_DEM_02": {
             "type": "Demand",

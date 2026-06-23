@@ -1,5 +1,5 @@
 #! format: off
-const FUEL_BOILER_PARAMETERS = Dict(
+const FUEL_BOILER_COMPONENT_PARAMETERS = Dict(
     "m_fuel_in" => (
         description="Fuel input medium",
         display_name="Medium fuel_in",
@@ -94,6 +94,37 @@ const FUEL_BOILER_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const FUEL_BOILER_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer",
+    Dict{String,Any}(
+            "lifetime_years" => 20,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  20,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/W"
+    )
+)
+
+const FUEL_BOILER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transformer",
+    Dict{String,Any}(
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/W"
+    ),
+)
 #! format: on
 
 """
@@ -121,6 +152,9 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -140,8 +174,16 @@ mutable struct FuelBoiler <: Component
     end
 end
 
-function component_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
-    return deepcopy(FUEL_BOILER_PARAMETERS) # Return a copy to prevent external modification
+function component_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{FuelBoiler})::Dict{String,Any}
+    return deepcopy(FUEL_BOILER_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,
@@ -150,8 +192,17 @@ function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_
 end
 
 function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(FuelBoiler))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(FuelBoiler)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(FuelBoiler)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(FuelBoiler)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,Any},
@@ -175,6 +226,8 @@ function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,
             InterfaceMap(m_heat_out => nothing),
             m_fuel_in,
             m_heat_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             params["power_th"] / efficiencies[Symbol("heat_out")](1.0),
             linear_interface,
             params["min_power_fraction"],
@@ -188,9 +241,9 @@ end
 
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_fuel_in],
-                          unload_storages(unit.controller, unit.m_fuel_in))
+                          unload_storages(unit.controller, unit.m_fuel_in), unit.uac, unit.m_fuel_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
@@ -245,10 +298,16 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
     unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::FuelBoiler)
     return unit.min_power_fraction > 0.0
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::FuelBoiler)
+    return unit.power # [W]
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}

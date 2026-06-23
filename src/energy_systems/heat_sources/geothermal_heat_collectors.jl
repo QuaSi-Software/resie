@@ -6,7 +6,7 @@ using SparseArrays
 using LinearAlgebra
 
 #! format: off
-const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
+const GEOTHERMAL_HEAT_COLLECTOR_COMPONENT_PARAMETERS = Dict(
     "m_heat_in" => (
         default="m_h_w_ht1",
         description="Heat input medium (for regeneration/loading)",
@@ -71,7 +71,6 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
-            ("consider_losses", "is_true"),
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
@@ -641,6 +640,37 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         unit="K"
     ),
 )
+
+const GEOTHERMAL_HEAT_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params("storage",
+    Dict{String,Any}(
+            "lifetime_years" => 30,
+            "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
+            "capex_price_change_rate_per_year" => 0.012,
+            "maintenance_inspection_rate_per_year" => 0.02,
+            "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+            "repair_rate_per_year" => 0.01,
+            "repair_price_change_rate_per_year" =>  0.0,
+            "operational_labour_hours_per_year" =>  0.0,
+            "subsidy_rate_of_capex" =>  0.0,
+            "subsidy_max" =>  -1.0
+    ),
+    Dict{String,Any}(
+            "capex_specific" => "€/m"
+    )
+)
+
+const GEOTHERMAL_HEAT_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_params("storage",
+    Dict{String,Any}(
+        "lifetime_years" => 30,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/m"
+    ),
+)
 #! format: on
 
 """
@@ -661,6 +691,9 @@ mutable struct GeothermalHeatCollector <: Component
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
 
     ambient_temperature_profile::Union{Profile,Nothing}
     constant_ambient_temperature::Temperature
@@ -792,8 +825,16 @@ mutable struct GeothermalHeatCollector <: Component
     end
 end
 
-function component_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
-    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{GeothermalHeatCollector})::Dict{String,Any}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, param_name::String,
@@ -817,8 +858,17 @@ function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String
 end
 
 function validate_config(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalHeatCollector))
+                         uac::String, sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(GeothermalHeatCollector)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(GeothermalHeatCollector)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(GeothermalHeatCollector)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params::Dict{String,Any},
@@ -833,6 +883,8 @@ function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params:
             InterfaceMap(m_heat_out => nothing),
             m_heat_in,
             m_heat_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             some_or_none(params["ambient_temperature_profile_file_path"],
                          params["ambient_temperature_from_global_file"]),
             params["constant_ambient_temperature"],
@@ -920,10 +972,10 @@ end
 function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     if unit.regeneration
         set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                              unload_storages(unit.controller, unit.m_heat_in))
+                              unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     end
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     # calculate diameters of pipe
     unit.pipe_d_i = 2 * unit.pipe_radius_outer - (2 * unit.pipe_thickness)
@@ -1772,6 +1824,10 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     energy_taken = unit.current_max_input_energy - energy_demand
     unit.collector_total_heat_energy_in_out += energy_taken
     handle_component_update!(unit, "load", sim_params)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::GeothermalHeatCollector)
+    return unit.pipe_length * unit.number_of_pipes # [m]
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}

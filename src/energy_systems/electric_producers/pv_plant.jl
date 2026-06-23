@@ -1,5 +1,5 @@
 #! format: off
-const PV_PLANT_PARAMETERS = Dict(
+const PV_PLANT_COMPONENT_PARAMETERS = Dict(
     "m_el_out" => (
         default="m_e_ac_230v",
         description="Medium of the output electricity",
@@ -27,6 +27,54 @@ const PV_PLANT_PARAMETERS = Dict(
         unit="-"
     ),
 )
+
+const PV_PLANT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection_fixed", 
+    Dict{String,Any}(
+        "energy_price_profile_file_path" => nothing,
+        "energy_price_profile_scale" => 1.0,
+        "constant_energy_price" => nothing,
+        "energy_price_change_rate_per_year" =>  0.0,
+        "base_cost_per_year" => 0.0,
+        "base_cost_change_rate_per_year" => 0.0,
+
+        "unmet_energy_price_profile_file_path" => nothing,
+        "unmet_energy_price_profile_scale" => 1.0,
+        "constant_unmet_energy_price" => 0.0,
+        "unmet_energy_price_change_rate_per_year" =>  0.0,
+
+        "lifetime_years" => 20,
+        "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
+        "capex_price_change_rate_per_year" => 0.0,
+        "maintenance_inspection_rate_per_year" => 0.0,
+        "maintenance_inspection_price_change_rate_per_year" =>  0.0,
+        "repair_rate_per_year" => 0.0,
+        "repair_price_change_rate_per_year" =>  0.0,
+        "operational_labour_hours_per_year" =>  0.0,
+        "subsidy_rate_of_capex" => 0.0,
+        "subsidy_max" => -1.0
+    ),
+    Dict{String,Any}(            
+        "capex_specific" => "€/scale"
+    ),
+)
+
+const PV_PLANT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source", 
+    Dict{String,Any}(
+        "energy_emissions_profile_file_path" => nothing,
+        "energy_emissions_profile_scale" => 1.0,
+        "constant_energy_emissions" => nothing,
+        "energy_emissions_change_rate_per_year" =>  0.0,
+
+        "lifetime_years" => 20,
+        "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
+        "embodied_emissions_change_rate_per_year" => 0.0
+    ),
+    Dict{String,Any}(
+        "embodied_emissions_specific" => "g CO2/scale"
+    )
+)
 #! format: on
 
 """
@@ -45,6 +93,9 @@ mutable struct PVPlant <: Component
 
     m_el_out::Symbol
 
+    economic_parameters::Dict{String,Any}
+    emissions_parameters::Dict{String,Any}
+
     energy_profile::Profile
     scaling_factor::Float64
 
@@ -55,8 +106,16 @@ mutable struct PVPlant <: Component
     end
 end
 
-function component_parameters(x::Type{PVPlant})::Dict{String,NamedTuple}
-    return deepcopy(PV_PLANT_PARAMETERS) # return a copy to prevent external modification
+function component_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_COMPONENT_PARAMETERS)
+end
+
+function economic_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_ECONOMIC_PARAMETERS)
+end
+
+function emissions_parameters(x::Type{PVPlant})::Dict{String,Any}
+    return deepcopy(PV_PLANT_EMISSIONS_PARAMETERS)
 end
 
 function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
@@ -65,8 +124,17 @@ function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_nam
 end
 
 function validate_config(x::Type{PVPlant}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
-                         sim_params::Dict{String,Any})
-    validate_config(Component, extracted, uac, sim_params, component_parameters(PVPlant))
+                         sim_params::Dict{String,Any}, param_type::String)
+    if param_type == "economy"
+        parameter = economic_parameters(PVPlant)
+        uac = uac * " - economic_parameters"
+    elseif param_type == "emissions"
+        parameter = emissions_parameters(PVPlant)
+        uac = uac * " - emissions_parameters"
+    elseif param_type == "component"
+        parameter = component_parameters(PVPlant)
+    end
+    validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
 function init_from_params(x::Type{PVPlant}, uac::String, params::Dict{String,Any},
@@ -83,6 +151,8 @@ function init_from_params(x::Type{PVPlant}, uac::String, params::Dict{String,Any
             InterfaceMap(),
             InterfaceMap(m_el_out => nothing),
             m_el_out,
+            params["economic_parameters"],
+            params["emissions_parameters"],
             energy_profile,
             params["scale"],
             0.0)  # supply
@@ -90,7 +160,7 @@ end
 
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
-                          load_storages(unit.controller, unit.m_el_out))
+                          load_storages(unit.controller, unit.m_el_out), unit.uac, unit.m_el_out)
 end
 
 function control(unit::PVPlant,
@@ -104,6 +174,10 @@ end
 function process(unit::PVPlant, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
+end
+
+function get_reference_for_capex_and_embodied_emissions(unit::PVPlant)
+    return unit.scaling_factor
 end
 
 function output_values(unit::PVPlant)::Vector{String}

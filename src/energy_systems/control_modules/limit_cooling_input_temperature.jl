@@ -1,3 +1,26 @@
+#! format: off
+CONMOD_LIMIT_COOLING_INPUT_TEMPERATURE_PARAMS = Dict(
+    "target_uac" => (
+        default=nothing,
+        description="UAC of the target component.",
+        display_name="Target UAC",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_limit" => (
+        default=nothing,
+        description="Maximum allowed temperature for the cooling return flow.",
+        display_name="Temperature limit",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+)
+#! format: on
+
 """
 Control module Limit Return Temperature
 
@@ -74,6 +97,9 @@ end
 
 # method for control module name on type-level
 control_module_name(x::Type{CM_LimitCoolingInputTemperature})::String = "limit_cooling_input_temperature"
+
+# method for parameter definitions on type-level
+control_module_parameters(x::Type{CM_LimitCoolingInputTemperature})::Dict{String,NamedTuple} = CONMOD_LIMIT_COOLING_INPUT_TEMPERATURE_PARAMS
 
 function has_method_for(mod::CM_LimitCoolingInputTemperature, func::ControlModuleFunction)::Bool
     return func == cmf_limit_cooling_input_temperature

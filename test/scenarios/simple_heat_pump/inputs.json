@@ -3,8 +3,10 @@
         "csv_output_file": "./test/scenarios/simple_heat_pump/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/simple_heat_pump/auxiliary_info.md",
+        "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/simple_heat_pump/sankey_plot.html",
         "sankey_plot": "default",
+        "csv_output": "custom",
         "csv_output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1:IN",
@@ -16,7 +18,8 @@
             "TST_SRC_01": ["Temperature", "Max_Energy"]
         },
         "output_plot_file": "./test/scenarios/simple_heat_pump/output_plot.html",
-        "output_plot": {
+        "output_plot": "custom",
+        "output_plot_spec": {
             "1": {
                 "key": {"TST_HP_01": ["m_h_w_lt1:IN"]},
                 "axis": "left",
@@ -88,12 +91,11 @@
             "scale": 6000
         },
         "TST_GRI_01": {
-            "type": "GridConnection",
+            "type": "GridInput",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_HP_01"
-            ],
-            "is_source": true
+            ]
         },
         "TST_HP_01": {
             "type": "HeatPump",

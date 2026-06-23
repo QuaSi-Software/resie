@@ -1,0 +1,8 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+TST_DEM_01 Temperature;intensive;mean;96;53,28125;50,0;65,0;;
+TST_HP_01 COP;intensive;mean_excluding_zero;96;3,0;3,0;3,0;;
+TST_HP_01 m_e_ac_230v IN;energy;sum;96;8600,0;37,5;375,0;8,6;0,0086
+TST_HP_01 m_h_w_ht1 OUT;energy;sum;96;25800,0;112,5;1125,0;25,8;0,0258
+TST_HP_01 m_h_w_lt1 IN;energy;sum;96;17200,0;75,0;750,0;17,2;0,0172
+TST_SRC_01 Max_Energy;intensive;mean;96;1273,4375;1200,0;1350,0;;
+TST_SRC_01 Temperature;intensive;mean;96;23,97916667;23,0;25,0;;

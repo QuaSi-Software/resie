@@ -1,36 +1,33 @@
-ReSiE general log file of simulation started at: 2026-02-24 13:09:52
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
 This log file contains general warnings, errors and information written by ReSiE
 ---------------------------------
 [Info] Logging set up
-[Info] For 'TST_DEM_01', no 'temperature' is set.
-[Info] For 'TST_GRO_HEAT', no 'temperature' is set.
-[Info] For 'TST_GRI_GAS', no 'temperature' is set.
-[Info] For 'TST_GRI_01', no 'temperature' is set.
-[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\auxiliary_info.md
+[Info] Auxiliary info dumped to file .\test\scenarios\electric_transformer\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/669 in 0.837 s. ETA: 16.1313 s
-[Info] Progress: 66/669 in 0.028 s. ETA: 0.5116 s
-[Info] Progress: 99/669 in 0.035 s. ETA: 0.6045 s
-[Info] Progress: 132/669 in 0.036 s. ETA: 0.5858 s
-[Info] Progress: 165/669 in 0.034 s. ETA: 0.5193 s
-[Info] Progress: 198/669 in 0.028 s. ETA: 0.3996 s
-[Info] Progress: 231/669 in 0.041 s. ETA: 0.5442 s
-[Info] Progress: 264/669 in 0.037 s. ETA: 0.4541 s
-[Info] Progress: 297/669 in 0.031 s. ETA: 0.3495 s
-[Info] Progress: 330/669 in 0.036 s. ETA: 0.3698 s
-[Info] Progress: 363/669 in 0.04 s. ETA: 0.3524 s
-[Info] Progress: 396/669 in 0.03 s. ETA: 0.2482 s
-[Info] Progress: 429/669 in 0.029 s. ETA: 0.2109 s
-[Info] Progress: 462/669 in 0.044 s. ETA: 0.2760 s
-[Info] Progress: 495/669 in 0.021 s. ETA: 0.1107 s
-[Info] Progress: 528/669 in 0.045 s. ETA: 0.1923 s
-[Info] Progress: 561/669 in 0.03 s. ETA: 0.0982 s
-[Info] Progress: 594/669 in 0.038 s. ETA: 0.0864 s
-[Info] Progress: 627/669 in 0.037 s. ETA: 0.0471 s
-[Info] Progress: 660/669 in 0.037 s. ETA: 0.0101 s
+[Info] Progress: 33/669 in 0.855 s. ETA: 16.4782 s
+[Info] Progress: 66/669 in 0.054 s. ETA: 0.9867 s
+[Info] Progress: 99/669 in 0.059 s. ETA: 1.0191 s
+[Info] Progress: 132/669 in 0.057 s. ETA: 0.9275 s
+[Info] Progress: 165/669 in 0.058 s. ETA: 0.8858 s
+[Info] Progress: 198/669 in 0.079 s. ETA: 1.1275 s
+[Info] Progress: 231/669 in 0.065 s. ETA: 0.8627 s
+[Info] Progress: 264/669 in 0.056 s. ETA: 0.6873 s
+[Info] Progress: 297/669 in 0.077 s. ETA: 0.8680 s
+[Info] Progress: 330/669 in 0.063 s. ETA: 0.6472 s
+[Info] Progress: 363/669 in 0.074 s. ETA: 0.6862 s
+[Info] Progress: 396/669 in 0.071 s. ETA: 0.5874 s
+[Info] Progress: 429/669 in 0.093 s. ETA: 0.6764 s
+[Info] Progress: 462/669 in 0.097 s. ETA: 0.6022 s
+[Info] Progress: 495/669 in 0.065 s. ETA: 0.3427 s
+[Info] Progress: 528/669 in 0.068 s. ETA: 0.2905 s
+[Info] Progress: 561/669 in 0.064 s. ETA: 0.2062 s
+[Info] Progress: 594/669 in 0.08 s. ETA: 0.1818 s
+[Info] Progress: 627/669 in 0.069 s. ETA: 0.0878 s
+[Info] Progress: 660/669 in 0.121 s. ETA: 0.0330 s
 [Info] -- Finished time step loop
-[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\output_plot.html
-[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\sankey_plot.html
-[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\electric_transformer\out.csv
+[Info] CSV-file with outputs written to .\test\scenarios\electric_transformer\out.csv
+[Info] Summary CSV-file with outputs created and written to .\test\scenarios\electric_transformer\out_aggregated.csv
+[Info] Line plot created and saved to .\test\scenarios\electric_transformer\output_plot.html
+[Info] Sankey created and saved to .\test\scenarios\electric_transformer\sankey_plot.html
 [Info] general log saved to .\test\scenarios\electric_transformer\general.log

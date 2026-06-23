@@ -24,22 +24,19 @@ function get_energy_system_ely_and_hp()
             "scale" => 3000,
         ),
         "TST_GRI_O2_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridOutput",
             "medium" => "m_c_g_o2",
             "output_refs" => [],
-            "is_source" => false,
         ),
         "TST_GRI_el_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_ELY_01"],
-            "is_source" => true,
         ),
         "TST_GRI_el_02" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
