@@ -219,8 +219,21 @@ Sets the flag to decide over storage potential transfer to the given boolean val
 that if the flag is already set to false, no further changes will set it back to true. This
 is to prevent components overwriting the values of others.
 """
-function set_storage_transfer!(interface::SystemInterface, flag::Bool)
+function set_storage_transfer!(interface::SystemInterface, flag::Bool, uac::String, medium::Symbol)
     interface.do_storage_transfer = interface.do_storage_transfer && flag
+end
+
+"""
+    set_storage_transfer!(Nothing, value)
+
+Sets the flag to decide over storage potential transfer to the given boolean value. Note
+that if the flag is already set to false, no further changes will set it back to true. This
+is to prevent components overwriting the values of others.
+"""
+function set_storage_transfer!(interface::Nothing, flag::Bool, uac::String, medium::Symbol)
+    @error "In unit `$uac`, an error in the connections occurred for medium `$(String(medium))`. " *
+           "Check the consistency of the media names across the connected components."
+    throw(InputError())
 end
 
 """

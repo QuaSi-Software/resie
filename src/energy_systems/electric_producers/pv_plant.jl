@@ -160,7 +160,7 @@ end
 
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
-                          load_storages(unit.controller, unit.m_el_out))
+                          load_storages(unit.controller, unit.m_el_out), unit.uac, unit.m_el_out)
 end
 
 function control(unit::PVPlant,

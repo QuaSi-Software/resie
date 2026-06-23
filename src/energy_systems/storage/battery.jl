@@ -609,12 +609,13 @@ end
 
 function initialise!(unit::Battery, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
-                          load_storages(unit.controller, unit.m_el_out))
+                          load_storages(unit.controller, unit.m_el_out), unit.uac, unit.m_el_out)
+
     if unit.heat_lt_is_usable
         set_storage_transfer!(unit.output_interfaces[unit.m_heat_lt_out],
-                              load_storages(unit.controller, unit.m_heat_lt_out))
+                              load_storages(unit.controller, unit.m_heat_lt_out), unit.uac, unit.m_heat_lt_out)
     end
 
     unit.load_end_of_last_timestep = copy(unit.load)
