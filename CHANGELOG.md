@@ -4,6 +4,32 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.4
+* Improve error handling during project loading and component operation
+  * Add clearer error messages for unknown component types
+  * Add clearer error messages for invalid calls to `set_storage_transfer!()`due to empty interfaces
+* Add missing CSV reference output for scenario `chpp_two_hyst`
+
+### Version 0.14.3
+* Change fixed output precision to use significant digits for rounding instead of decimal digits
+* Update all scenario outputs due to to changes in the fixed output precision
+* Add check and error message to scenario CLI if the given scenario does not exist
+* Fix wrong conditional in GeothermalHeatCollector
+
+### Version 0.14.2
+* Fix order of operations for transformers with active part load connected to middle busses with both input and output branch: additional potential steps are now added where required
+* Fix heat pump behaviour with secondary output interfaces in cases with zero energy demand on the interface with the higher bus priority
+* Fix error message in heat pump slice splitting for primary and secondary output interfaces
+* Update scenario `secondary_interfaces` to reflect corrected heat pump output temperatures in secondary interfaces
+
+### Version 0.14.1
+* add two new examples and scenarios for a multi-family house and a district, both with economic evaluation and GHG emissions
+* add the generation of a summary CSV (`write_summary_CSV`) that calculates means, sums, minimums, and maximums of all outputs with auto-detection of the parameter type
+* add emissions and economic outputs and summary CSV outputs to the scenario comparison and reference results, as well as several missing CSV outputs
+* add the parameter `capex_specific_scale` for convenient scaling of investment cost functions
+* clarify the installation instructions for ReSiE in the README
+* align the formatting of file paths in log output
+
 ### Version 0.14.0
 
 #### Major feature: Costs and emissions

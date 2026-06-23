@@ -329,6 +329,7 @@ const HEAT_PUMP_ECONOMIC_PARAMETERS = get_economic_standard_params("transformer"
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.015,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -347,6 +348,7 @@ const HEAT_PUMP_EMISSIONS_PARAMETERS = get_emissions_standard_params("transforme
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -807,11 +809,11 @@ end
 
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+                          unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
     if unit.has_secondary_interface
         if unit.primary_el_sources == [] || unit.secondary_el_sources == []
             @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both `primary_el_sources` and " *
@@ -1197,6 +1199,12 @@ function calculate_slices(unit::HeatPump,
 
         # apply restrictions of control modules for a slice
         if !check_src_to_snk(unit.controller, energies.in_uacs_heat[src_idx], energies.out_uacs[snk_idx])
+            snk_idx += 1
+            continue
+        end
+
+        # move to next output slice if no energy is requested here. This can happen with secondary interfaces.
+        if energies.available_heat_out[snk_idx] < EPS
             snk_idx += 1
             continue
         end
@@ -1673,7 +1681,11 @@ function split_slices_primary_secondary(unit::HeatPump,
             is_secondary = src in secondary_uac
 
             if is_primary && is_secondary
-                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
+                @error "In heat pump $(unit.uac), the source '$src' is both in primary_uac and secondary_uac, choose one!"
+                throw(InputError())
+            elseif !is_primary && !is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac!"
+                throw(InputError())
             end
 
             # scale energy quantities

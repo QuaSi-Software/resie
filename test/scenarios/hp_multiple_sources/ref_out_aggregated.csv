@@ -1,0 +1,45 @@
+Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
+TST_BFT_TH_01 Capacity;intensive;mean;96;200000,0;200000,0;200000,0;;
+TST_BFT_TH_01 CurrentMaxOutTemp;intensive;mean;96;39,99985715;39,99314324;40,0;;
+TST_BFT_TH_01 Load;intensive;mean;96;48713,35068;29986,28648;84116,37607;;
+TST_BFT_TH_01 Load%;intensive;mean;96;24,35667534;14,99314324;42,05818804;;
+TST_BFT_TH_01 LossesGains;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_BFT_TH_01 m_h_w_lt1 IN;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_BFT_TH_01 m_h_w_lt1 OUT;energy;sum;96;55013,71352;0,0;1898,708056;55,01371352;0,05501371352
+TST_BFT_TH_02 Capacity;intensive;mean;96;145000,0;145000,0;145000,0;;
+TST_BFT_TH_02 CurrentMaxOutTemp;intensive;mean;96;85,0;85,0;85,0;;
+TST_BFT_TH_02 Load;intensive;mean;96;131124,2188;72137,5;145000,0;;
+TST_BFT_TH_02 Load%;intensive;mean;96;90,43049569;49,75;100,0;;
+TST_BFT_TH_02 LossesGains;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_BFT_TH_02 m_h_w_ht1 IN;energy;sum;96;75000,0;0,0;2137,5;75,0;0,075
+TST_BFT_TH_02 m_h_w_ht1 OUT;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_BUS_TH_01 Balance;energy;sum;96;-225,0;-112,5;0,0;-0,225;-0,000225
+TST_BUS_TH_02 Balance;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_DEM_01 Demand;energy;sum;96;25800,0;112,5;1125,0;25,8;0,0258
+TST_DEM_01 m_h_w_lt1 IN;energy;sum;96;25575,0;0,0;1125,0;25,575;0,025575
+TST_DEM_01 Temperature;intensive;mean;96;40,0;40,0;40,0;;
+TST_DEM_02 Demand;energy;sum;96;25800,0;112,5;1125,0;25,8;0,0258
+TST_DEM_02 m_h_w_ht1 IN;energy;sum;96;25800,0;112,5;1125,0;25,8;0,0258
+TST_DEM_02 Temperature;intensive;mean;96;85,0;85,0;85,0;;
+TST_GRI_01 m_e_ac_230v OUT;energy;sum;96;36017,12889;36,51577551;812,1537444;36,01712889;0,03601712889
+TST_GRI_01 Output_sum;cumulative;last;96;-36017,12889;-36017,12889;-803,8760709;-36,01712889;-0,03601712889
+TST_HP_01 Avg_PLR;intensive;mean_excluding_zero;96;0,4666666667;0,05;1,0;;
+TST_HP_01 COP;intensive;mean_excluding_zero;96;2,919418995;2,48873208;3,080860215;;
+TST_HP_01 Effective_COP;intensive;mean_excluding_zero;96;2,919418995;2,48873208;3,080860215;;
+TST_HP_01 Losses_heat;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 Losses_power;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 LossesGains;energy;sum;96;0,0;0,0;0,0;0,0;0,0
+TST_HP_01 m_e_ac_230v IN;energy;sum;96;36017,12889;36,51577551;812,1537444;36,01712889;0,03601712889
+TST_HP_01 m_h_w_ht1 OUT;energy;sum;96;100800,0;112,5;2250,0;100,8;0,1008
+TST_HP_01 m_h_w_lt1 IN;energy;sum;96;64782,87111;75,98422449;1449,575608;64,78287111;0,06478287111
+TST_HP_01 MixingTemperature_Input;intensive;mean_excluding_zero;96;36,07843841;28,36836762;38,5;;
+TST_HP_01 MixingTemperature_Output;intensive;mean_excluding_zero;96;85,0;85,0;85,0;;
+TST_HP_01 Time_active;intensive;mean_excluding_zero;96;0,4666666667;0,05;1,0;;
+TST_SRC_01 m_h_w_lt1 OUT;energy;sum;96;16432,67486;75,98422449;225,0;16,43267486;0,01643267486
+TST_SRC_01 Max_Energy;intensive;mean;96;212,2395833;200,0;225,0;;
+TST_SRC_01 Temperature_snk_out;intensive;mean;96;38,5;38,5;38,5;;
+TST_SRC_01 Temperature_src_in;intensive;mean;96;40,0;40,0;40,0;;
+TST_SRC_02 m_h_w_lt1 OUT;energy;sum;96;18911,48273;0,0;450,0;18,91148273;0,01891148273
+TST_SRC_02 Max_Energy;intensive;mean;96;424,4791667;400,0;450,0;;
+TST_SRC_02 Temperature_snk_out;intensive;mean;96;21,8618786;19,95575031;23,59613357;;
+TST_SRC_02 Temperature_src_in;intensive;mean;96;24,05805068;22,01431158;25,93352761;;

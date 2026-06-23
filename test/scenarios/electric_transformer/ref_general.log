@@ -5,27 +5,29 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\electric_transformer\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/669 in 0.322 s. ETA: 6.2058 s
-[Info] Progress: 66/669 in 0.007 s. ETA: 0.1279 s
-[Info] Progress: 99/669 in 0.01 s. ETA: 0.1727 s
-[Info] Progress: 132/669 in 0.083 s. ETA: 1.3506 s
-[Info] Progress: 165/669 in 0.013 s. ETA: 0.1985 s
-[Info] Progress: 198/669 in 0.006 s. ETA: 0.0856 s
-[Info] Progress: 231/669 in 0.01 s. ETA: 0.1327 s
-[Info] Progress: 264/669 in 0.013 s. ETA: 0.1595 s
-[Info] Progress: 297/669 in 0.01 s. ETA: 0.1127 s
-[Info] Progress: 330/669 in 0.008 s. ETA: 0.0822 s
-[Info] Progress: 363/669 in 0.011 s. ETA: 0.1020 s
-[Info] Progress: 396/669 in 0.009 s. ETA: 0.0745 s
-[Info] Progress: 429/669 in 0.012 s. ETA: 0.0873 s
-[Info] Progress: 462/669 in 0.011 s. ETA: 0.0690 s
-[Info] Progress: 495/669 in 0.009 s. ETA: 0.0475 s
-[Info] Progress: 528/669 in 0.005 s. ETA: 0.0214 s
-[Info] Progress: 561/669 in 0.012 s. ETA: 0.0393 s
-[Info] Progress: 594/669 in 0.013 s. ETA: 0.0295 s
-[Info] Progress: 627/669 in 0.005 s. ETA: 0.0064 s
-[Info] Progress: 660/669 in 0.018 s. ETA: 0.0049 s
+[Info] Progress: 33/669 in 0.855 s. ETA: 16.4782 s
+[Info] Progress: 66/669 in 0.054 s. ETA: 0.9867 s
+[Info] Progress: 99/669 in 0.059 s. ETA: 1.0191 s
+[Info] Progress: 132/669 in 0.057 s. ETA: 0.9275 s
+[Info] Progress: 165/669 in 0.058 s. ETA: 0.8858 s
+[Info] Progress: 198/669 in 0.079 s. ETA: 1.1275 s
+[Info] Progress: 231/669 in 0.065 s. ETA: 0.8627 s
+[Info] Progress: 264/669 in 0.056 s. ETA: 0.6873 s
+[Info] Progress: 297/669 in 0.077 s. ETA: 0.8680 s
+[Info] Progress: 330/669 in 0.063 s. ETA: 0.6472 s
+[Info] Progress: 363/669 in 0.074 s. ETA: 0.6862 s
+[Info] Progress: 396/669 in 0.071 s. ETA: 0.5874 s
+[Info] Progress: 429/669 in 0.093 s. ETA: 0.6764 s
+[Info] Progress: 462/669 in 0.097 s. ETA: 0.6022 s
+[Info] Progress: 495/669 in 0.065 s. ETA: 0.3427 s
+[Info] Progress: 528/669 in 0.068 s. ETA: 0.2905 s
+[Info] Progress: 561/669 in 0.064 s. ETA: 0.2062 s
+[Info] Progress: 594/669 in 0.08 s. ETA: 0.1818 s
+[Info] Progress: 627/669 in 0.069 s. ETA: 0.0878 s
+[Info] Progress: 660/669 in 0.121 s. ETA: 0.0330 s
 [Info] -- Finished time step loop
+[Info] CSV-file with outputs written to .\test\scenarios\electric_transformer\out.csv
+[Info] Summary CSV-file with outputs created and written to .\test\scenarios\electric_transformer\out_aggregated.csv
 [Info] Line plot created and saved to .\test\scenarios\electric_transformer\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\electric_transformer\sankey_plot.html
 [Info] general log saved to .\test\scenarios\electric_transformer\general.log

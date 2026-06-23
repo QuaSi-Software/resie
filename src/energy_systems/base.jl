@@ -219,8 +219,21 @@ Sets the flag to decide over storage potential transfer to the given boolean val
 that if the flag is already set to false, no further changes will set it back to true. This
 is to prevent components overwriting the values of others.
 """
-function set_storage_transfer!(interface::SystemInterface, flag::Bool)
+function set_storage_transfer!(interface::SystemInterface, flag::Bool, uac::String, medium::Symbol)
     interface.do_storage_transfer = interface.do_storage_transfer && flag
+end
+
+"""
+    set_storage_transfer!(Nothing, value)
+
+Sets the flag to decide over storage potential transfer to the given boolean value. Note
+that if the flag is already set to false, no further changes will set it back to true. This
+is to prevent components overwriting the values of others.
+"""
+function set_storage_transfer!(interface::Nothing, flag::Bool, uac::String, medium::Symbol)
+    @error "In unit `$uac`, an error in the connections occurred for medium `$(String(medium))`. " *
+           "Check the consistency of the media names across the connected components."
+    throw(InputError())
 end
 
 """
@@ -2028,8 +2041,9 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
             if !(value in type_def[name].options)
-                throw(InputError("Given value $value is not in the allowed options for " *
-                                 "parameter `$name` of component `$uac`."))
+                throw(InputError("Given value `$value` is not in the allowed options for " *
+                                 "parameter `$name` of component `$uac`. " *
+                                 "Allowed options are: $(join(("`$option`" for option in type_def[name].options), ", "))"))
             end
         end
 
@@ -2245,6 +2259,15 @@ function get_economic_standard_params(type::String, defaults::Dict{String,Any},
                 json_type="string",
                 function_type="1dim",
                 unit=units["capex_specific"]
+            ),
+            "capex_specific_scale" => (
+                default=defaults["capex_specific_scale"],
+                description="Scale factor for specific invest costs. Especially useful for power function that do not scale linearly.",
+                display_name="capex function scale factor",
+                required=true,
+                type=Float64,
+                json_type="number",
+                unit="-"
             ),
             "capex_price_change_rate_per_year" => (
                 default=defaults["capex_price_change_rate_per_year"],
@@ -2485,6 +2508,15 @@ function get_emissions_standard_params(type::String, defaults::Dict{String,Any},
             json_type="string",
             function_type="1dim",
             unit=units["embodied_emissions_specific"]
+        ),
+        "embodied_emissions_specific_scale" => (
+            default=defaults["embodied_emissions_specific_scale"],
+            description="Scale factor for specific embodies emissions. Especially useful for power function that do not scale linearly.",
+            display_name="embodied emissions function scale factor",
+            required=true,
+            type=Float64,
+            json_type="number",
+            unit="-"
         ),
         "embodied_emissions_change_rate_per_year" => (
             default=defaults["embodied_emissions_change_rate_per_year"],

@@ -128,6 +128,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
+    do_write_summary_CSV = io_settings["write_summary_CSV"]
     csv_output_file_path = io_settings["csv_output_file"]
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
@@ -279,16 +280,41 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
     end
 
-    # write output to CSV if not done continuously
-    if do_write_CSV && !do_write_CSV_continuously
-        write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
-                          output_keys_to_CSV,
-                          weather_CSV_keys,
-                          sim_params,
-                          io_settings,
-                          csv_time_unit;
-                          do_return=false,
-                          output_rows=output_csv)
+    if do_write_CSV
+        csv_file_path = sim_params["run_path"](csv_output_file_path)
+        if do_write_CSV_continuously
+            @info "CSV-file with outputs continuously written to $(csv_file_path)"
+        else
+            # write output to CSV if not done continuously
+            write_to_CSV_file(csv_file_path,
+                              output_keys_to_CSV,
+                              weather_CSV_keys,
+                              sim_params,
+                              io_settings,
+                              csv_time_unit;
+                              do_return=false,
+                              output_rows=output_csv)
+            @info "CSV-file with outputs written to $(csv_file_path)"
+        end
+
+        if do_write_summary_CSV
+            output_path = replace(csv_file_path, r"\.csv$"i => "_aggregated.csv")
+
+            success = aggregate_csv(csv_file_path,
+                                    output_path,
+                                    output_keys_to_CSV,
+                                    weather_CSV_keys,
+                                    ["Transfer", "Demand", "IN", "OUT", "Supply", "Losses", "Gains", "EnergyFlow",
+                                     "Balance", "Charge"],              # energy terms
+                                    ["_sum"],                           # cumulative terms
+                                    ["COP", "Time_active", "Avg_PLR", "MixingTemperature_Input",
+                                     "MixingTemperature_Output"],       # zero as missing terms
+                                    ["Time"],                           # time columns
+                                    ';',                                # separator
+                                    sim_params["epsilon"],              # threshold
+                                    io_settings["fixed_output_precision"])
+            success && @info "Summary CSV-file with outputs created and written to $(output_path)"
+        end
     end
 
     # create profile line plot
@@ -316,10 +342,6 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                       sim_params)
         filepath = sim_params["run_path"](io_settings["sankey_plot_file"])
         @info "Sankey created and saved to $filepath"
-    end
-
-    if do_write_CSV
-        @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
 
     # plot additional figures potentially available from components after simulation

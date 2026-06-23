@@ -428,6 +428,7 @@ const GEOTHERMAL_PROBES_ECONOMIC_PARAMETERS = get_economic_standard_params("stor
     Dict{String,Any}(
             "lifetime_years" => 50,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.01,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -446,6 +447,7 @@ const GEOTHERMAL_PROBES_EMISSIONS_PARAMETERS = get_emissions_standard_params("st
     Dict{String,Any}(
         "lifetime_years" => 50,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -665,10 +667,10 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     end
     if unit.regeneration
         set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                              unload_storages(unit.controller, unit.m_heat_in))
+                              unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     end
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     # calculate and initialize constant variables
     unit.energy_in_out_per_probe_meter = zeros(sim_params["number_of_time_steps"])

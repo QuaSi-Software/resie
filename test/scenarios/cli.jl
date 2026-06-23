@@ -118,7 +118,10 @@ function rename_paths_and_dates(subdir::String)
     files_to_adjust = ["output_plot.html",
                        "sankey_plot.html",
                        "balanceWarn.log",
-                       "general.log"]
+                       "general.log",
+                       "economic_results_cashflows.html",
+                       "economic_results_present_values.html",
+                       "emissions_plot.html"]
 
     path_prefix = abspath(joinpath(dirname(@__FILE__), "..", ".."))
 
@@ -258,8 +261,14 @@ function set_reference(name, subdir)
                       "balanceWarn.log",
                       "general.log",
                       "out.csv",
+                      "out_aggregated.csv",
                       "output_plot.html",
-                      "sankey_plot.html"]
+                      "sankey_plot.html",
+                      "economic_results_cashflows.html",
+                      "economic_results_present_values.html",
+                      "economic_results.csv",
+                      "emissions_plot.html",
+                      "emissions_results.csv"]
 
     println("Setting reference outputs for scenario $name")
 
@@ -287,8 +296,14 @@ function compare(name, subdir)
                     "balanceWarn.log",
                     "general.log",
                     "out.csv",
+                    "out_aggregated.csv",
                     "output_plot.html",
-                    "sankey_plot.html"]
+                    "sankey_plot.html",
+                    "economic_results_cashflows.html",
+                    "economic_results_present_values.html",
+                    "economic_results.csv",
+                    "emissions_plot.html",
+                    "emissions_results.csv"]
 
     print("Comparing output file content for scenario $name: ")
 
@@ -350,10 +365,22 @@ function rebuild_overview(scenarios_dir)
                    "general.log",
                    "inputs.json",
                    "out.csv",
+                   "out_aggregated.csv",
+                   "economic_results_cashflows.html",
+                   "economic_results_present_values.html",
+                   "economic_results.csv",
+                   "emissions_plot.html",
+                   "emissions_results.csv",
                    "ref_auxiliary_info.md",
                    "ref_balanceWarn.log",
                    "ref_general.log",
-                   "ref_out.csv"]
+                   "ref_out.csv",
+                   "ref_out_aggregated.csv",
+                   "ref_economic_results_cashflows.html",
+                   "ref_economic_results_present_values.html",
+                   "ref_economic_results.csv",
+                   "ref_emissions_plot.html",
+                   "ref_emissions_results.csv"]
 
     scenarios_list_html = ""
     for name in readdir(scenarios_dir)
@@ -428,6 +455,11 @@ function main()
 
     if command == "rebuild_overview"
         rebuild_overview(scenarios_dir)
+        return
+    end
+
+    if scenario_name !== nothing && !isdir(joinpath(scenarios_dir, scenario_name))
+        println("Given scenario $(scenario_name) does not exist")
         return
     end
 

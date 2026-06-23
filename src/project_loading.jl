@@ -53,6 +53,16 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
+    "write_summary_CSV" => (
+        default=true,
+        description="Toggle if a CSV summary output with sum/mean values should be created " *
+                    "additionally to the timestep-wise CSV output.",
+        display_name="Write summary CSV?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
     "csv_output_file" => (
         default="./output/out.csv",
         description="File path to where the CSV output will be written",
@@ -355,11 +365,11 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "fixed_output_precision" => (
         default=0,
-        description="If given a non-zero value, uses this many digits as the fixed " *
-                    "precision for float outputs in CSV and plot files. It is not " *
-                    "recommended to use this setting. It is intended for making the " *
-                    "output perfectly repeatable, which is useful for testing but not in " *
-                    "normal simuation.",
+        description="If given a non-zero value, uses this many significant digits as the " *
+                    "fixed precision for float outputs in CSV and plot files. It is not " *
+                    "recommended to use this setting in normal simulation. It's intended " *
+                    "for making the output perfectly repeatable, which is useful for " *
+                    "testing but changes the results.",
         display_name="Fixed output precision",
         required=false,
         type=Integer,
@@ -913,6 +923,12 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
         unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
+
+        if !isdefined(EnergySystems, symbol)
+            @error "The component type `$(string(unit_config["type"]))` of component `$(unit_key)` is " *
+                   "not a supported component type by ReSiE."
+            throw(InputError())
+        end
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.Component
             instance = unit_class(unit_key, unit_config, sim_params)

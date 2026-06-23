@@ -6,7 +6,7 @@
         "fixed_output_precision": 10,
         "sankey_plot_file": "./test/scenarios/heating_and_cooling/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "nothing",
+        "csv_output": "nothing",
         "output_plot_file": "./test/scenarios/heating_and_cooling/output_plot.html",
         "output_plot": "all_incl_flows"
     },

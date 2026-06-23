@@ -135,6 +135,7 @@ const FIXED_SUPPLY_ECONOMIC_PARAMETERS = get_economic_standard_params("connectio
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
         "capex_price_change_rate_per_year" => 0.0,
         "maintenance_inspection_rate_per_year" => 0.0,
         "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -158,6 +159,7 @@ const FIXED_SUPPLY_EMISSIONS_PARAMETERS = get_emissions_standard_params("connect
     
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -277,7 +279,7 @@ end
 
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     if unit.treat_profile_as_volume_flow_in_qm_per_hour
         if unit.rho_medium === nothing

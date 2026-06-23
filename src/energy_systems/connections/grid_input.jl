@@ -61,6 +61,7 @@ const GRID_INPUT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection"
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
         "capex_price_change_rate_per_year" => 0.0,
         "maintenance_inspection_rate_per_year" => 0.0,
         "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -84,6 +85,7 @@ const GRID_INPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connectio
 
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -182,7 +184,8 @@ function init_from_params(x::Type{GridInput}, uac::String, params::Dict{String,A
 end
 
 function initialise!(unit::GridInput, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.output_interfaces[unit.medium], load_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 end
 
 function control(unit::GridInput, components::Grouping, sim_params::Dict{String,Any})

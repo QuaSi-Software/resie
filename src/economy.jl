@@ -355,7 +355,8 @@ function calculate_annuity_of_unmet_energies(unmet_energy_profile::Union{Nothing
     add_to_breakdown!(breakdown, component.uac,
                       Dict("annuity_unmet_energies" => component_unmet_energies_annuity,
                            "unmet_energy_costs_per_year" => unmet_energy_costs_per_year,
-                           "unmet_energy_costs_per_year" * "_discounted" => unmet_energy_costs_per_year_result_discounted
+                           "unmet_energy_costs_per_year" * "_discounted" =>
+                               unmet_energy_costs_per_year_result_discounted,
                            ))
 
     return annuity_energies, breakdown
@@ -471,7 +472,7 @@ function calculate_annuity_of_capex_and_opex(component::EnergySystems.Component,
                            "repairs_costs_per_year" => repair_per_year,
                            "repairs_costs_per_year_discounted" => repair_per_year_discounted,
                            "labour_costs_per_year" => labour_per_year,
-                           "labour_costs_per_year_discounted" => labour_per_year_discounted
+                           "labour_costs_per_year_discounted" => labour_per_year_discounted,
                            ))
 
     return annuity_capex, annuity_opex, breakdown
@@ -497,7 +498,8 @@ function get_capex_from_component(component::EnergySystems.Component, sim_params
     subsidies_per_year = zeros(Float64, observation_period)
 
     # calculate initial investment (A0)
-    investment_first_year = component.economic_parameters["capex_specific"](capex_reference)   # € at time 0
+    investment_first_year = component.economic_parameters["capex_specific"](component.economic_parameters["capex_specific_scale"] *
+                                                                            capex_reference)   # € at time 0
     investments_per_year[1] = investment_first_year
 
     # subsidies as one-time event at the beginning of the observation period
@@ -591,7 +593,7 @@ function plot_economic_results(result::EconomicResult, output_file_path::String,
     isempty(series) && return false
 
     # Optional fixed output precision for plotted values.
-    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; sigsigdigits=fixed_output_precision) : v
 
     # parameter 
     observation_period_in_years = Int(sim_params["economic_parameters"]["observation_period_in_years"])
@@ -781,7 +783,7 @@ function plot_extended_price_and_emissions_profiles(economic_result::Any,
 
     # Optional fixed output precision for plotted values.
     # Round after unit conversion so precision applies to displayed units.
-    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; digits=fixed_output_precision) : v
+    round_for_plot(v) = fixed_output_precision > 0 ? round.(v; sigdigits=fixed_output_precision) : v
 
     traces = PlotlyJS.AbstractTrace[]
 

@@ -99,6 +99,7 @@ const FUEL_BOILER_ECONOMIC_PARAMETERS = get_economic_standard_params("transforme
     Dict{String,Any}(
             "lifetime_years" => 20,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.02,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -117,6 +118,7 @@ const FUEL_BOILER_EMISSIONS_PARAMETERS = get_emissions_standard_params("transfor
     Dict{String,Any}(
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -239,9 +241,9 @@ end
 
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_fuel_in],
-                          unload_storages(unit.controller, unit.m_fuel_in))
+                          unload_storages(unit.controller, unit.m_fuel_in), unit.uac, unit.m_fuel_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end

@@ -154,6 +154,7 @@ const GENERIC_HEAT_SOURCE_ECONOMIC_PARAMETERS = get_economic_standard_params("co
 
         "lifetime_years" => 20,
         "capex_specific" => "const:0.0",
+        "capex_specific_scale" => 1.0,
         "capex_price_change_rate_per_year" => 0.0,
         "maintenance_inspection_rate_per_year" => 0.0,
         "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -177,6 +178,7 @@ const GENERIC_HEAT_SOURCE_EMISSIONS_PARAMETERS = get_emissions_standard_params("
     
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -299,7 +301,7 @@ end
 
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     if unit.temperature_reduction_model == "lmtd"
         if unit.min_source_in_temperature === nothing && unit.temperature_profile !== nothing

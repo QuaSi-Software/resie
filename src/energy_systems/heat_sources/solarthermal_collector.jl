@@ -448,6 +448,7 @@ const SOLARTHERMAL_COLLECTOR_ECONOMIC_PARAMETERS = get_economic_standard_params(
     Dict{String,Any}(
             "lifetime_years" => 18,
             "capex_specific" => nothing,
+            "capex_specific_scale" => 1.0,
             "capex_price_change_rate_per_year" => 0.012,
             "maintenance_inspection_rate_per_year" => 0.01,
             "maintenance_inspection_price_change_rate_per_year" =>  0.0,
@@ -466,6 +467,7 @@ const SOLARTHERMAL_COLLECTOR_EMISSIONS_PARAMETERS = get_emissions_standard_param
     Dict{String,Any}(
         "lifetime_years" => 18,
         "embodied_emissions_specific" => "const:0.0",
+        "embodied_emissions_specific_scale" => 1.0,
         "embodied_emissions_change_rate_per_year" => 0.0
     ),
     Dict{String,Any}(
@@ -690,7 +692,7 @@ end
 
 function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
 
     if sim_params["longitude"] === nothing || sim_params["latitude"] === nothing
         @error "Longitude and latitude must be provided through a weather file or in the 
