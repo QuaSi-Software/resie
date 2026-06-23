@@ -1073,6 +1073,12 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
         unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
+
+        if !isdefined(EnergySystems, symbol)
+            @error "The component type `$(string(unit_config["type"]))` of component `$(unit_key)` is " *
+                   "not a supported component type by ReSiE."
+            throw(InputError())
+        end
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.Component
             instance = unit_class(unit_key, unit_config, sim_params)

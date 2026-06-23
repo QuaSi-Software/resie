@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.4
+* Improve error handling during project loading and component operation
+  * Add clearer error messages for unknown component types
+  * Add clearer error messages for invalid calls to `set_storage_transfer!()`due to empty interfaces
+* Add missing CSV reference output for scenario `chpp_two_hyst`
+
 ### Version 0.14.3
 * Change fixed output precision to use significant digits for rounding instead of decimal digits
 * Update all scenario outputs due to to changes in the fixed output precision

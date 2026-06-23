@@ -503,23 +503,23 @@ end
 
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
 
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_ht_out],
-                          load_storages(unit.controller, unit.m_heat_ht_out))
+                          load_storages(unit.controller, unit.m_heat_ht_out), unit.uac, unit.m_heat_ht_out)
 
     if unit.heat_lt_is_usable
         set_storage_transfer!(unit.output_interfaces[unit.m_heat_lt_out],
-                              load_storages(unit.controller, unit.m_heat_lt_out))
+                              load_storages(unit.controller, unit.m_heat_lt_out), unit.uac, unit.m_heat_lt_out)
     else
         unit.controller.parameters["consider_m_heat_lt_out"] = false
     end
 
     set_storage_transfer!(unit.output_interfaces[unit.m_h2_out],
-                          load_storages(unit.controller, unit.m_h2_out))
+                          load_storages(unit.controller, unit.m_h2_out), unit.uac, unit.m_h2_out)
 
     set_storage_transfer!(unit.output_interfaces[unit.m_o2_out],
-                          load_storages(unit.controller, unit.m_o2_out))
+                          load_storages(unit.controller, unit.m_o2_out), unit.uac, unit.m_o2_out)
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end

@@ -54,8 +54,7 @@ function test_load_no_connections()
         @test bus.connectivity.energy_flow === nothing
     catch e
         exception_occured = true
-        @test e isa MethodError
-        @test String(nameof(e.f)) == "set_storage_transfer!"
+        @test e isa Resie.EnergySystems.InputError
     end
 
     @test exception_occured
@@ -82,8 +81,7 @@ function test_load_given_lists_empty()
         @test bus.connectivity.energy_flow === nothing
     catch e
         exception_occured = true
-        @test e isa MethodError
-        @test String(nameof(e.f)) == "set_storage_transfer!"
+        @test e isa Resie.EnergySystems.InputError
     end
 
     @test exception_occured

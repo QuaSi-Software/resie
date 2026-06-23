@@ -809,11 +809,11 @@ end
 
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+                          unload_storages(unit.controller, unit.m_heat_in), unit.uac, unit.m_heat_in)
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out), unit.uac, unit.m_heat_out)
     if unit.has_secondary_interface
         if unit.primary_el_sources == [] || unit.secondary_el_sources == []
             @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both `primary_el_sources` and " *
