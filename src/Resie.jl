@@ -3,7 +3,6 @@ module Resie
 using Printf
 using Dates: now, seconds
 using UUIDs
-using LinearAlgebra
 using Base.Threads
 
 """
@@ -556,19 +555,90 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         else
             start_time = now()
+            f = function (sample_values) 
+                    optim_func!(all_results, io_settings, sim_params, optim_results_path, 
+                                project_config, sample_values, 
+                                run_lock, output_lock, results_lock)
+                end
+            f_batch = function (sample_values)    
+                        if size(sample_values, 1) > 1
+                            objectives = zeros(size(sample_values))
+                            @threads for i in axes(sample_values, 1)
+                                objectives[i, :] = f(sample_values[i,:])
+                            end
+                        else
+                            objectives = reshape(f(sample_values), 1, :)
+                        end
+                        return objectives
+                       end
             if optimiser["type"] == "Optim"
-                optimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                                      project_config, sample_values, 
-                                                      run_lock, output_lock, results_lock), 
-                         optimiser["args"]...)
+                Optim.optimize(f, optimiser["args"]...)
             elseif optimiser["type"] == "BlackBoxOptim"
-                bboptimize(sample_values -> optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                                        project_config, sample_values, 
-                                                        run_lock, output_lock, results_lock),
-                           optimiser["args"]...; optimiser["kwargs"]...)
+                BlackBoxOptim.bboptimize(f, optimiser["args"]...; optimiser["kwargs"]...)
+            elseif optimiser["type"] == "Metaheuristics"
+                #TODO implement batch evaluation for other packages that need it        
+                if Threads.nthreads() > 1
+                    f_wrap = function (sample_values)    
+                                if size(sample_values, 1) > 1
+                                    objectives = zeros(size(sample_values, 1))
+                                    @threads for i in axes(sample_values, 1)
+                                        objectives[i] = f(sample_values[i,:])
+                                    end
+                                else
+                                    objectives = [f(sample_values)]
+                                end
+                                return objectives
+                             end
+                else
+                    f_wrap = f
+                end
+
+                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
+                @globalInfo res
+
+            elseif optimiser["type"] == "NLopt"
+                f = function (sample_values, gradient)
+                        optim_func!(all_results, io_settings, sim_params, optim_results_path, 
+                                    project_config, sample_values, 
+                                    run_lock, output_lock, results_lock)
+                    end
+                NLopt.min_objective!(optimiser["args"][1], f)
+                res = NLopt.optimize(optimiser["args"]...)
+                @globalInfo "Optimisation results: $res"
+
+            elseif optimiser["type"] == "NOMAD"
+                f = function (sample_values)
+                        res = optim_func!(all_results, io_settings, sim_params, optim_results_path, 
+                                        project_config, sample_values, 
+                                        run_lock, output_lock, results_lock)
+                        success = ifelse(res == Inf, false, true) 
+                        return success, true, [res]
+                    end
+                prob = NOMAD.NomadProblem(optimiser["args"][1:end-1]..., f; optimiser["kwargs"]...)
+                NOMAD.solve(prob, optimiser["args"][end])
+
+            elseif optimiser["type"] == "GlobalSensitivity"
+                if Threads.nthreads() > 1
+                    f_wrap = function (sample_values)    
+                                if size(sample_values, 2) > 1
+                                    objectives = zeros(size(sample_values, 2))
+                                    @threads for i in axes(sample_values, 2)
+                                        objectives[i] = f(sample_values[:,i])
+                                    end
+                                else
+                                    objectives = reshape(f(sample_values), 1, :)
+                                end
+                                return objectives
+                             end
+                else
+                    f_wrap = f
+                end
+
+                res = GlobalSensitivity.gsa(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
+                @globalInfo res
             end
             runtime = round(Int, seconds(now() - start_time))
-            @globalInfo "[$(length(total_results)) runs → completed in $runtime s."
+            @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
         end
 
         if !io_settings["write_optimisation_csv_continuously"]
@@ -617,18 +687,24 @@ Run a single simulation sample with given parameters.
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 # Returns
-- `OrderedDict{String,Union{Float64, String}}`: Results of the simulation run
+- `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
 function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any}, 
                     optim_results_path::String, project_config::OrderedDict{String,Any}, 
                     sample_params::Dict{String, Any}, run_ID::UUID, run_lock::ReentrantLock, 
-                    output_lock::ReentrantLock)::OrderedDict{String,Union{Float64, String}}
+                    output_lock::ReentrantLock)::OrderedDict{String,Union{Float64, Int64, String}}
     start = now()
     if sample_params !== nothing
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
     end
 
-    results = OrderedDict{String,Union{Float64, String}}()
+    results = OrderedDict{String,Union{Float64, Int64, String}}()
+
+    if !isnothing(sample_params)
+        for (key, value) in pairs(sample_params)
+            results[key] = value
+        end 
+    end
 
     try
         sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
@@ -641,12 +717,6 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         start = now()
         @info "---- Simulation loop ----"
         
-        if !isnothing(sample_params)
-            for (key, value) in pairs(sample_params)
-                results[key] = value
-            end 
-        end
-
         sim_output = run_simulation_loop(sim_params, io_settings, components, operations)
         if !isnothing(sim_output)
             for (key, value) in pairs(sim_output)
@@ -660,23 +730,42 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         if !isnothing(optim_results_path) && filesize(optim_results_path) == 0
             throw(e)
         end
+
+        if sim_params["optimisation"]["run_optimisation"]
+            for (func, spec) in pairs(sim_params["optimisation"]["objective_params"])
+                if func == "sum" || func == "mean"
+                    keys = parse_outkeys(spec)
+                    for key in keys
+                        results["$func $key"] = NaN
+                    end
+                elseif func == "economic" || func == "emissions"
+                    for key in spec
+                        results["$func $key"] = NaN
+                    end
+                end
+            end
+            results["objective"] = Inf
+            if io_settings["matrix_plot"] == "custom"
+                for (func, spec) in pairs(io_settings["matrix_plot_spec"])
+                    if func == "sum" || func == "mean"
+                        keys = parse_outkeys(spec)
+                        for key in keys
+                            results["$func $key"] = NaN
+                        end
+                    elseif func == "economic" || func == "emissions"
+                        for key in spec
+                            results["$func $key"] = NaN
+                        end
+                    end
+                end
+            end
+        end
+
         # save excact error message to output file
         error_message = sprint(showerror, e)
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
-        @globalInfo full_error_message
+        @globalInfo full_error_message            
         results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
-
-        if sim_params["optimisation"]["run_optimisation"]
-            for key in parse_outkeys(sim_params["optimisation"]["output_keys_sum"])
-                results[key] = NaN
-            end
-            for key in parse_outkeys(sim_params["optimisation"]["output_keys_mean"])
-                results[key] = NaN
-            end 
-            if haskey(sim_params["optimisation"], "objective_function")
-                results["objective"] = NaN
-            end
-        end
     end
 
     if sim_params["optimisation"]["run_optimisation"] && io_settings["write_optimisation_csv_continuously"]

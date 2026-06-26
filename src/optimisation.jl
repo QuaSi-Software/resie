@@ -1,5 +1,9 @@
-using Optim
-using BlackBoxOptim
+import Optim
+import BlackBoxOptim
+import Metaheuristics
+import NLopt
+import NOMAD
+import GlobalSensitivity
 using Base.Threads
 
 
@@ -103,13 +107,13 @@ end
 
 """
     optim_func!(all_results, io_settings, sim_params, optim_results_path, project_config, 
-                        sample_values, run_lock, output_lock, results_lock)
+                sample_values, run_lock, output_lock, results_lock)
 
 Objective function called by algorithms. Wraps running of single simulations in a 
 compatible format. Can be used as a batch function with Arrays for algorithms supporting it.
 
 # Arguments
-- `all_results::Array{Union{Float64,Nothing}}`: Results of all runs
+- `all_results::Array{Any}`: Results of all runs
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
 - `optim_results_path::String`: Filepath for optim_results
@@ -123,13 +127,12 @@ compatible format. Can be used as a batch function with Arrays for algorithms su
 # Returns
 - `Union{Array{Float64},Float64}`: Objective of the simulation run or batch runs
 """
-function optim_func!(all_results::Array{Union{Float64,Nothing}}, 
-                     io_settings::Dict{String,Any}, sim_params::Dict{String,Any}, 
-                     optim_results_path::String, project_config::OrderedDict{String,Any}, 
+function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any}, 
+                     sim_params::Dict{String,Any}, optim_results_path::String, 
+                     project_config::OrderedDict{String,Any}, 
                      sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock, 
                      output_lock::ReentrantLock, 
                      results_lock::ReentrantLock)::Union{Array{Float64},Float64}
-    #TODO implement batch evaluation for Metaheuristics e.g. if size(sample_values) > 1 then @threads return Vector
     sample_params = Dict{String, Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config, 
@@ -144,8 +147,8 @@ end
 
 """
     monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, optim_results_path, 
-                                project_config, idx, run_ID, run_lock, output_lock, 
-                                results_lock)
+                           project_config, idx, run_ID, run_lock, output_lock, 
+                           results_lock)
 
 Combined monte carlo and simulated annealing algorithm. The temperature determines if a 
 completely random or existing sample is used as starting point, determines the size of the 
@@ -153,7 +156,7 @@ neighborhood and the number of results (sorted by) global measure, from which a 
 is drawn.
 
 # Arguments
-- `all_results::Array{Union{Float64,Nothing}}`: Results of all runs
+- `all_results::Array{Any}`: Results of all runs
 - `obj::Array{Union{Float64,Nothing}}`: Objectives for optimisation
 - `obj_lock::ReentrantLock`:: Lock for obj
 - `sim_params::Dict{String,Any}`: Simulation parameters
@@ -165,8 +168,8 @@ is drawn.
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 - `results_lock::ReentrantLock`: Lock for all_results
 """
-function monte_carlo_annealing!(all_results::Array{Union{Float64,Nothing}}, 
-                                obj::Array{Union{Float64,Nothing}}, obj_lock::ReentrantLock, 
+function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float64,Nothing}}, 
+                                obj_lock::ReentrantLock, 
                                 sim_params::Dict{String,Any}, optim_results_path::String, 
                                 project_config::OrderedDict{String,Any}, idx::Int64, 
                                 run_ID::UUID, run_lock::ReentrantLock, 

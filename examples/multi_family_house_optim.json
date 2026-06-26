@@ -31,7 +31,7 @@
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.12.2024 23:45",
+        "end": "31.01.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 60,
         "time_step_unit": "minutes",
@@ -42,30 +42,31 @@
         "calculate_economy": true,
         "observation_period_in_years": 20,
         "interest_rate": 0.03,
-        "repeat_method": "last_year"
+        "repeat_method": "all"
     },
     "emissions_parameters": {
         "calculate_emissions": true,
         "observation_period_in_years": 20,
         "include_embodied_emissions": false,
-        "repeat_method": "last_year"
+        "repeat_method": "all"
     },
     "optimisation_parameters": {
         "run_optimisation": true,
-        "type": "parametervariation",
+        "type": "Metaheuristics",
         "objective_params":  {"economic":  ["total_annuity"],
                               "sum": {"Building_el_GRO": ["m_e_ac_230v:IN"]}},
-        "iterator": "product",
+        "algorithm": "ECA",
+        "max_runs": 50,
         "optim_params": {
             "components": {
-                "Building_heating_BFT": {"volume": {"start": 0,
-                                                    "stop": 3.0,
-                                                    "step": 0.5
+                "Building_heating_BFT": {"volume": {"min": 0,
+                                                    "max": 3.0,
+                                                    "start": 2.0
                                          }
                 },
-                "Building_PV": {"scale": {"start": 0,
-                                          "stop": 1000,
-                                          "step": 100
+                "Building_PV": {"scale": {"min": 0,
+                                          "max": 1000,
+                                          "start": 500
                                 }
                 }
             }
