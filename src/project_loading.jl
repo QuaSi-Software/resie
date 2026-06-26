@@ -732,6 +732,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
+    #TODO remove type and only use algorithm to choose package internally
     "type" => (
         default="nothing",
         description="Sets type of optimisation algorithm",
@@ -750,7 +751,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
                     "defining how many combinations are randomly chosen.",
         display_name="Iterator for parametervariation",
         required=false,
-        #TODO check if this is functioning like expected
+        #TODO check if this is functioning like ; remove
         options=["product", "zip", r"^random_\d+$"],
         conditionals=[("type", "is", "parametervariation")],
         type=String,
@@ -1493,6 +1494,8 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
         optimiser["iterator"] = range(1, optimiser_config["max_runs"]; step=1)
         optimiser["nbh_scale"] = default(optimiser_config, "nbh_scale", 0.5)
 
+        optimiser["objective_function"] = x -> x
+
     elseif optimiser_config["type"] == "Optim"
         upper_bounds = zeros(length(optimiser["optim_params"]))
         lower_bounds = zeros(length(optimiser["optim_params"]))
@@ -1602,6 +1605,7 @@ function parse_objective_function(eff_def::String)::Function
     #TODO get more function definitions analog to different optimisation packages
     if method == "sum"
         return x -> sum(x) 
+    #TODO check how to keep or define order
     elseif method == "linear"
         params = parse.(Float64, split(data, ","))
         return x -> sum(x .* params)

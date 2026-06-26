@@ -25,7 +25,7 @@
         "output_optimisation_csv": true,
         "optimisation_csv_file_path": "./output/optim_results.csv",
         "write_optimisation_csv_continuously": true,
-        "matrix_plot": "custom",
+        "matrix_plot": "default",
         "matrix_plot_file": "./output/matrix_plot.html",
         "matrix_plot_spec": {"emissions": ["total_emissions"]}
     },
@@ -60,12 +60,12 @@
             "components": {
                 "Building_heating_BFT": {"volume": {"start": 0,
                                                     "stop": 3.0,
-                                                    "step": 3
+                                                    "step": 0.5
                                          }
                 },
                 "Building_PV": {"scale": {"start": 0,
                                           "stop": 1000,
-                                          "step": 1000
+                                          "step": 100
                                 }
                 }
             }
@@ -105,7 +105,8 @@
             "energy_profile_file_path": "./profiles/examples/district/demand_electricity_living_2690_square_meter.prf",
             "scale": 1,
             "economic_parameters": {
-                "constant_energy_price": 0.0
+                "constant_energy_price": 0.0,
+                "constant_unmet_energy_price": 5
             },
             "emissions_parameters": {
                 "constant_energy_emissions_credits": 0.0
