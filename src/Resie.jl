@@ -669,7 +669,7 @@ Run a single simulation sample with given parameters.
 # Arguments
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `optim_results_path::String`: Filepath for optim_results
+- `optim_results_path::Union{String,Nothing}`: Filepath for optim_results
 - `project_config::OrderedDict{String,Any}`: The project config
 - `sample_params::Dict{String, Any}`: Values and names of the sample parameters that get 
                                       used for the next simulation run
@@ -680,11 +680,11 @@ Run a single simulation sample with given parameters.
 - `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
 function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any}, 
-                    optim_results_path::String, project_config::OrderedDict{String,Any}, 
-                    sample_params::Dict{String, Any}, run_ID::UUID, run_lock::ReentrantLock, 
+                    optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any}, 
+                    sample_params::Union{Dict{String, Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock, 
                     output_lock::ReentrantLock)::OrderedDict{String,Union{Float64, Int64, String}}
     start = now()
-    if sample_params !== nothing
+    if !isnothing(sample_params)
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
     end
 

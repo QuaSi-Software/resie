@@ -1432,7 +1432,9 @@ end
 
 function get_optimisation_parameters(project_config::AbstractDict{String,Any},
                                      sim_params::Dict{String,Any})::Dict{String,Any}
-    if !haskey(project_config, "optimisation_parameters")
+    if !haskey(project_config, "optimisation_parameters") || 
+       project_config["optimisation_parameters"]["run_optimisation"] == false
+       # end of expression
         return Dict{String,Any}("run_optimisation" => false)
     end
     optimiser_config = Dict{String,Any}()
