@@ -1,11 +1,12 @@
-import Optim
-import BlackBoxOptim
-import Metaheuristics
-import NLopt
-import NOMAD
-import GlobalSensitivity
-using Base.Threads
-
+using Optim: Optim
+using BlackBoxOptim: BlackBoxOptim
+using Metaheuristics: Metaheuristics
+using NLopt: NLopt
+using NOMAD: NOMAD
+using PolyChaos: PolyChaos
+using LinearAlgebra
+using Statistics
+using Random
 
 """
     create_variant(io_settings, sim_params, project_config, sample_params)
@@ -20,8 +21,8 @@ Create a variant of the input file for the simulation run
 # Returns
 - `OrderedDict{String,Any}`: Modified project_config
 """
-function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, Any}, 
-                        project_config::OrderedDict{String,Any}, 
+function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
+                        project_config::OrderedDict{String,Any},
                         sample_params::Dict{String,Any})::OrderedDict{String,Any}
     cfg = deepcopy(project_config)
 
@@ -36,17 +37,17 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, 
         # not needed for performance boost
         if io_settings["csv_output"] != "nothing"
             name, ext = rsplit(io_settings["csv_output_file"], '.'; limit=2)
-            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * param_key * 
+            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * param_key *
                                                     "_" * string(value) * "." * ext
         end
         if io_settings["output_plot"] != "nothing"
             name, ext = rsplit(io_settings["output_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * param_key * 
+            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * param_key *
                                                      "_" * string(value) * "." * ext
         end
         if io_settings["sankey_plot"] != "nothing"
             name, ext = rsplit(io_settings["sankey_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * param_key * 
+            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * param_key *
                                                      "_" * string(value) * "." * ext
         end
     end
@@ -62,7 +63,7 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String, 
     #         profile_scales[name] = profile["scale"]
     #         profile_addons[name] = profile["addon"]
     #     end
-    
+
     #     # create correct profiles from price_profile_paths and add the to sim_output.
     #     # profiles will be overwritten for every run to make sure the profile_scales and 
     #     # profile_addons calculated correctly.
@@ -127,18 +128,18 @@ compatible format. Can be used as a batch function with Arrays for algorithms su
 # Returns
 - `Union{Array{Float64},Float64}`: Objective of the simulation run or batch runs
 """
-function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any}, 
-                     sim_params::Dict{String,Any}, optim_results_path::String, 
-                     project_config::OrderedDict{String,Any}, 
-                     sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock, 
-                     output_lock::ReentrantLock, 
+function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
+                     sim_params::Dict{String,Any}, optim_results_path::String,
+                     project_config::OrderedDict{String,Any},
+                     sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
+                     output_lock::ReentrantLock,
                      results_lock::ReentrantLock)::Union{Array{Float64},Float64}
-    sample_params = Dict{String, Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
+    sample_params = Dict{String,Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
-    results = run_sample(io_settings, sim_params, optim_results_path, project_config, 
+    results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          sample_params, run_ID, run_lock, output_lock)
 
-    lock(results_lock) do 
+    lock(results_lock) do
         push!(all_results, results)
     end
 
@@ -168,11 +169,11 @@ is drawn.
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 - `results_lock::ReentrantLock`: Lock for all_results
 """
-function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float64,Nothing}}, 
-                                obj_lock::ReentrantLock, 
-                                sim_params::Dict{String,Any}, optim_results_path::String, 
-                                project_config::OrderedDict{String,Any}, idx::Int64, 
-                                run_ID::UUID, run_lock::ReentrantLock, 
+function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float64,Nothing}},
+                                obj_lock::ReentrantLock,
+                                sim_params::Dict{String,Any}, optim_results_path::String,
+                                project_config::OrderedDict{String,Any}, idx::Int64,
+                                run_ID::UUID, run_lock::ReentrantLock,
                                 output_lock::ReentrantLock, results_lock::ReentrantLock)
     optimiser = sim_params["optimisation"]
     # temperature schedule is simple inverse logistic curve
@@ -180,10 +181,10 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
 
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
-        sample_params = Dict{String, Any}()
+        sample_params = Dict{String,Any}()
         for (key, param) in pairs(optimiser["optim_params"])
             #TODO maybe define optim params also as ranges but use minimum(range) and maximum(range) as limits
-            sample_params[key] = rand(range(start=param["min"], stop=param["max"], length=100))
+            sample_params[key] = rand(range(; start=param["min"], stop=param["max"], length=100))
         end
     else
         # set parameters to neighborhood of existing result, drawn from the top results
@@ -192,8 +193,8 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
         sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
         # sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
         sample = all_results[sample_idx]
-        
-        sample_params = Dict{String, Any}()
+
+        sample_params = Dict{String,Any}()
         for (key, param) in pairs(optimiser["optim_params"])
             range = optimiser["nbh_scale"] * temperature * (param["max"] - param["min"])
             value = sample[key] + rand((-0.5 * range):(0.5 * range))
@@ -209,11 +210,11 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
     if any(!isnothing(obj))
         @lock obj_lock obj = results["objective"]
     else
-        @lock obj_lock obj .= min.(obj, results["objective"]) 
+        @lock obj_lock obj .= min.(obj, results["objective"])
     end
 
     # write output to all_results
-    lock(results_lock) do 
+    lock(results_lock) do
         push!(all_results, results)
 
         # calculate global measure and sort by it
@@ -223,3 +224,117 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
         sort!(all_results; by=x -> x["gm"])
     end
 end
+
+"""
+    calc_global_sensitivity!(model_function, bounds, all_results, sim_params)
+
+Calculate the global sensitivity indices with polynomial chaos expansion (PCE). A 
+surrogate 3rd degree polynomial model is fit to the existing data. If the existing data is 
+doesn't produce a well enough fit more data is generated in batches until RMSE is < 0.1 or 
+2x the max_runs is hit.
+
+# Arguments
+- `model_function::Function`: Function to run if more datapoints are needed
+- `bounds::Array{Float64}`: Bounds in which to analyse parameters
+- `all_results::Array{Any}`: Results of all runs
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Float64`: Total-order Sobol sensitivity index
+- `Float64`: First-order Sobol sensitivity index
+- `Float64`: Relative root mean square error for the surrogate model
+- `Float64`: R^2 for the surrogate model
+"""
+function calc_global_sensitivity!(model_function::Function, bounds::Array{Float64},
+                                  all_results::Array{Float64},
+                                  sim_params::Dict{String,Any})::Tuple{Float64,Float64,Float64,Float64}
+    d = size(bounds, 1)
+    deg = 3
+    op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
+    mop = PolyChaos.MultiOrthoPoly(fill(op, d), deg)
+
+    # [-1,1] -> physical
+    function to_phys(x, lo, hi)
+        lo + (x + 1) * (hi - lo) / 2
+    end
+
+    # physical -> [-1,1]
+    function to_std(x, lo, hi)
+        (x - lo) / (hi - lo) * 2 - 1
+    end
+
+    # Fit PCE coefficients by least squares and estimate out-of-sample error via
+    # leave-one-out CV using the hat-matrix shortcut:
+    function fit_surrogate(X_std::Matrix{Float64}, y::Vector{Float64}, mop::PolyChaos.MultiOrthoPoly)
+        Phi = zeros(length(y), mop.dim)
+        for i in 1:length(y)
+            Phi[i, :] = PolyChaos.evaluate(X_std[i, :], mop)
+        end
+        coeffs = Phi \ y
+        resid = y .- Phi * coeffs
+        H = Phi * pinv(Phi' * Phi) * Phi'     # hat matrix, only needed for its diagonal
+        leverage = diag(H)
+        loocv_resid = resid ./ (1 .- leverage)
+        rel_rmse = sqrt(mean(loocv_resid .^ 2)) / std(y)
+        r2 = 1 - sum(loocv_resid .^ 2) / sum((y .- mean(y)) .^ 2)
+
+        return coeffs, rel_rmse, r2
+    end
+
+    # Take samples (standardized on [-1,1])
+    n_existing = size(all_results, 1)
+    if n_existing > 0
+        keys = vcat("objective", sim_params["optimisation"]["optim_params_keys"]...)
+        res_matrix = [d[k] for d in all_results, k in keys]
+        X_phys = res_matrix[:, 2:end]
+        y = res_matrix[:, 1]
+        X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+        coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
+    else
+        rel_rmse = 1.0
+        coeffs = 0.0
+        r2 = 0.0
+        y = []
+        X_phys = Array{Float64}(undef, 0, d)
+    end
+
+    while rel_rmse > 0.1 && r2 > 0.9 && length(y) < sim_params["optimisation"]["max_runs"] * 2
+        if n_existing < mop.dim
+            n_new = max(mop.dim - n_existing, Threads.nthreads())
+        else
+            n_new = max(mop.dim, Threads.nthreads())
+        end
+
+        X_std_new = rand(n_new, d) .* 2 .- 1
+        X_phys_new = hcat([to_phys.(X_std_new[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+        y_new = zeros(n_new)
+        @threads for i in 1:n_new
+            y_new[i] = model_function(X_phys_new[i, :])
+        end
+
+        X_phys = vcat(X_phys, X_phys_new)
+        y = vcat(y, y_new)
+
+        X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+        coeffs, rel_rmse, r2 = fit_and_loocv(X_std, y, mop)
+    end
+
+    # Calculate Sobol indices from coefficients 
+    total_var = sum(coeffs[2:end] .^ 2)
+
+    S_first = zeros(d)
+    S_total = zeros(d)
+    for i in 1:d, k in 2:mop.dim
+        degs = mop.ind[k, :]
+        if degs[i] != 0
+            S_total[i] += coeffs[k]^2
+            if all(j == i || degs[j] == 0 for j in 1:d)
+                S_first[i] += coeffs[k]^2
+            end
+        end
+    end
+    S_first ./= total_var
+    S_total ./= total_var
+
+    return S_total, S_first, rel_rmse, r2
+end
+

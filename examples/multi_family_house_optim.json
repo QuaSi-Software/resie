@@ -56,6 +56,7 @@
         "objective_params":  {"economic":  ["total_annuity"],
                               "sum": {"Building_el_GRO": ["m_e_ac_230v:IN"]}},
         "algorithm": "ECA",
+        "run_sensitivity": true,
         "max_runs": 50,
         "optim_params": {
             "components": {

@@ -518,29 +518,24 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         optimiser = sim_params["optimisation"]
 
         all_results = []
-        if optimiser["type"] == "monte_carlo_annealing"
-            obj = Array{Union{Float64,Nothing}}(nothing)
-            obj_lock = ReentrantLock()
-        end
-        nr_runs = Atomic{Int}(1)
         @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
         #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
         if length(optimiser["iterator"]) > 1
+            nr_runs = Atomic{Int}(1)
+            if optimiser["type"] == "monte_carlo_annealing"
+                obj = Array{Union{Float64,Nothing}}(nothing)
+                obj_lock = ReentrantLock()
+            end
             @threads for sample_values in collect(optimiser["iterator"])
                 run_nr = nr_runs[]
                 atomic_add!(nr_runs, 1)
-                sample_ID = uuid4()
                 start_time = now()
 
                 # decide which algorithm to run based on type of optimiser
                 if optimiser["type"] == "parametervariation"
-                    sample_params = Dict{String, Any}(zip(optimiser["optim_params_keys"], sample_values))
-                    results = run_sample(io_settings, sim_params, optim_results_path, 
-                                         project_config, sample_params, sample_ID, 
-                                         run_lock, output_lock)
-                    lock(results_lock) do 
-                        push!(all_results, results) 
-                    end
+                    optim_func!(all_results, io_settings, sim_params, optim_results_path, 
+                                project_config, sample_values, 
+                                run_lock, output_lock, results_lock)
 
                 elseif optimiser["type"] == "monte_carlo_annealing"
                     monte_carlo_annealing!(all_results, obj, obj_lock, 
@@ -560,17 +555,6 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                                 project_config, sample_values, 
                                 run_lock, output_lock, results_lock)
                 end
-            f_batch = function (sample_values)    
-                        if size(sample_values, 1) > 1
-                            objectives = zeros(size(sample_values))
-                            @threads for i in axes(sample_values, 1)
-                                objectives[i, :] = f(sample_values[i,:])
-                            end
-                        else
-                            objectives = reshape(f(sample_values), 1, :)
-                        end
-                        return objectives
-                       end
             if optimiser["type"] == "Optim"
                 Optim.optimize(f, optimiser["args"]...)
             elseif optimiser["type"] == "BlackBoxOptim"
@@ -637,6 +621,12 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                 res = GlobalSensitivity.gsa(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
                 @globalInfo res
             end
+
+            if optimiser["run_sensitivity"]
+                St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:,1:2], all_results, sim_params)
+                @globalInfo "Global sensitivity: S_total: $St, S_first: $S1, RMSE surrogate: $rel_rmse, R2 surrogate: $r2"
+            end
+
             runtime = round(Int, seconds(now() - start_time))
             @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
         end
