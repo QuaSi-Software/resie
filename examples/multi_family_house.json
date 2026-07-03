@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "./output/out.csv",
+        "csv_output_file_path": "./output/out.csv",
         "csv_time_unit": "date",
         "csv_output": "all_incl_flows",
         "csv_output_weather": false,
@@ -8,9 +8,9 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "auxiliary_plots": false,
-        "sankey_plot_file": "./output/output_sankey.html",
+        "sankey_plot_file_path": "./output/output_sankey.html",
         "sankey_plot": "default",
-        "output_plot_file": "./output/output_plot.html",
+        "output_plot_file_path": "./output/output_plot.html",
         "output_plot_time_unit": "date",
         "output_plot": "all_incl_flows",
         "plot_weather_data": false,

@@ -4,8 +4,8 @@
         "auxiliary_info_file": "./test/scenarios/multisector_district/auxiliary_info.md",
         "fixed_output_precision": 10,
         "sankey_plot": "default",
-        "sankey_plot_file": "./test/scenarios/multisector_district/sankey_plot.html",
-        "csv_output_file": "./test/scenarios/multisector_district/out.csv",
+        "sankey_plot_file_path": "./test/scenarios/multisector_district/sankey_plot.html",
+        "csv_output_file_path": "./test/scenarios/multisector_district/out.csv",
         "csv_output": "custom",
         "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1:IN"],
@@ -25,7 +25,7 @@
                           "TST_HTP_02->TST_DEM_TH_01", 
                           "TST_HTP_02->TST_DEM_TH_02"]
         },
-        "output_plot_file": "./test/scenarios/multisector_district/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/multisector_district/output_plot.html",
         "output_plot": "custom",
         "output_plot_spec": {
             "1": {

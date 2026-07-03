@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "nothing",
+        "csv_output_file_path": "nothing",
         "auxiliary_info": false,
         "sankey_plot": "nothing",
         "output_plot": "nothing",

@@ -1,10 +1,10 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/2_transformer_limited/out.csv",
+        "csv_output_file_path": "./test/scenarios/2_transformer_limited/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/2_transformer_limited/auxiliary_info.md",
         "fixed_output_precision": 10,
-        "sankey_plot_file": "./test/scenarios/2_transformer_limited/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/2_transformer_limited/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "custom",
         "csv_output_keys": {
@@ -13,7 +13,7 @@
             "TST_HP_01": ["m_h_w_ht1:OUT"],
             "TST_01_ELT_01_ELY": ["m_h_w_lt1:OUT", "m_c_g_h2:OUT"]
         },
-        "output_plot_file": "./test/scenarios/2_transformer_limited/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/2_transformer_limited/output_plot.html",
         "output_plot": "custom",
         "output_plot_spec": { 
             "1": {

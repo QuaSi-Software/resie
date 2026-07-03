@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "./output/out.csv",
+        "csv_output_file_path": "./output/out.csv",
         "csv_output": "nothing",
         "csv_output_weather": false,
         "write_csv_continuously": false,
@@ -26,7 +26,7 @@
         "optimisation_csv_file_path": "./output/optim_results.csv",
         "write_optimisation_csv_continuously": true,
         "matrix_plot": "default",
-        "matrix_plot_file": "./output/matrix_plot.html",
+        "matrix_plot_file_path": "./output/matrix_plot.html",
         "matrix_plot_spec": {"emissions": ["total_emissions"]}
     },
     "simulation_parameters": {

@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/district_economy_emissions/out.csv",
+        "csv_output_file_path": "./test/scenarios/district_economy_emissions/out.csv",
         "csv_time_unit": "date",
         "csv_output": "nothing",
         "csv_output_weather": false,
@@ -8,9 +8,9 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/district_economy_emissions/auxiliary_info.md",
         "auxiliary_plots": false,
-        "sankey_plot_file": "./test/scenarios/district_economy_emissions/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/district_economy_emissions/sankey_plot.html",
         "sankey_plot": "default",
-        "output_plot_file": "./test/scenarios/district_economy_emissions/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/district_economy_emissions/output_plot.html",
         "output_plot_time_unit": "date",
         "output_plot": "all_incl_flows",
         "plot_weather_data": false,

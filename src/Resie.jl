@@ -135,7 +135,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
     do_write_summary_CSV = io_settings["write_summary_CSV"]
-    csv_file_path = io_settings["csv_output_file"]
+    csv_file_path = io_settings["csv_output_file_path"]
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
@@ -375,7 +375,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                   weather_data_keys,
                                   io_settings,
                                   sim_params)
-        filepath = sim_params["run_path"](io_settings["output_plot_file"])
+        filepath = sim_params["run_path"](io_settings["output_plot_file_path"])
         @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
     end
 
@@ -388,7 +388,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                       nr_of_interfaces,
                       io_settings,
                       sim_params)
-        filepath = sim_params["run_path"](io_settings["sankey_plot_file"])
+        filepath = sim_params["run_path"](io_settings["sankey_plot_file_path"])
         @info "Sankey created and saved to $filepath"
     end
 
@@ -798,4 +798,3 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
 end
 
 end # module
-

@@ -131,9 +131,9 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # Economy and emissions filter
     function is_economic_emissions_key(ok::EnergySystems.OutputKey)
         occursin("OUT", ok.value_key) ||
-        occursin("IN", ok.value_key) ||
-        occursin("Supply", ok.value_key) ||
-        occursin("Demand", ok.value_key)
+            occursin("IN", ok.value_key) ||
+            occursin("Supply", ok.value_key) ||
+            occursin("Demand", ok.value_key)
     end
 
     # get requirements
@@ -724,7 +724,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         # create legend entries
         labels = String[]
         if plot_data
-            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .* 
+            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .*
                      axis[1:length(outputs_plot_keys)] .* ")"
         end
         if plot_weather
@@ -830,7 +830,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     end
 
     p = plot(traces, layout)
-    file_path = sim_params["run_path"](io_settings["output_plot_file"])
+    file_path = sim_params["run_path"](io_settings["output_plot_file_path"])
     savefig(p, file_path)
 end
 
@@ -1002,7 +1002,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = sim_params["run_path"](io_settings["sankey_plot_file"])
+    file_path = sim_params["run_path"](io_settings["sankey_plot_file_path"])
     savefig(p, file_path)
 end
 
@@ -1298,22 +1298,19 @@ function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any},
     objective = replace(objective, NaN=>missing)
     min_obj = minimum(skipmissing(objective))
     low_quartile_obj = sort(objective)[length(objective) ÷ 4]
-    scatter_traces = splom(  
-        dimensions=[attr(label=k, values=results_dict[k]) for k in param_names],
-        marker=attr(color=objective, 
-                      colorscale=reverse(ColorSchemes.viridis), 
-                      cmin=min_obj,
-                      cmax=low_quartile_obj,
-                      showscale=true,
-                      line=attr(color="red", width=objective.==min_obj * 1),
-                      colorbar=attr(title=obj_key)
-                      ),
-        text=string.(objective),
-        hovertemplate="%{x}, %{y}, %{text}"
-        )
+    scatter_traces = splom(; dimensions=[attr(; label=k, values=results_dict[k]) for k in param_names],
+                           marker=attr(; color=objective,
+                                       colorscale=reverse(ColorSchemes.viridis),
+                                       cmin=min_obj,
+                                       cmax=low_quartile_obj,
+                                       showscale=true,
+                                       line=attr(; color="red", width=objective .== min_obj * 1),
+                                       colorbar=attr(; title=obj_key)),
+                           text=string.(objective),
+                           hovertemplate="%{x}, %{y}, %{text}")
     p = plot(scatter_traces)
 
-    file_path = sim_params["run_path"](io_settings["matrix_plot_file"])
+    file_path = sim_params["run_path"](io_settings["matrix_plot_file_path"])
     savefig(p, file_path)
 end
 

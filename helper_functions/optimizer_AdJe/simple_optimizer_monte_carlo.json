@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "nothing",
+        "csv_output_file_path": "nothing",
         "auxiliary_info": false,
         "sankey_plot": "nothing",
         "output_plot": "nothing",
@@ -182,7 +182,7 @@
         "nbh_scale": 0.5,
         "continuous_output": true,
         "matrix_plot": "objective",
-        "matrix_plot_file": "./output/matrix_plot.html",
+        "matrix_plot_file_path": "./output/matrix_plot.html",
 
         "optim_params": {
             "components": {

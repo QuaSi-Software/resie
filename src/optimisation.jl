@@ -36,19 +36,19 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
         # and add Info that this is happening with hint to set the files to nothing of if 
         # not needed for performance boost
         if io_settings["csv_output"] != "nothing"
-            name, ext = rsplit(io_settings["csv_output_file"], '.'; limit=2)
-            cfg["io_settings"]["csv_output_file"] = name * "_" * uac * "_" * param_key *
-                                                    "_" * string(value) * "." * ext
+            name, ext = rsplit(io_settings["csv_output_file_path"], '.'; limit=2)
+            cfg["io_settings"]["csv_output_file_path"] = name * "_" * uac * "_" * param_key *
+                                                         "_" * string(value) * "." * ext
         end
         if io_settings["output_plot"] != "nothing"
-            name, ext = rsplit(io_settings["output_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["output_plot_file"] = name * "_" * uac * "_" * param_key *
-                                                     "_" * string(value) * "." * ext
+            name, ext = rsplit(io_settings["output_plot_file_path"], '.'; limit=2)
+            cfg["io_settings"]["output_plot_file_path"] = name * "_" * uac * "_" * param_key *
+                                                          "_" * string(value) * "." * ext
         end
         if io_settings["sankey_plot"] != "nothing"
-            name, ext = rsplit(io_settings["sankey_plot_file"], '.'; limit=2)
-            cfg["io_settings"]["sankey_plot_file"] = name * "_" * uac * "_" * param_key *
-                                                     "_" * string(value) * "." * ext
+            name, ext = rsplit(io_settings["sankey_plot_file_path"], '.'; limit=2)
+            cfg["io_settings"]["sankey_plot_file_path"] = name * "_" * uac * "_" * param_key *
+                                                          "_" * string(value) * "." * ext
         end
     end
 
@@ -336,4 +336,3 @@ function calc_global_sensitivity!(model_function::Function, bounds::Array{Float6
 
     return S_total, S_first, rel_rmse, r2
 end
-
