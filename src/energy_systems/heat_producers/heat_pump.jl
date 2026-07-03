@@ -831,7 +831,9 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
                    "the same bus has to be connected, which is not the case!"
         end
         set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_secondary],
-                              load_storages(unit.controller, unit.m_heat_out_secondary))
+                              load_storages(unit.controller, unit.m_heat_out_secondary),
+                              unit.uac,
+                              unit.m_heat_out_secondary)
     end
 end
 
