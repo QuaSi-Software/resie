@@ -218,9 +218,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             # write requested output data to the CSV file if configured, or to output
             # storage if not
             if do_write_CSV
-                row = get_output_row(output_keys_to_CSV, 
-                                     weather_CSV_keys, 
-                                     sim_params, 
+                row = get_output_row(output_keys_to_CSV,
+                                     weather_CSV_keys,
+                                     sim_params,
                                      csv_time_unit)
                 row[2:end] = replace.(row[2:end], '.' => ',')
                 if do_write_CSV_continuously
@@ -289,14 +289,14 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     if do_optimise
-        optim_results = Dict{String,Any}()
+        optim_results = Dict{String,Union{Array{Float64},Float64}}()
         # create keys consistent with csv_output for return data for return Dict
         output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
-        output_data = OrderedDict{String, AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
+        output_data = OrderedDict{String,AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
 
-        function write_optim_results!(params::Dict{String,Any}, 
-                                      output_data::OrderedDict{String, AbstractArray}, 
-                                      res::Dict{String,Any})::Dict{String,Any}
+        function write_optim_results!(params::Dict{String,Any},
+                                      output_data::OrderedDict{String,AbstractArray},
+                                      res::Dict{String,Union{Array{Float64},Float64}})
             for (func, spec) in pairs(params)
                 if func == "sum"
                     keys = parse_outkeys(spec)
@@ -305,7 +305,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                     end
                 elseif func == "mean"
                     keys = parse_outkeys(spec)
-                    for key in keys                    
+                    for key in keys
                         res["mean $key"] = sum(output_data[key]) / length(output_data[key])
                     end
                 elseif func == "economic"
@@ -318,24 +318,22 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                     end
                 end
             end
-            return res
         end
-
         # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
-        write_optim_results!(sim_params["optimisation"]["objective_params"], output_data, 
+        write_optim_results!(sim_params["optimisation"]["objective_params"], output_data,
                              optim_results)
         # calculate objective from the results 
         optim_results["objective"] = sim_params["optimisation"]["objective_function"](values(optim_results))
-        
+
         # write necessary values for matrix_plot in the global result dictionary that is returned by run_simulation_loop()
         if io_settings["matrix_plot"] == "custom"
-            write_optim_results!(io_settings["matrix_plot_spec"], output_data, 
+            write_optim_results!(io_settings["matrix_plot_spec"], output_data,
                                  optim_results)
         end
     end
 
     # write output to CSV if not done continuously
-    if do_write_CSV 
+    if do_write_CSV
         if do_write_CSV_continuously
             @info "CSV-file with outputs continuously written to $(csv_file_path)"
         else
@@ -355,7 +353,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                 output_path,
                                 output_keys_to_CSV,
                                 weather_CSV_keys,
-                                ["Transfer", "Demand", "IN", "OUT", "Supply", "Losses", 
+                                ["Transfer", "Demand", "IN", "OUT", "Supply", "Losses",
                                  "Gains", "EnergyFlow", "Balance", "Charge"], # energy terms
                                 ["_sum"],                           # cumulative terms
                                 ["COP", "Time_active", "Avg_PLR", "MixingTemperature_Input",
@@ -404,7 +402,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             end
         end
         if length(component_list) > 0
-            @info "(Further) auxiliary plots are saved to folder $(output_path) for the " * 
+            @info "(Further) auxiliary plots are saved to folder $(output_path) for the " *
                   "following components: $(join(component_list, ", "))"
         end
     end
@@ -514,7 +512,8 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
     if sim_params["optimisation"]["run_optimisation"]
         optim_results_path = sim_params["run_path"](io_settings["optimisation_csv_file_path"])
-        open(optim_results_path, "w") do f end
+        open(optim_results_path, "w") do f
+        end
         optimiser = sim_params["optimisation"]
 
         all_results = []
@@ -533,14 +532,14 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
                 # decide which algorithm to run based on type of optimiser
                 if optimiser["type"] == "parametervariation"
-                    optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                project_config, sample_values, 
+                    optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                                project_config, sample_values,
                                 run_lock, output_lock, results_lock)
 
                 elseif optimiser["type"] == "monte_carlo_annealing"
-                    monte_carlo_annealing!(all_results, obj, obj_lock, 
-                                           sim_params, optim_results_path, project_config, 
-                                           sample_values, sample_ID, 
+                    monte_carlo_annealing!(all_results, obj, obj_lock,
+                                           sim_params, optim_results_path, project_config,
+                                           sample_values, sample_ID,
                                            run_lock, output_lock, results_lock)
                 end
                 runtime = round(Int, seconds(now() - start_time))
@@ -550,29 +549,40 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         else
             start_time = now()
-            f = function (sample_values) 
-                    optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                project_config, sample_values, 
-                                run_lock, output_lock, results_lock)
-                end
+            f = function (sample_values)
+                optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                            project_config, sample_values,
+                            run_lock, output_lock, results_lock)
+            end
             if optimiser["type"] == "Optim"
                 Optim.optimize(f, optimiser["args"]...)
             elseif optimiser["type"] == "BlackBoxOptim"
-                BlackBoxOptim.bboptimize(f, optimiser["args"]...; optimiser["kwargs"]...)
+                if optimiser["N_obj"] == 1
+                    f_wrap = f
+                else
+                    f_wrap(x) = Tuple(f(x))
+                end
+                BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
             elseif optimiser["type"] == "Metaheuristics"
                 #TODO implement batch evaluation for other packages that need it        
                 if Threads.nthreads() > 1
-                    f_wrap = function (sample_values)    
-                                if size(sample_values, 1) > 1
-                                    objectives = zeros(size(sample_values, 1))
-                                    @threads for i in axes(sample_values, 1)
-                                        objectives[i] = f(sample_values[i,:])
-                                    end
-                                else
-                                    objectives = [f(sample_values)]
-                                end
-                                return objectives
-                             end
+                    if optimiser["N_obj"] == 1
+                        f_arr(x) = [f(x)]
+                    else
+                        f_arr = f
+                    end
+                    f_wrap = function (sample_values)
+                        N_samples = size(sample_values, 1)
+                        if N_samples > 1
+                            objectives = zeros(N_samples, optimiser["N_obj"])
+                            @threads for i in 1:N_samples
+                                objectives[i, :] = f_arr(sample_values[i, :])
+                            end
+                        else
+                            objectives = f_arr(sample_values)
+                        end
+                        return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
+                    end
                 else
                     f_wrap = f
                 end
@@ -582,38 +592,41 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
             elseif optimiser["type"] == "NLopt"
                 f = function (sample_values, gradient)
-                        optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                    project_config, sample_values, 
-                                    run_lock, output_lock, results_lock)
-                    end
+                    optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                                project_config, sample_values,
+                                run_lock, output_lock, results_lock)
+                end
                 NLopt.min_objective!(optimiser["args"][1], f)
                 res = NLopt.optimize(optimiser["args"]...)
                 @globalInfo "Optimisation results: $res"
 
             elseif optimiser["type"] == "NOMAD"
                 f = function (sample_values)
-                        res = optim_func!(all_results, io_settings, sim_params, optim_results_path, 
-                                        project_config, sample_values, 
-                                        run_lock, output_lock, results_lock)
-                        success = ifelse(res == Inf, false, true) 
-                        return success, true, [res]
+                    res = optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                                      project_config, sample_values,
+                                      run_lock, output_lock, results_lock)
+                    success = ifelse(res == Inf, false, true)
+                    if length(res) == 1
+                        res = [res]
                     end
-                prob = NOMAD.NomadProblem(optimiser["args"][1:end-1]..., f; optimiser["kwargs"]...)
+                    return success, true, res
+                end
+                prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f; optimiser["kwargs"]...)
                 NOMAD.solve(prob, optimiser["args"][end])
 
             elseif optimiser["type"] == "GlobalSensitivity"
                 if Threads.nthreads() > 1
-                    f_wrap = function (sample_values)    
-                                if size(sample_values, 2) > 1
-                                    objectives = zeros(size(sample_values, 2))
-                                    @threads for i in axes(sample_values, 2)
-                                        objectives[i] = f(sample_values[:,i])
-                                    end
-                                else
-                                    objectives = reshape(f(sample_values), 1, :)
-                                end
-                                return objectives
-                             end
+                    f_wrap = function (sample_values)
+                        if size(sample_values, 2) > 1
+                            objectives = zeros(size(sample_values, 2))
+                            @threads for i in axes(sample_values, 2)
+                                objectives[i] = f(sample_values[:, i])
+                            end
+                        else
+                            objectives = reshape(f(sample_values), 1, :)
+                        end
+                        return objectives
+                    end
                 else
                     f_wrap = f
                 end
@@ -623,7 +636,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
 
             if optimiser["run_sensitivity"]
-                St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:,1:2], all_results, sim_params)
+                St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, sim_params)
                 @globalInfo "Global sensitivity: S_total: $St, S_first: $S1, RMSE surrogate: $rel_rmse, R2 surrogate: $r2"
             end
 
@@ -639,7 +652,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
                 # write rows 
                 #TODO can probably speed up by collecting data and writing once
-                for results in all_results            
+                for results in all_results
                     row = join(collect(values(results)), ';') * "\n"
                     row = replace(row, '.' => ',')
                     write(file_handle, row)
@@ -647,18 +660,16 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         end
 
-        if io_settings["matrix_plot"] != "nothing"
+        if io_settings["matrix_plot"] != "nothing" && optimiser["N_obj"] == 1
             create_matrix_plot(all_results, io_settings, sim_params)
         end
     else
-        _ = run_sample(io_settings, sim_params, nothing, project_config, 
+        _ = run_sample(io_settings, sim_params, nothing, project_config,
                        nothing, run_ID, run_lock, output_lock)
     end
 
     return true
 end
-
-
 
 """
     run_sample(io_settings, sim_params, optim_results_path, project_config, sample_params, 
@@ -679,41 +690,41 @@ Run a single simulation sample with given parameters.
 # Returns
 - `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
-function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any}, 
-                    optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any}, 
-                    sample_params::Union{Dict{String, Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock, 
-                    output_lock::ReentrantLock)::OrderedDict{String,Union{Float64, Int64, String}}
+function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
+                    optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any},
+                    sample_params::Union{Dict{String,Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock,
+                    output_lock::ReentrantLock)::OrderedDict{String,Any}
     start = now()
     if !isnothing(sample_params)
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
     end
 
-    results = OrderedDict{String,Union{Float64, Int64, String}}()
+    results = OrderedDict{String,Any}()
 
     if !isnothing(sample_params)
         for (key, value) in pairs(sample_params)
             results[key] = value
-        end 
+        end
     end
 
     try
         sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
         @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
-        lock(run_lock) do 
+        lock(run_lock) do
             current_runs[run_ID] = SimulationRun(sim_params, io_settings, components, operations)
         end
 
         start = now()
         @info "---- Simulation loop ----"
-        
+
         sim_output = run_simulation_loop(sim_params, io_settings, components, operations)
         if !isnothing(sim_output)
             for (key, value) in pairs(sim_output)
                 results[key] = value
             end
         end
- 
+
         results["error"] = ""
 
     catch e
@@ -754,16 +765,17 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         # save excact error message to output file
         error_message = sprint(showerror, e)
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
-        @globalInfo full_error_message            
-        results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+        @globalInfo full_error_message
+        results["error"] = "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
     end
 
     if sim_params["optimisation"]["run_optimisation"] && io_settings["write_optimisation_csv_continuously"]
         # Write results to seperate file after all simulations are finished.
         row = join(collect(values(results)), ';') * "\n"
+        row = replace(row, ',' => ' ')
         row = replace(row, '.' => ',')
         # Lock the file writing
-        lock(output_lock) do 
+        lock(output_lock) do
             # create header if file is empty
             if filesize(optim_results_path) == 0
                 header = join(collect(keys(results)), ';') * "\n"
@@ -776,15 +788,14 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
             end
         end
     end
-        
+
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
-    lock(run_lock) do 
+    lock(run_lock) do
         close_run(run_ID)
     end
 
     return results
 end
-
 
 end # module
 

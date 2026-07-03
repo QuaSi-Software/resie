@@ -1432,9 +1432,9 @@ end
 
 function get_optimisation_parameters(project_config::AbstractDict{String,Any},
                                      sim_params::Dict{String,Any})::Dict{String,Any}
-    if !haskey(project_config, "optimisation_parameters") || 
+    if !haskey(project_config, "optimisation_parameters") ||
        project_config["optimisation_parameters"]["run_optimisation"] == false
-       # end of expression
+        # end of expression
         return Dict{String,Any}("run_optimisation" => false)
     end
     optimiser_config = Dict{String,Any}()
@@ -1483,35 +1483,36 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
     optimiser["iterator"] = [1]
     optimiser["run_sensitivity"] = optimiser_config["run_sensitivity"]
 
-    # read and parse optim_params
-    optim_params = Dict{String,Any}()
+    # read and parse optim_params in Arrays to preserve order
+    optimiser["optim_params_keys"] = String[]
+    optimiser["optim_params_values"] = []
     # Matrix with bounds with colums being lower_bound, upper_bound, start_value
     bounds = Array{Float64}(undef, 0, 3)
     for (category, uacs) in pairs(optimiser_config["optim_params"])
         for (uac, params) in pairs(uacs)
             for (key_param, def) in pairs(params)
+                key = category * " " * uac * " " * key_param
+                push!(optimiser["optim_params_keys"], key)
                 if haskey(def, "values")
-                    optim_params[category * " " * uac * " " * key_param] = def["values"]
+                    push!(optimiser["optim_params_values"], def["values"])
                     bounds = vcat(bounds,
                                   [minimum(def["values"]) maximum(def["values"]) (minimum(def["values"]) +
                                                                                   maximum(def["values"])) / 2])
                 elseif haskey(def, "min") && haskey(def, "max")
-                    optim_params[category * " " * uac * " " * key_param] = def
+                    values = range(; start=def["min"], stop=def["max"], length=100)
+                    push!(optimiser["optim_params_values"], values)
                     start_val = ifelse(haskey(def, "start"), def["start"], (def["min"] + def["max"]) / 2)
                     bounds = vcat(bounds, [def["min"] def["max"] start_val])
                 else
                     def = Dict(Symbol(k) => v for (k, v) in def)
                     values = range(; def...)
-                    optim_params[category * " " * uac * " " * key_param] = values
+                    push!(optimiser["optim_params_values"], values)
                     bounds = vcat(bounds, [minimum(values) maximum(values) (minimum(values) + maximum(values)) / 2])
                 end
             end
         end
     end
-    optimiser["optim_params"] = optim_params
     optimiser["bounds"] = bounds
-    # May be unnecessary but added to make sure the order of keys and values is the same
-    optimiser["optim_params_keys"] = keys(optimiser["optim_params"])
 
     # read and parse objective_params
     optimiser["objective_keys_sum_mean"] = Dict{String,Any}()
@@ -1527,7 +1528,13 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
                 throw(InputError())
             end
         end
-        optimiser["objective_function"] = parse_objective_function(optimiser_config["objective_function"])
+
+        optimiser["objective_function"], f_obj_name = parse_objective_function(optimiser_config["objective_function"])
+        if f_obj_name == "multi-objective"
+            optimiser["N_obj"] = length(optimiser["objective_params"])
+        else
+            optimiser["N_obj"] = 1
+        end
     end
 
     if !isnothing(optimiser_config["max_runs"])
@@ -1536,11 +1543,11 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
 
     if optimiser_config["type"] == "parametervariation"
         if optimiser_config["iterator"] == "product"
-            optimiser["iterator"] = Iterators.product(values(optimiser["optim_params"])...)
+            optimiser["iterator"] = Iterators.product(optimiser["optim_params_values"]...)
         elseif optimiser_config["iterator"] == "zip"
-            optimiser["iterator"] = zip(values(optimiser["optim_params"])...)
+            optimiser["iterator"] = zip(optimiser["optim_params_values"]...)
         elseif split(optimiser_config["iterator"], "_")[1] == "random"
-            iter = Iterators.product(values(optimiser["optim_params"])...)
+            iter = Iterators.product(optimiser["optim_params_values"]...)
             n_samples = min(parse(Int, split(optimiser_config["iterator"], "_")[2]),
                             length(iter))
             optimiser["iterator"] = rand(collect(iter), n_samples)
@@ -1550,18 +1557,18 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
         optimiser["iterator"] = range(1, optimiser_config["max_runs"]; step=1)
         optimiser["nbh_scale"] = default(optimiser_config, "nbh_scale", 0.5)
 
-        optimiser["objective_function"] = x -> x
-
     elseif optimiser_config["type"] == "Optim"
+        if f_obj_name == "multi-objective"
+            @error "Objective function multi-objective not supported for algorithms from " *
+                   "package 'Optim'"
+            throw(InputError())
+        end
         optimiser["args"] = []
 
         #TODO most Optim algorithms ignore bounds which can be supposedly added with wrapper 
         # Optim.Fminbox() but it doesn't work
         if optimiser_config["algorithm"] == "NelderMead"
             alg = Optim.NelderMead()
-
-        elseif optimiser_config["algorithm"] == "SimulatedAnnealing"
-            alg = Optim.SimulatedAnnealing()
 
         elseif optimiser_config["algorithm"] == "SAMIN"
             alg = Optim.SAMIN()
@@ -1572,7 +1579,7 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             alg = Optim.ParticleSwarm(; upper=bounds[:, 2], lower=bounds[:, 1])
         else
             @error "For optimisation type 'Optim' the algorithm has to be one of " *
-                   "'NelderMead', 'SimulatedAnnealing', 'SAMIN', 'ParticleSwarm'."
+                   "'NelderMead', 'SAMIN', 'ParticleSwarm'."
             throw(InputError())
         end
 
@@ -1596,11 +1603,21 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
         alg = Symbol(optimiser_config["algorithm"])
 
         optimiser["args"] = [bounds[:, 3]]
-
         optimiser["kwargs"] = Dict{Symbol,Any}()
+
+        if f_obj_name == "multi-objective"
+            if optimiser_config["algorithm"] != "borg_moea"
+                @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
+                       "support multi-objective optimisation. Choose a different " *
+                       "objective_function or algorithm 'borg_moea'."
+                throw(InputError())
+            end
+            optimiser["kwargs"][:FitnessScheme] = BlackBoxOptim.ParetoFitnessScheme{2}(; is_minimizing=true)
+        end
+
         optimiser["kwargs"][:Method] = alg
-        optimiser["kwargs"][:SearchRange] = b
-        optimiser["kwargs"][:NumDimensions] = length(bounds[:, 3])
+        optimiser["kwargs"][:SearchRange] = Tuple.(eachrow(bounds[:, 1:2]))
+        optimiser["kwargs"][:NumDimensions] = size(bounds, 1)
         optimiser["kwargs"][:NThreads] = Threads.nthreads() - 1
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
@@ -1612,12 +1629,36 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
         end
 
     elseif optimiser_config["type"] == "Metaheuristics"
+        m_obj_algs = ["MOEAD_DE", "NSGA2", "NSGA3", "SMS_EMOA", "SPEA2", "CCMO"]
+        if f_obj_name == "multi-objective" && !(optimiser_config["algorithm"] in m_obj_algs)
+            @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
+                   "support multi-objective optimisation. Choose a different " *
+                   "objective_function or algorithm."
+            throw(InputError())
+        end
+
         alg = getproperty(Metaheuristics, Symbol(optimiser_config["algorithm"]))
 
         optimiser["args"] = Any[[bounds[:, 1] bounds[:, 2]]']
 
+        args_alg = []
         kwargs_general = Dict{Symbol,Any}()
         kwargs_alg = Dict{Symbol,Any}()
+
+        if optimiser_config["max_runs"] < 100
+            @warn "'max_runs' of optimiser are smaller than algorithm default for " *
+                  "one generation of 100. This may lead to poor results."
+            kwargs_alg[:N] = ceil(optimiser_config["max_runs"]/4)
+        end
+
+        if optimiser_config["algorithm"] == "MOEAD_DE"
+            if optimiser["N_obj"] == 1
+                @error "Algorithm 'MOEAD_DE' can only be used with " *
+                       "objective_function='multi-objective'"
+                throw(InputError())
+            end
+            push!(args_alg, Metaheuristics.gen_ref_dirs(size(bounds, 1), population_size))
+        end
 
         if Threads.nthreads() > 1
             kwargs_general[:parallel_evaluation] = true
@@ -1636,14 +1677,20 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             end
         end
         options = Metaheuristics.Options(; kwargs_general...)
-
-        push!(optimiser["args"], alg(; kwargs_alg..., options=options))
+        if optimiser_config["algorithm"] == "CCMO"
+            push!(optimiser["args"], alg(Metaheuristics.NSGA2(args_alg...; kwargs_alg...); options=options))
+        else
+            push!(optimiser["args"], alg(args_alg...; kwargs_alg..., options=options))
+        end
 
     elseif optimiser_config["type"] == "NLopt"
-        if occursin(r"LD.*", optimiser_config["algorithm"])
+        if occursin(r"LD_.*", optimiser_config["algorithm"])
             @error "The chosen algorithm `$(optimiser_config["algorithm"])` needs a " *
                    "gradient which is not supported in ReSiE"
             throw(InputError())
+        end
+        if startswith(optimiser_config["algorithm"], "NLOPT_")
+            optimiser_config["algorithm"] = split(optimiser_config["algorithm"], "NLOPT_")[2]
         end
 
         alg = NLopt.Opt(Symbol(optimiser_config["algorithm"]), 2)
@@ -1701,13 +1748,8 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
 
         optimiser["kwargs"][:options] = NOMAD.NomadOptions(; kwargs_general...)
 
-        if split(optimiser_config["objective_function"], ":")[1] == "multi-objective"
-            N_obj = length(optimiser["objective_params"])
-        else
-            N_obj = 1
-        end
-
-        optimiser["args"] = Any[length(upper_bounds), N_obj, ["OBJ"], bounds[:, 3]]
+        optimiser["args"] = [size(bounds, 1), optimiser["N_obj"],
+                             fill("OBJ", optimiser["N_obj"]), bounds[:, 3]]
 
     else
         #TODO double check what packages to implement
@@ -1718,14 +1760,14 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
         # x NOMAD for MADS (mesh adaptive direct search) algorithm thats supposedly good for heavy problems 
         #   -> brought 13-17 additional dependencies
         #TODO handle multi-objective since most algorithms support it 
-        # - handle input
+        # x handle input
         # - plot outputs like pareto front -> example see optimisation-cli.jl
     end
 
     return optimiser
 end
 
-function parse_objective_function(eff_def::String)::Function
+function parse_objective_function(eff_def::String)::Tuple{Function,String}
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
@@ -1737,15 +1779,18 @@ function parse_objective_function(eff_def::String)::Function
 
     #TODO get more function definitions analog to different optimisation packages
     if method == "sum"
-        return x -> sum(x)
-        #TODO check how to keep or define order
+        f = x -> sum(Float64.(x))
+    #TODO check how to keep or define order
     elseif method == "linear"
         params = parse.(Float64, split(data, ","))
-        return x -> sum(x .* params)
+        f = x -> sum(Float64.(x) .* params)
     elseif method == "multi-objective"
-        return x -> x
+        f = x -> collect(Float64.(x))
+    else
+        @error "Cannot parse objective function from: $eff_def. Has to be one of 'sum', " *
+               "'linear:[coefficients]', 'multi-objective'"
+        throw(InputError())
     end
 
-    @error "Cannot parse function from: $eff_def"
-    return x -> 0.0
+    return f, method
 end

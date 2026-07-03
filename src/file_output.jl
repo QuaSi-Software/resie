@@ -471,7 +471,6 @@ function parse_outkeys(output_keys::AbstractDict{String,Any})::Array{String}
     return keys
 end
 
-
 """
 get_output_header(output_keys, weather_data_keys, csv_time_unit)
 
@@ -518,7 +517,7 @@ function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKe
                         weather_data_keys::Union{Nothing,Vector{String}},
                         sim_params::Dict{String,Any},
                         csv_time_unit::String)
-    row = Array{Union{Float64, String}}(undef, 0)
+    row = Array{Union{Float64,String}}(undef, 0)
     if csv_time_unit == "seconds"
         time = sim_params["time_since_output"]
     elseif csv_time_unit == "minutes"
@@ -725,7 +724,8 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         # create legend entries
         labels = String[]
         if plot_data
-            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .* axis[1:length(outputs_plot_keys)] .* ")"
+            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .* 
+                     axis[1:length(outputs_plot_keys)] .* ")"
         end
         if plot_weather
             for outkey in outputs_plot_weather_keys
@@ -1291,7 +1291,7 @@ function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any},
             obj_key = func * " " * spec[1]
         end
     end
-    param_names = collect(keys(sim_params["optimisation"]["optim_params"]))
+    param_names = sim_params["optimisation"]["optim_params_keys"]
     N = length(param_names)
     results_dict = Dict(k => [d[k] for d in results] for k in keys(results[1]))
     objective = results_dict[obj_key]
@@ -1299,8 +1299,8 @@ function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any},
     min_obj = minimum(skipmissing(objective))
     low_quartile_obj = sort(objective)[length(objective) ÷ 4]
     scatter_traces = splom(  
-        dimensions = [attr(label=k, values=results_dict[k]) for k in param_names],
-        marker = attr(color=objective, 
+        dimensions=[attr(label=k, values=results_dict[k]) for k in param_names],
+        marker=attr(color=objective, 
                       colorscale=reverse(ColorSchemes.viridis), 
                       cmin=min_obj,
                       cmax=low_quartile_obj,
@@ -1308,20 +1308,20 @@ function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any},
                       line=attr(color="red", width=objective.==min_obj * 1),
                       colorbar=attr(title=obj_key)
                       ),
-        text = string.(objective),
-        hovertemplate = "%{x}, %{y}, %{text}"
+        text=string.(objective),
+        hovertemplate="%{x}, %{y}, %{text}"
         )
     p = plot(scatter_traces)
-    
+
     file_path = sim_params["run_path"](io_settings["matrix_plot_file"])
     savefig(p, file_path)
 end
 
 function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
-    header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
-                        "# profile_start_date_format:", "# timestamp_format:", 
+    header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:",
+                        "# profile_start_date_format:", "# timestamp_format:",
                         "# interpolation_type:"]
-    header_values = ["intensive", "startdate_timestamp", "01.01.2024 00:00", 
+    header_values = ["intensive", "startdate_timestamp", "01.01.2024 00:00",
                      "dd.mm.yyyy HH:MM", "seconds", "stepwise"]
     open(filepath, "w") do file_handle
         for (var, val) in zip(header_variables, header_values)
@@ -1329,16 +1329,16 @@ function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepat
         end
         for (ts, val) in zip(timestamps, values)
             write(file_handle, string(ts) * ";" * string(val) * "\n")
-        end      
+        end
     end
 
     @info "Profile file at $filepath created."
 end
 
 function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
-    header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:", 
+    header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:",
                         "# time_zone:", "# interpolation_type:"]
-    header_values = ["intensive", "datestamp", "dd.mm.yyyy HH:MM", 
+    header_values = ["intensive", "datestamp", "dd.mm.yyyy HH:MM",
                      "Europe/Berlin", "stepwise"]
     open(filepath, "w") do file_handle
         for (var, val) in zip(header_variables, header_values)
@@ -1346,7 +1346,7 @@ function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepat
         end
         for (ts, val) in zip(dates, values)
             write(file_handle, string(ts) * ";" * string(val) * "\n")
-        end      
+        end
     end
 
     @info "Profile file at $filepath created."

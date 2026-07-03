@@ -182,9 +182,8 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
         sample_params = Dict{String,Any}()
-        for (key, param) in pairs(optimiser["optim_params"])
-            #TODO maybe define optim params also as ranges but use minimum(range) and maximum(range) as limits
-            sample_params[key] = rand(range(; start=param["min"], stop=param["max"], length=100))
+        for (key, values) in zip(optimiser["optim_params_keys"], optimiser["optim_params_values"])
+            sample_params[key] = rand(values)
         end
     else
         # set parameters to neighborhood of existing result, drawn from the top results
@@ -195,10 +194,10 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
         sample = all_results[sample_idx]
 
         sample_params = Dict{String,Any}()
-        for (key, param) in pairs(optimiser["optim_params"])
-            range = optimiser["nbh_scale"] * temperature * (param["max"] - param["min"])
+        for (key, values) in zip(optimiser["optim_params_keys"], optimiser["optim_params_values"])
+            range = optimiser["nbh_scale"] * temperature * (maximum(values) - minimum(values))
             value = sample[key] + rand((-0.5 * range):(0.5 * range))
-            sample_params[key] = clamp(value, param["min"], param["max"])
+            sample_params[key] = clamp(value, minimum(values), maximum(values))
         end
     end
 
