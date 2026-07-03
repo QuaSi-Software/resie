@@ -516,7 +516,8 @@ Create a row with values for given outputs to be written to file or dictionary.
 function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                         weather_data_keys::Union{Nothing,Vector{String}},
                         sim_params::Dict{String,Any},
-                        csv_time_unit::String)
+                        csv_time_unit::String,
+                        io_settings::Dict{String,Any})
     row = Array{Union{Float64,String}}(undef, 0)
     if csv_time_unit == "seconds"
         time = sim_params["time_since_output"]

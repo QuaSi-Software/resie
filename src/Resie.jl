@@ -221,7 +221,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                 row = get_output_row(output_keys_to_CSV,
                                      weather_CSV_keys,
                                      sim_params,
-                                     csv_time_unit)
+                                     csv_time_unit,
+                                     io_settings)
                 row[2:end] = replace.(row[2:end], '.' => ',')
                 if do_write_CSV_continuously
                     # Write row to the output file
