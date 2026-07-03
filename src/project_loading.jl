@@ -1693,7 +1693,8 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             optimiser_config["algorithm"] = split(optimiser_config["algorithm"], "NLOPT_")[2]
         end
 
-        alg = NLopt.Opt(Symbol(optimiser_config["algorithm"]), 2)
+        n_dim_opt = length(bounds[:, 1])
+        alg = NLopt.Opt(Symbol(optimiser_config["algorithm"]), n_dim_opt)
         optimiser["kwargs"] = Dict{Symbol,Any}()
 
         optimiser["kwargs"][:lower_bounds] = bounds[:, 1]
@@ -1780,7 +1781,7 @@ function parse_objective_function(eff_def::String)::Tuple{Function,String}
     #TODO get more function definitions analog to different optimisation packages
     if method == "sum"
         f = x -> sum(Float64.(x))
-    #TODO check how to keep or define order
+        #TODO check how to keep or define order
     elseif method == "linear"
         params = parse.(Float64, split(data, ","))
         f = x -> sum(Float64.(x) .* params)
