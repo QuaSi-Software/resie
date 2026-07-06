@@ -134,7 +134,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
-    do_write_summary_CSV = io_settings["write_summary_CSV"]
+    do_write_summary_CSV = io_settings["write_summary_csv"]
     csv_file_path = io_settings["csv_output_file_path"]
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
@@ -425,8 +425,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         end
 
         # export economic results to CSV
-        if io_settings["output_economic_CSV"]
-            filepath = sim_params["run_path"](io_settings["economic_CSV_file_path"])
+        if io_settings["output_economic_csv"]
+            filepath = sim_params["run_path"](io_settings["economic_csv_file_path"])
             success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
             success && @info "Economic results exported to $filepath"
         end
@@ -442,9 +442,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             success && @info "Emissions plot created and saved to $filepath"
         end
 
-        if io_settings["output_emissions_CSV"]
+        if io_settings["output_emissions_csv"]
             # export emissions results to CSV
-            filepath = sim_params["run_path"](io_settings["emissions_CSV_file_path"])
+            filepath = sim_params["run_path"](io_settings["emissions_csv_file_path"])
             success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
             success && @info "Emissions results exported to $filepath"
         end

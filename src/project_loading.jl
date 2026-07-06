@@ -53,7 +53,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
-    "write_summary_CSV" => (
+    "write_summary_csv" => (
         default=true,
         description="Toggle if a CSV summary output with sum/mean values should be created " *
                     "additionally to the timestep-wise CSV output.",
@@ -206,7 +206,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="string",
         unit="-"
     ),
-    "output_economic_CSV" => (
+    "output_economic_csv" => (
         default=true,
         description="Toggle if a CSV with the economic results should be created",
         display_name="Output economic CSV?",
@@ -215,7 +215,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
-    "economic_CSV_file_path" => (
+    "economic_csv_file_path" => (
         default="./output/economic_results.csv",
         description="File path to where the economic results are written to CSV",
         display_name="Economic results CSV file path",
@@ -242,7 +242,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="string",
         unit="-"
     ),
-    "output_emissions_CSV" => (
+    "output_emissions_csv" => (
         default=true,
         description="Toggle if a CSV with the emission results should be created",
         display_name="Output emissions CSV?",
@@ -251,7 +251,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
-    "emissions_CSV_file_path" => (
+    "emissions_csv_file_path" => (
         default="./output/emissions_results.csv",
         description="File path to where the emissions are written to CSV",
         display_name="Emissions CSV file path",
