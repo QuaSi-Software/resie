@@ -52,6 +52,7 @@
     },
     "optimisation_parameters": {
         "run_optimisation": true,
+        "disable_all_simulation_outputs": false,
         "type": "Metaheuristics",
         "objective_params":  {"economic":  ["total_annuity"],
                               "sum": {"Building_el_GRO": ["m_e_ac_230v:IN"]}},

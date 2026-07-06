@@ -815,6 +815,15 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         json_type="string",
         unit="-"
     ),
+    "disable_all_simulation_outputs" => (
+        default=true,
+        description="Disables all simulation outputs written to the hard drive during optimisation.",
+        display_name="Disable all simulation outputs",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
     "max_runs" => (
         default=nothing,
         description="Set the maximum number of runs to be executed by the algorithm.",
@@ -1482,6 +1491,7 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
     optimiser["run_optimisation"] = true
     optimiser["iterator"] = [1]
     optimiser["run_sensitivity"] = optimiser_config["run_sensitivity"]
+    optimiser["disable_all_simulation_outputs"] = optimiser_config["disable_all_simulation_outputs"]
 
     # read and parse optim_params in Arrays to preserve order
     optimiser["optim_params_keys"] = String[]

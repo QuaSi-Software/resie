@@ -111,7 +111,8 @@ Performs the simulation as loop over time steps and records outputs.
 function run_simulation_loop(sim_params::Dict{String,Any},
                              io_settings::Dict{String,Any},
                              components::Grouping,
-                             operations::OrderOfOperations)
+                             operations::OrderOfOperations;
+                             suppress_all_output::Bool=false)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot,
     output_keys_to_CSV,
@@ -120,26 +121,28 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                            sim_params["economic_parameters"],
                                            sim_params["emissions_parameters"],
                                            sim_params["optimisation"],
-                                           components)
+                                           components,
+                                           suppress_all_output)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
                                                                                   something(output_keys_economic_emissions,
                                                                                             String[]),
                                                                                   something(output_keys_optimise,
                                                                                             String[]))))
-    weather_data_keys = get_weather_data_keys(sim_params)
+    weather_data_keys = get_weather_data_keys(sim_params, suppress_all_output)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing && io_settings["plot_weather_data"]
     do_write_CSV_weather = weather_data_keys !== nothing && io_settings["csv_output_weather"]
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     do_write_CSV_continuously = io_settings["write_csv_continuously"]
-    do_write_summary_CSV = io_settings["write_summary_csv"]
+    do_write_summary_CSV = !suppress_all_output && io_settings["write_summary_csv"]
     csv_file_path = io_settings["csv_output_file_path"]
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
     do_optimise = sim_params["optimisation"]["run_optimisation"]
+    do_create_sankey = !suppress_all_output && io_settings["sankey_plot"] !== "nothing"
 
     # Initialize the arrays for output
     output_weather_lineplot = do_create_plot_weather ?
@@ -164,7 +167,6 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # check if sankey should be plotted
-    do_create_sankey = io_settings["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get information about all interfaces for Sankey
         nr_of_interfaces,
@@ -176,7 +178,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(io_settings, components, operations, sim_params)
+    dump_auxiliary_outputs(io_settings, components, operations, sim_params, suppress_all_output)
 
     @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
@@ -394,7 +396,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # plot additional figures potentially available from components after simulation
-    if io_settings["auxiliary_plots"]
+    if io_settings["auxiliary_plots"] && !suppress_all_output
         component_list = []
         output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
         for component in components
@@ -409,7 +411,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # output economic results
-    if do_calculate_economy
+    if do_calculate_economy && !suppress_all_output
         if io_settings["plot_economic_cashflows"]
             filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
             success = plot_economic_results(economic_result, filepath, sim_params,
@@ -433,7 +435,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # output emissions results
-    if do_calculate_emissions
+    if do_calculate_emissions && !suppress_all_output
         # plot figure with yearly emissions
         if io_settings["plot_emission_results"]
             filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
@@ -451,7 +453,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     # plot utilized price and emission profiles
-    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"]
+    if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"] &&
+       !suppress_all_output
         filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
         success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
                                                              io_settings["fixed_output_precision"])
@@ -666,7 +669,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         end
     else
         _ = run_sample(io_settings, sim_params, nothing, project_config,
-                       nothing, run_ID, run_lock, output_lock)
+                       nothing, run_ID, run_lock, output_lock; suppress_all_output=false)
     end
 
     return true
@@ -674,7 +677,7 @@ end
 
 """
     run_sample(io_settings, sim_params, optim_results_path, project_config, sample_params, 
-               run_ID, run_lock, output_lock)
+               run_ID, run_lock, output_lock;suppress_all_output=false)
 
 Run a single simulation sample with given parameters.
 
@@ -688,13 +691,14 @@ Run a single simulation sample with given parameters.
 - `run_ID::UUID`: The run ID used in the run registry
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
+- `suppress_all_output::Bool=false`: Bool that can be set to suppress the generation of all outputs written to hard drive.
 # Returns
 - `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
 function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
                     optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any},
                     sample_params::Union{Dict{String,Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock,
-                    output_lock::ReentrantLock)::OrderedDict{String,Any}
+                    output_lock::ReentrantLock; suppress_all_output::Bool=false)::OrderedDict{String,Any}
     start = now()
     if !isnothing(sample_params)
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
@@ -719,7 +723,8 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         start = now()
         @info "---- Simulation loop ----"
 
-        sim_output = run_simulation_loop(sim_params, io_settings, components, operations)
+        sim_output = run_simulation_loop(sim_params, io_settings, components, operations;
+                                         suppress_all_output=suppress_all_output)
         if !isnothing(sim_output)
             for (key, value) in pairs(sim_output)
                 results[key] = value

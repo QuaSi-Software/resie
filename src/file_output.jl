@@ -21,11 +21,15 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                          economic_parameters::Union{Nothing,AbstractDict{String,Any}},
                          emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
                          optimiser_parameters::Union{Nothing,AbstractDict{String,Any}},
-                         components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
-                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
-                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
-                                                      Union{Nothing,Vector{EnergySystems.OutputKey}}}
-    function parse_all_mode(io_settings, setting_name::String)
+                         components::Grouping,
+                         suppress_all_output::Bool)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}}}
+    function parse_all_mode(io_settings, setting_name::String, suppress_all_output::Bool)
+        if suppress_all_output
+            return false, false, false
+        end
         do_create = false
         do_all_excl = false
         do_all_incl = false
@@ -137,8 +141,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     end
 
     # get requirements
-    do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
-    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output")
+    do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot", suppress_all_output)
+    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output", suppress_all_output)
     do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
     do_optimise = optimiser_parameters["run_optimisation"]
     do_matrix_plot = io_settings["matrix_plot"] == "custom"
@@ -586,7 +590,11 @@ general to find out why the energy system behaves in the simulation as it does.
 function dump_auxiliary_outputs(io_settings::Dict{String,Any},
                                 components::Grouping,
                                 order_of_operations::OrderOfOperations,
-                                sim_params::Dict{String,Any})
+                                sim_params::Dict{String,Any},
+                                suppress_all_output::Bool)
+    if suppress_all_output
+        return
+    end
     # export order of operations
     if io_settings["auxiliary_info"]
         aux_info_file_path = io_settings["auxiliary_info_file"]

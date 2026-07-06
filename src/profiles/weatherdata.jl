@@ -562,8 +562,10 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     return weatherdata_dict, headerdata
 end
 
-function get_weather_data_keys(sim_params::Dict{String,Any})
-    if haskey(sim_params, "weather_data")
+function get_weather_data_keys(sim_params::Dict{String,Any}, suppress_all_output::Bool)
+    if suppress_all_output
+        return nothing
+    elseif haskey(sim_params, "weather_data")
         return collect(String.(fieldnames(typeof(sim_params["weather_data"]))))
     else
         return nothing

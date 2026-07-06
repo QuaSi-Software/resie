@@ -137,7 +137,8 @@ function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
     sample_params = Dict{String,Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
-                         sample_params, run_ID, run_lock, output_lock)
+                         sample_params, run_ID, run_lock, output_lock;
+                         suppress_all_output=sim_params["optimisation"]["disable_all_simulation_outputs"])
 
     lock(results_lock) do
         push!(all_results, results)
@@ -203,7 +204,8 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
 
     # run sim and calculate objective results
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
-                         sample_params, run_ID, run_lock, output_lock)
+                         sample_params, run_ID, run_lock, output_lock;
+                         suppress_all_output=optimiser["disable_all_simulation_outputs"])
 
     # calculate minimum of results
     if any(!isnothing(obj))

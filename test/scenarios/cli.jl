@@ -232,7 +232,7 @@ function generate_output(name::String, subdir::String)
         && step_order !== nothing)
         # end of condition
         Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, io_settings, components, step_order)
-        Resie.run_simulation_loop(sim_params, io_settings, components, step_order)
+        Resie.run_simulation_loop(sim_params, io_settings, components, step_order; suppress_all_output=false)
         print("|  ✓  ")
     else
         print("|     ")
