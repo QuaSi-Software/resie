@@ -337,20 +337,21 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     # write output to CSV if not done continuously
     if do_write_CSV
+        csv_file_path_abs = sim_params["run_path"](csv_file_path)
         if do_write_CSV_continuously
-            @info "CSV-file with outputs continuously written to $(csv_file_path)"
+            @info "CSV-file with outputs continuously written to $(csv_file_path_abs)"
         else
-            open(sim_params["run_path"](csv_file_path), "a") do file_handle
+            open(csv_file_path_abs, "a") do file_handle
                 for row_idx in 1:size(output_csv)[1]
                     write(file_handle, join(output_csv[row_idx, :], ";") * "\n")
                 end
             end
-            @info "CSV-file with outputs written to $(csv_file_path)"
+            @info "CSV-file with outputs written to $(csv_file_path_abs)"
         end
     end
 
     if do_write_summary_CSV
-        output_path = replace(csv_file_path, r"\.csv$"i => "_aggregated.csv")
+        output_path = sim_params["run_path"](replace(csv_file_path, r"\.csv$"i => "_aggregated.csv"))
 
         success = aggregate_csv(csv_file_path,
                                 output_path,
