@@ -24,31 +24,35 @@ Create a variant of the input file for the simulation run
 function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
                         project_config::OrderedDict{String,Any},
                         sample_params::Dict{String,Any})::OrderedDict{String,Any}
+    # helper function to shorten parameter values for output file naming
+    function compact_value(value)
+        if abs(value) >= 100
+            return string(round(Int, value))
+        elseif abs(value) >= 10
+            return string(round(value; digits=1))
+        else
+            return string(round(value; digits=2))
+        end
+    end
+
+    # crete initial config for the current run
     cfg = deepcopy(project_config)
 
     # set up the parameters for this simulation variant
+    run_name = ""
     for (key, value) in pairs(sample_params)
         category, uac, param_key = split(key, " ")
         cfg[category][uac][param_key] = value
-        # rename outputs to clarify parameter values if outputfiles for each simulation 
-        # should be generated
-        #TODO do same for all type of output files that get generated for each simulation
-        # and add Info that this is happening with hint to set the files to nothing of if 
-        # not needed for performance boost
-        if io_settings["csv_output"] != "nothing"
-            name, ext = rsplit(io_settings["csv_output_file_path"], '.'; limit=2)
-            cfg["io_settings"]["csv_output_file_path"] = name * "_" * uac * "_" * param_key *
-                                                         "_" * string(value) * "." * ext
-        end
-        if io_settings["output_plot"] != "nothing"
-            name, ext = rsplit(io_settings["output_plot_file_path"], '.'; limit=2)
-            cfg["io_settings"]["output_plot_file_path"] = name * "_" * uac * "_" * param_key *
-                                                          "_" * string(value) * "." * ext
-        end
-        if io_settings["sankey_plot"] != "nothing"
-            name, ext = rsplit(io_settings["sankey_plot_file_path"], '.'; limit=2)
-            cfg["io_settings"]["sankey_plot_file_path"] = name * "_" * uac * "_" * param_key *
-                                                          "_" * string(value) * "." * ext
+        run_name *= uac * "_" * param_key * "_" * compact_value(value) * "_"
+    end
+
+    # rename outputs to clarify parameter values if outputfiles for each simulation should be generated
+    for (key, value) in pairs(io_settings)
+        if endswith(key, "file_path") && io_settings[key] != "nothing"
+            dir, filename = splitdir(value)
+            root, ext = splitext(filename)
+            new_path = joinpath(dir, run_name * "_" * root * ext)
+            cfg["io_settings"][key] = new_path
         end
     end
 
