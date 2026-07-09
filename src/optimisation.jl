@@ -129,6 +129,7 @@ compatible format. Can be used as a batch function with Arrays for algorithms su
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 - `results_lock::ReentrantLock`: Lock for all_results
+- `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 # Returns
 - `Union{Array{Float64},Float64}`: Objective of the simulation run or batch runs
 """
@@ -137,12 +138,14 @@ function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
                      project_config::OrderedDict{String,Any},
                      sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
                      output_lock::ReentrantLock,
-                     results_lock::ReentrantLock)::Union{Array{Float64},Float64}
+                     results_lock::ReentrantLock;
+                     cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)::Union{Array{Float64},Float64}
     sample_params = Dict{String,Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          sample_params, run_ID, run_lock, output_lock;
-                         suppress_all_output=sim_params["optimisation"]["disable_all_simulation_outputs"])
+                         suppress_all_output=sim_params["optimisation"]["disable_all_simulation_outputs"],
+                         cancel_flag=cancel_flag)
 
     lock(results_lock) do
         push!(all_results, results)
@@ -163,6 +166,7 @@ is drawn.
 
 # Arguments
 - `all_results::Array{Any}`: Results of all runs
+- `io_settings::Dict{String,Any}`: IO settings used for simulation output and result writing.
 - `obj::Array{Union{Float64,Nothing}}`: Objectives for optimisation
 - `obj_lock::ReentrantLock`:: Lock for obj
 - `sim_params::Dict{String,Any}`: Simulation parameters
@@ -173,13 +177,15 @@ is drawn.
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 - `results_lock::ReentrantLock`: Lock for all_results
+- `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 """
-function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float64,Nothing}},
-                                obj_lock::ReentrantLock,
+function monte_carlo_annealing!(all_results::Array{Any}, io_settings::Dict{String,Any},
+                                obj::Array{Union{Float64,Nothing}}, obj_lock::ReentrantLock,
                                 sim_params::Dict{String,Any}, optim_results_path::String,
                                 project_config::OrderedDict{String,Any}, idx::Int64,
                                 run_ID::UUID, run_lock::ReentrantLock,
-                                output_lock::ReentrantLock, results_lock::ReentrantLock)
+                                output_lock::ReentrantLock, results_lock::ReentrantLock;
+                                cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)
     optimiser = sim_params["optimisation"]
     # temperature schedule is simple inverse logistic curve
     temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimiser["iterator"]) - 0.5)))
@@ -209,7 +215,8 @@ function monte_carlo_annealing!(all_results::Array{Any}, obj::Array{Union{Float6
     # run sim and calculate objective results
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          sample_params, run_ID, run_lock, output_lock;
-                         suppress_all_output=optimiser["disable_all_simulation_outputs"])
+                         suppress_all_output=optimiser["disable_all_simulation_outputs"],
+                         cancel_flag=cancel_flag)
 
     # calculate minimum of results
     if any(!isnothing(obj))
@@ -360,12 +367,13 @@ and dispatches the corresponding optimisation workflow.
   simulation variants.
 
 # Returns
+- `Bool`: Flag is simulation was successful (true) or not (false)
 - `Vector{Any}`: The updated `all_results` collection containing the results of all
   completed optimisation or parameter-variation runs.
 """
 function perform_optimisation(io_settings::Dict{String,Any},
                               sim_params::Dict{String,Any},
-                              project_config::OrderedDict{String,Any})::Vector{Any}
+                              project_config::OrderedDict{String,Any})::Tuple{Bool,Vector{Any}}
     # establish overarching locks for parallelization
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
@@ -377,10 +385,12 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
     optimiser = sim_params["optimisation"]
 
+    # handle interruption via STR+C for parallel runs and optimisation
+    cancel_optimisation = Threads.Atomic{Bool}(false)
+
     # prepare result vector
     all_results = []
 
-    #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
     if length(optimiser["iterator"]) > 1
         nr_runs = Atomic{Int}(1)
         if optimiser["type"] == "monte_carlo_annealing"
@@ -388,126 +398,201 @@ function perform_optimisation(io_settings::Dict{String,Any},
             obj_lock = ReentrantLock()
         end
         @threads for sample_values in collect(optimiser["iterator"])
-            run_nr = nr_runs[]
-            atomic_add!(nr_runs, 1)
-            start_time = now()
-
-            # decide which algorithm to run based on type of optimiser
-            if optimiser["type"] == "parametervariation"
-                optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                            project_config, sample_values,
-                            run_lock, output_lock, results_lock)
-
-            elseif optimiser["type"] == "monte_carlo_annealing"
-                monte_carlo_annealing!(all_results, obj, obj_lock,
-                                       sim_params, optim_results_path, project_config,
-                                       sample_values, sample_ID,
-                                       run_lock, output_lock, results_lock)
+            if cancel_optimisation[]
+                continue
             end
-            runtime = round(Int, seconds(now() - start_time))
-            max_runs = length(optimiser["iterator"])
-            eta = round(Int, (max_runs - run_nr) * runtime / Threads.nthreads() / 60)
-            @globalInfo "[$run_nr/$max_runs] → completed in $runtime s. ETA: $eta min"
+
+            try
+                run_nr = nr_runs[]
+                atomic_add!(nr_runs, 1)
+                start_time = now()
+
+                # decide which algorithm to run based on type of optimiser
+                if optimiser["type"] == "parametervariation"
+                    optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                                project_config, sample_values,
+                                run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+
+                elseif optimiser["type"] == "monte_carlo_annealing"
+                    # TODO this is not working currently...
+                    monte_carlo_annealing!(all_results, io_settings, obj, obj_lock,
+                                           sim_params, optim_results_path, project_config,
+                                           sample_values, sample_ID,
+                                           run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+                end
+                runtime = round(Int, seconds(now() - start_time))
+                max_runs = length(optimiser["iterator"])
+                eta = round(Int, (max_runs - run_nr) * runtime / Threads.nthreads() / 60)
+                @globalInfo "[$run_nr/$max_runs] → completed in $runtime s. ETA: $eta min"
+            catch e
+                if e isa InterruptException
+                    cancel_optimisation[] = true
+                    continue
+                else
+                    rethrow()
+                end
+            end
         end
     else
         start_time = now()
+        # generic optimisation function
         f = function (sample_values)
-            optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                        project_config, sample_values,
-                        run_lock, output_lock, results_lock)
-        end
-        if optimiser["type"] == "Optim"
-            Optim.optimize(f, optimiser["args"]...)
-        elseif optimiser["type"] == "BlackBoxOptim"
-            if optimiser["N_obj"] == 1
-                f_wrap = f
-            else
-                f_wrap(x) = Tuple(f(x))
+            if cancel_optimisation[]
+                throw(InterruptException())
             end
-            BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
-        elseif optimiser["type"] == "Metaheuristics"
-            #TODO implement batch evaluation for other packages that need it        
-            if Threads.nthreads() > 1
-                if optimiser["N_obj"] == 1
-                    f_arr(x) = [f(x)]
-                else
-                    f_arr = f
-                end
-                f_wrap = function (sample_values)
-                    N_samples = size(sample_values, 1)
-                    if N_samples > 1
-                        objectives = zeros(N_samples, optimiser["N_obj"])
-                        @threads for i in 1:N_samples
-                            objectives[i, :] = f_arr(sample_values[i, :])
-                        end
-                    else
-                        objectives = f_arr(sample_values)
-                    end
-                    return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
-                end
-            else
-                f_wrap = f
-            end
-
-            res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
-            @globalInfo res
-
-        elseif optimiser["type"] == "NLopt"
-            f = function (sample_values, gradient)
+            try
                 optim_func!(all_results, io_settings, sim_params, optim_results_path,
                             project_config, sample_values,
-                            run_lock, output_lock, results_lock)
-            end
-            NLopt.min_objective!(optimiser["args"][1], f)
-            res = NLopt.optimize(optimiser["args"]...)
-            @globalInfo "Optimisation results: $res"
-
-        elseif optimiser["type"] == "NOMAD"
-            f = function (sample_values)
-                res = optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                                  project_config, sample_values,
-                                  run_lock, output_lock, results_lock)
-                success = ifelse(res == Inf, false, true)
-                if length(res) == 1
-                    res = [res]
+                            run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+            catch e
+                if e isa InterruptException
+                    cancel_optimisation[] = true
+                    rethrow()
+                else
+                    rethrow()
                 end
-                return success, true, res
             end
-            prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f; optimiser["kwargs"]...)
-            NOMAD.solve(prob, optimiser["args"][end])
+        end
 
-        elseif optimiser["type"] == "GlobalSensitivity"
-            if Threads.nthreads() > 1
-                f_wrap = function (sample_values)
-                    if size(sample_values, 2) > 1
-                        objectives = zeros(size(sample_values, 2))
-                        @threads for i in axes(sample_values, 2)
-                            objectives[i] = f(sample_values[:, i])
-                        end
+        try
+            if optimiser["type"] == "Optim"
+                Optim.optimize(f, optimiser["args"]...)
+            elseif optimiser["type"] == "BlackBoxOptim"
+                if optimiser["N_obj"] == 1
+                    f_wrap = f
+                else
+                    f_wrap(x) = Tuple(f(x))
+                end
+                BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
+            elseif optimiser["type"] == "Metaheuristics"
+                #TODO implement batch evaluation for other packages that need it        
+                if Threads.nthreads() > 1
+                    if optimiser["N_obj"] == 1
+                        f_arr(x) = [f(x)]
                     else
-                        objectives = reshape(f(sample_values), 1, :)
+                        f_arr = f
                     end
-                    return objectives
+                    f_wrap = function (sample_values)
+                        N_samples = size(sample_values, 1)
+                        if N_samples > 1
+                            objectives = zeros(N_samples, optimiser["N_obj"])
+                            @threads for i in 1:N_samples
+                                if cancel_optimisation[]
+                                    continue
+                                end
+
+                                try
+                                    objectives[i, :] = f_arr(sample_values[i, :])
+                                catch e
+                                    if e isa InterruptException
+                                        cancel_optimisation[] = true
+                                    else
+                                        rethrow()
+                                    end
+                                end
+                            end
+                            if cancel_optimisation[]
+                                throw(InterruptException())
+                            end
+                        else
+                            objectives = f_arr(sample_values)
+                        end
+                        return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
+                    end
+                else
+                    f_wrap = f
                 end
-            else
-                f_wrap = f
+
+                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
+                @globalInfo res
+
+            elseif optimiser["type"] == "NLopt"
+                f_nlopt = function (sample_values, gradient)
+                    return f(sample_values)
+                end
+                NLopt.min_objective!(optimiser["args"][1], f_nlopt)
+                res = NLopt.optimize(optimiser["args"]...)
+                @globalInfo "Optimisation results: $res"
+            elseif optimiser["type"] == "NOMAD"
+                f_nomad = function (sample_values)
+                    try
+                        res = f(sample_values)
+                        success = res == Inf ? false : true
+                        if length(res) == 1
+                            res = [res]
+                        end
+                        return success, true, res
+                    catch e
+                        if e isa InterruptException
+                            cancel_optimisation[] = true
+                            rethrow()
+                        else
+                            rethrow()
+                        end
+                    end
+                end
+                prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f_nomad; optimiser["kwargs"]...)
+                NOMAD.solve(prob, optimiser["args"][end])
+
+            elseif optimiser["type"] == "GlobalSensitivity"
+                if Threads.nthreads() > 1
+                    f_wrap = function (sample_values)
+                        if size(sample_values, 2) > 1
+                            objectives = zeros(size(sample_values, 2))
+                            @threads for i in axes(sample_values, 2)
+                                if cancel_optimisation[]
+                                    continue
+                                end
+
+                                try
+                                    objectives[i] = f(sample_values[:, i])
+                                catch e
+                                    if e isa InterruptException
+                                        cancel_optimisation[] = true
+                                    else
+                                        rethrow()
+                                    end
+                                end
+                            end
+                            if cancel_optimisation[]
+                                throw(InterruptException())
+                            end
+                        else
+                            objectives = reshape(f(sample_values), 1, :)
+                        end
+                        return objectives
+                    end
+                else
+                    f_wrap = f
+                end
+
+                res = GlobalSensitivity.gsa(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
+                @globalInfo res
             end
 
-            res = GlobalSensitivity.gsa(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
-            @globalInfo res
-        end
+            if optimiser["run_sensitivity"]
+                St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, sim_params)
+                @globalInfo "Global sensitivity: S_total: $St, S_first: $S1, RMSE surrogate: $rel_rmse, R2 surrogate: $r2"
+            end
 
-        if optimiser["run_sensitivity"]
-            St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, sim_params)
-            @globalInfo "Global sensitivity: S_total: $St, S_first: $S1, RMSE surrogate: $rel_rmse, R2 surrogate: $r2"
-        end
+            runtime = round(Int, seconds(now() - start_time))
+            @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
 
-        runtime = round(Int, seconds(now() - start_time))
-        @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
+        catch e
+            if e isa InterruptException
+                cancel_optimisation[] = true
+            else
+                rethrow()
+            end
+        end
     end
 
-    # wirte results to optimisation result file it not written continuously
-    if !io_settings["write_optimisation_csv_continuously"]
+    if cancel_optimisation[]
+        return false, all_results
+    end
+
+    # write results to optimisation result file if not written continuously
+    if !io_settings["write_optimisation_csv_continuously"] && !isempty(all_results)
         open(optim_results_path, "w") do file_handle
             # write header
             header = join(collect(keys(all_results[1])), ';') * "\n"
@@ -523,5 +608,5 @@ function perform_optimisation(io_settings::Dict{String,Any},
         end
     end
 
-    return all_results
+    return true, all_results
 end

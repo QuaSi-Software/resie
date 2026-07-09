@@ -107,12 +107,14 @@ Performs the simulation as loop over time steps and records outputs.
 -`io_settings::Dict{String,Any}`: IO settings
 -`components::Grouping`: The energy system components
 -`operations::OrderOfOperations`: Order of operations
+- `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 """
 function run_simulation_loop(sim_params::Dict{String,Any},
                              io_settings::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations;
-                             suppress_all_output::Bool=false)
+                             suppress_all_output::Bool=false,
+                             cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot,
     output_keys_to_CSV,
@@ -188,6 +190,11 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
     start = now()
     for steps in 1:sim_params["number_of_time_steps"]
+        # handle interruption from STRG+C for multi-thread simulations
+        if cancel_flag !== nothing && cancel_flag[]
+            throw(InterruptException())
+        end
+
         # check if data should be output
         do_output = sim_params["current_date"] >= sim_params["start_date_output"]
         output_steps = Int(max(1,
@@ -478,6 +485,7 @@ Load a project from the given file and run the simulation with it.
 """
 function load_and_run(filepath::String, run_ID::UUID)::Bool
     start = now()
+    success = true
     @globalInfo "---- Simulation setup ----"
     @globalInfo "-- Starting simulation at $(start)"
     @globalInfo "-- Now reading project config"
@@ -513,9 +521,12 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     if sim_params["optimisation"]["run_optimisation"]
         # perform multiple simulation runs
         @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
-        all_results = perform_optimisation(io_settings, sim_params, project_config)
+        success, all_results = perform_optimisation(io_settings, sim_params, project_config)
 
-        if io_settings["matrix_plot"] != "nothing" && sim_params["optimisation"]["N_obj"] == 1
+        if success &&
+           io_settings["matrix_plot"] != "nothing" &&
+           sim_params["optimisation"]["N_obj"] == 1 &&
+           !isempty(all_results)
             create_matrix_plot(all_results, io_settings, sim_params)
         end
     else
@@ -527,7 +538,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                        nothing, run_ID, run_lock, output_lock; suppress_all_output=false)
     end
 
-    return true
+    return success
 end
 
 """
@@ -547,13 +558,15 @@ Run a single simulation sample with given parameters.
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
 - `output_lock::ReentrantLock`: Lock for file at optim_results_path
 - `suppress_all_output::Bool=false`: Bool that can be set to suppress the generation of all outputs written to hard drive.
+- `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 # Returns
 - `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
 function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
                     optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any},
                     sample_params::Union{Dict{String,Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock,
-                    output_lock::ReentrantLock; suppress_all_output::Bool=false)::OrderedDict{String,Any}
+                    output_lock::ReentrantLock; suppress_all_output::Bool=false,
+                    cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)::OrderedDict{String,Any}
     start = now()
     if !isnothing(sample_params)
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
@@ -579,7 +592,8 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         @info "---- Simulation loop ----"
 
         sim_output = run_simulation_loop(sim_params, io_settings, components, operations;
-                                         suppress_all_output=suppress_all_output)
+                                         suppress_all_output=suppress_all_output,
+                                         cancel_flag=cancel_flag)
         if !isnothing(sim_output)
             for (key, value) in pairs(sim_output)
                 results[key] = value
@@ -589,6 +603,14 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         results["error"] = ""
 
     catch e
+        if e isa InterruptException
+            if cancel_flag !== nothing
+                cancel_flag[] = true
+            end
+            @globalInfo "Optimisation interrupted by user."
+            rethrow()
+        end
+
         if !isnothing(optim_results_path) && filesize(optim_results_path) == 0
             throw(e)
         end
@@ -628,6 +650,10 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
         @globalInfo full_error_message
         results["error"] = "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+    finally
+        lock(run_lock) do
+            close_run(run_ID)
+        end
     end
 
     if sim_params["optimisation"]["run_optimisation"] && io_settings["write_optimisation_csv_continuously"]
@@ -651,10 +677,6 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
     end
 
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
-    lock(run_lock) do
-        close_run(run_ID)
-    end
-
     return results
 end
 
