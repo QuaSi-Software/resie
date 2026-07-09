@@ -1,3 +1,13 @@
+# Suppress GR/GKS GUI windows for file-only plots.
+# Windows uses "nul"; other systems use GR's no-output workstation type "100".
+if Sys.iswindows()
+    ENV["GKSwstype"] = "nul"
+    ENV["GKS_WSTYPE"] = "nul"
+else
+    ENV["GKSwstype"] = "100"
+    ENV["GKS_WSTYPE"] = "100"
+end
+
 using UUIDs
 using Logging
 using Resie

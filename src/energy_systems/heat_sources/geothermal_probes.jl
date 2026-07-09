@@ -735,7 +735,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                                       "U_configurations" => "U_configurations_5m_v1.0.json",
                                       "lopsided_U_configuration" => "LopU_configurations_5m_v1.0.json",
                                       "C_configuration" => "C_configurations_5m_v1.0.json",
-                                      "L_configuration" => "L_configurations_5m_v1.0.json"
+                                      "L_configuration" => "L_configurations_5m_v1.0.json",
                                       )
 
     libfile_path = joinpath(@__DIR__,
@@ -820,50 +820,50 @@ end
 function plot_optional_figures_begin(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
                                      sim_params::Dict{String,Any})
     # plot g-function values during simulation time
-    plot(0:Int(sim_params["number_of_time_steps"]),
-         unit.g_function[1:Int(sim_params["number_of_time_steps"] + 1)];
-         title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
-         xlabel="time [time step]",
-         ylabel="g-function value [-]",
-         legend=false,
-         linewidth=6,
-         gridlinewidth=1,
-         size=(1800, 1200),
-         titlefontsize=30,
-         guidefontsize=24,
-         tickfontsize=24,
-         legendfontsize=24,
-         grid=true,
-         minorgrid=true,
-         margin=15Plots.mm)
+    p = plot(0:Int(sim_params["number_of_time_steps"]),
+             unit.g_function[1:Int(sim_params["number_of_time_steps"] + 1)];
+             title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
+             xlabel="time [time step]",
+             ylabel="g-function value [-]",
+             legend=false,
+             linewidth=6,
+             gridlinewidth=1,
+             size=(1800, 1200),
+             titlefontsize=30,
+             guidefontsize=24,
+             tickfontsize=24,
+             legendfontsize=24,
+             grid=true,
+             minorgrid=true,
+             margin=15Plots.mm)
     fig_name = "probe_field_g_funcion_$(unit.uac)"
     for output_format in output_formats
-        savefig(output_path * "/" * fig_name * "." * output_format)
+        savefig(p, output_path * "/" * fig_name * "." * output_format)
     end
 
     if unit.probe_coordinates !== nothing
         # plot probe field configuration
         lib_default_spacing = 5
-        scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing),
-                [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing);
-                title="probe field configuration for \"$(unit.uac)\"",
-                xlabel="distribution in x direction [m]",
-                ylabel="distribution in y direction [m]",
-                aspect_ratio=:equal,
-                legend=false,
-                markersize=6,
-                gridlinewidth=1,
-                size=(1800, 1200),
-                titlefontsize=30,
-                guidefontsize=24,
-                tickfontsize=24,
-                legendfontsize=24,
-                grid=true,
-                minorgrid=true,
-                margin=10Plots.mm)
+        p = scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing),
+                    [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing);
+                    title="probe field configuration for \"$(unit.uac)\"",
+                    xlabel="distribution in x direction [m]",
+                    ylabel="distribution in y direction [m]",
+                    aspect_ratio=:equal,
+                    legend=false,
+                    markersize=6,
+                    gridlinewidth=1,
+                    size=(1800, 1200),
+                    titlefontsize=30,
+                    guidefontsize=24,
+                    tickfontsize=24,
+                    legendfontsize=24,
+                    grid=true,
+                    minorgrid=true,
+                    margin=10Plots.mm)
         fig_name = "probe_field_geometry_$(unit.uac)"
         for output_format in output_formats
-            savefig(output_path * "/" * fig_name * "." * output_format)
+            savefig(p, output_path * "/" * fig_name * "." * output_format)
         end
         # throw not needed values away
         unit.probe_coordinates = nothing
