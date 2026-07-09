@@ -520,6 +520,9 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         end
     else
         # perform single simulation run
+        # establish overarching locks for parallelization
+        run_lock = ReentrantLock()
+        output_lock = ReentrantLock()
         _ = run_sample(io_settings, sim_params, nothing, project_config,
                        nothing, run_ID, run_lock, output_lock; suppress_all_output=false)
     end
