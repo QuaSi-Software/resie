@@ -1459,7 +1459,7 @@ function get_optimisation_parameters(project_config::AbstractDict{String,Any},
     EnergySystems.validate_config(EnergySystems.Component, optimiser_config, "Optimisation parameters",
                                   sim_params, OPTIMISATION_PARAMATERS_DEF)
 
-    optimiser = load_optimiser(optimiser_config)
+    optimiser = load_optimiser(optimiser_config, sim_params)
 
     return optimiser
 end
@@ -1485,7 +1485,7 @@ end
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")
 
-function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
+function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{String,Any})::Dict{String,Any}
     optimiser = Dict{String,Any}()
     optimiser["type"] = optimiser_config["type"]
     optimiser["run_optimisation"] = true
@@ -1535,6 +1535,15 @@ function load_optimiser(optimiser_config::Dict{String,Any})::Dict{String,Any}
             elseif obj != "economic" && obj != "emissions"
                 @error "Objective parameter {$obj: $value} could not be read. $obj has " *
                        "to be one of 'sum', 'mean', 'economic', 'emissions'."
+                throw(InputError())
+            end
+            if obj == "economic" && !sim_params["economic_parameters"]["calculate_economy"]
+                @error "For optimisation, the objective parameter `economic` is chose, but the " *
+                       "flag `calculate_economy` is set to false. Activate it in the `economic_parameters` section."
+                throw(InputError())
+            elseif obj == "emissions" && !sim_params["emissions_parameters"]["calculate_emissions"]
+                @error "For optimisation, the objective parameter `emissions` is chose, but the " *
+                       "flag `calculate_emissions` is set to false. Activate it in the `emissions_parameters` section."
                 throw(InputError())
             end
         end
