@@ -118,7 +118,7 @@ Objective function called by algorithms. Wraps running of single simulations in 
 compatible format. Can be used as a batch function with Arrays for algorithms supporting it.
 
 # Arguments
-- `all_results::Array{Any}`: Results of all runs
+- `all_results::Vector{Any}`: Results of all runs
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
 - `optim_results_path::String`: Filepath for optim_results
@@ -165,7 +165,7 @@ neighborhood and the number of results (sorted by) global measure, from which a 
 is drawn.
 
 # Arguments
-- `all_results::Array{Any}`: Results of all runs
+- `all_results::Vector{Any}`: Results of all runs
 - `io_settings::Dict{String,Any}`: IO settings used for simulation output and result writing.
 - `obj::Array{Union{Float64,Nothing}}`: Objectives for optimisation
 - `obj_lock::ReentrantLock`:: Lock for obj
@@ -179,7 +179,7 @@ is drawn.
 - `results_lock::ReentrantLock`: Lock for all_results
 - `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 """
-function monte_carlo_annealing!(all_results::Array{Any}, io_settings::Dict{String,Any},
+function monte_carlo_annealing!(all_results::Vector{Any}, io_settings::Dict{String,Any},
                                 obj::Array{Union{Float64,Nothing}}, obj_lock::ReentrantLock,
                                 sim_params::Dict{String,Any}, optim_results_path::String,
                                 project_config::OrderedDict{String,Any}, idx::Int64,
@@ -248,7 +248,7 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 # Arguments
 - `model_function::Function`: Function to run if more datapoints are needed
 - `bounds::Array{Float64}`: Bounds in which to analyse parameters
-- `all_results::Array{Any}`: Results of all runs
+- `all_results::Vector{Any}`: Results of all runs
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Float64`: Total-order Sobol sensitivity index
@@ -257,8 +257,8 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 - `Float64`: R^2 for the surrogate model
 """
 function calc_global_sensitivity!(model_function::Function, bounds::Array{Float64},
-                                  all_results::Array{Float64},
-                                  sim_params::Dict{String,Any})::Tuple{Float64,Float64,Float64,Float64}
+                                  all_results::Vector{Any},
+                                  sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
     d = size(bounds, 1)
     deg = 3
     op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
@@ -327,7 +327,7 @@ function calc_global_sensitivity!(model_function::Function, bounds::Array{Float6
         y = vcat(y, y_new)
 
         X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
-        coeffs, rel_rmse, r2 = fit_and_loocv(X_std, y, mop)
+        coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
     end
 
     # Calculate Sobol indices from coefficients 
@@ -389,7 +389,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
     cancel_optimisation = Threads.Atomic{Bool}(false)
 
     # prepare result vector
-    all_results = []
+    all_results = Vector{Any}()
 
     if length(optimiser["iterator"]) > 1
         nr_runs = Atomic{Int}(1)
