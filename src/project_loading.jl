@@ -1664,7 +1664,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         kwargs_general = Dict{Symbol,Any}()
         kwargs_alg = Dict{Symbol,Any}()
 
-        if optimiser_config["max_runs"] < 100
+        if haskey(optimiser_config, "max_runs") && optimiser_config["max_runs"] < 100
             @warn "'max_runs' of optimiser are smaller than algorithm default for " *
                   "one generation of 100. This may lead to poor results."
             kwargs_alg[:N] = ceil(optimiser_config["max_runs"]/4)
