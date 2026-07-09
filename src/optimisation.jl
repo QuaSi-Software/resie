@@ -385,6 +385,18 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
     optimiser = sim_params["optimisation"]
 
+    # ensure disabled file outputs for multi-thread simulations, as this can lead to troubles
+    uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
+                                      (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1) ||
+                                      (optimiser["type"] == "GlobalSensitivity" && Threads.nthreads() > 1)
+
+    if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
+        throw(InputError("Parallel optimisation sample evaluation requires " *
+                         "`optimisation.disable_all_simulation_outputs = true`. " *
+                         "Plots.jl/GR output is not thread-safe when multiple samples write plots concurrently. " *
+                         "Either set `disable_all_simulation_outputs` to true or use a non-threaded optimiser."))
+    end
+
     # handle interruption via STR+C for parallel runs and optimisation
     cancel_optimisation = Threads.Atomic{Bool}(false)
 
