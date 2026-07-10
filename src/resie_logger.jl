@@ -85,7 +85,7 @@ Base.show(io::IO, level::CustomLevel) =
     if level == BalanceWarning
         print(io, "BalanceWarning")
     elseif level == GlobalInfo
-        print(io, "Info")
+        print(io, "GlobalInfo")
     else
         show(io, LogLevel(level))
     end
