@@ -23,6 +23,7 @@ Avaiblable logging level:
  Debug          | @debug        | Logging.LogLevel(-1000) 
  Info           | @info         | Logging.LogLevel(    0)
  BalanceWarning | @balanceWarn  | Logging.LogLevel(  500)  <-- this is a custom log level!
+ GlobalInfo     | @globalInfo   | Logging.LogLevel(  700)  <-- this is a custom log level!
  Warn           | @warn         | Logging.LogLevel( 1000)
  Error          | @error        | Logging.LogLevel( 2000)
 """
@@ -62,8 +63,8 @@ macro balanceWarn(exprs...)
 end
 
 """
-Adding custom level "GlobalInfo" of level 500.
-This can be used with the @balanceWarn macro.
+Adding custom level "GlobalInfo" of level 700.
+This can be used with the @globalInfo macro.
 
 To add further custom levels, you need to define a new constant using the 
 CustomLevel struct, the corresponding macro and export the macro. 
