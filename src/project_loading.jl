@@ -1459,7 +1459,7 @@ function get_optimisation_parameters(project_config::AbstractDict{String,Any},
     EnergySystems.validate_config(EnergySystems.Component, optimiser_config, "Optimisation parameters",
                                   sim_params, OPTIMISATION_PARAMATERS_DEF)
 
-    optimiser = load_optimiser(optimiser_config, sim_params)
+    optimiser = load_optimiser(optimiser_config, sim_params, project_config)
 
     return optimiser
 end
@@ -1485,7 +1485,8 @@ end
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")
 
-function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{String,Any})::Dict{String,Any}
+function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{String,Any}, 
+                        project_config::AbstractDict{String,Any})::Dict{String,Any}
     optimiser = Dict{String,Any}()
     optimiser["type"] = optimiser_config["type"]
     optimiser["run_optimisation"] = true
@@ -1501,6 +1502,16 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     for (uac, params) in pairs(sort(optimiser_config["optim_params"]))
         for (key_param, def) in pairs(sort(params))
             key = uac * " " * key_param
+            if !(uac in keys(project_config["components"]) || 
+                 uac in keys(project_config) ||
+                 key_param in keys(project_config["components"][uac]) || 
+                 key_param in keys(project_config[uac])
+                 )
+               # end of expression
+                @error "$key of optim_params is not a parameter in the input file. " *
+                       "Check for spelling errors or the description in the documentation."
+                throw(InputError()) 
+            end
             push!(optimiser["optim_params_keys"], key)
             if haskey(def, "values")
                 push!(optimiser["optim_params_values"], def["values"])
@@ -1536,12 +1547,14 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                 throw(InputError())
             end
             if obj == "economic" && !sim_params["economic_parameters"]["calculate_economy"]
-                @error "For optimisation, the objective parameter `economic` is chose, but the " *
-                       "flag `calculate_economy` is set to false. Activate it in the `economic_parameters` section."
+                @error "For optimisation, the objective parameter `economic` is chosen, " *
+                       "but the flag `calculate_economy` is set to false. Activate it in " *
+                       "the `economic_parameters` section."
                 throw(InputError())
             elseif obj == "emissions" && !sim_params["emissions_parameters"]["calculate_emissions"]
-                @error "For optimisation, the objective parameter `emissions` is chose, but the " *
-                       "flag `calculate_emissions` is set to false. Activate it in the `emissions_parameters` section."
+                @error "For optimisation, the objective parameter `emissions` is chosen, " *
+                       "but the flag `calculate_emissions` is set to false. Activate it " *
+                       "in the `emissions_parameters` section."
                 throw(InputError())
             end
         end
