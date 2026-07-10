@@ -41,8 +41,12 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
     # set up the parameters for this simulation variant
     run_name = ""
     for (key, value) in pairs(sample_params)
-        category, uac, param_key = split(key, " ")
-        cfg[category][uac][param_key] = value
+        uac, param_key = split(key, " ")
+        if uac in keys(cfg["components"])
+            cfg["components"][uac][param_key] = value
+        else
+            cfg[uac][param_key] = value
+        end
         run_name *= uac * "_" * param_key * "_" * compact_value(value) * "_"
     end
 
@@ -67,44 +71,6 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
     #         profile_scales[name] = profile["scale"]
     #         profile_addons[name] = profile["addon"]
     #     end
-
-    #     # create correct profiles from price_profile_paths and add the to sim_output.
-    #     # profiles will be overwritten for every run to make sure the profile_scales and 
-    #     # profile_addons calculated correctly.
-    #     # If multiple threads are used each thread gets their own profile.
-    #     #TODO change directiory to something better
-    #     profile_dir = sim_params["run_path"]("./profiles/parallel_runs")
-    #     mkpath(profile_dir)
-
-    #     profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
-    #     date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
-    #     new_paths = Dict{String,String}() 
-
-    #     for (name, path) in pairs(profile_paths)
-    #         if profile_scales[name] != 1 && profile_addons[name] != 0 && profile_id == 0
-    #             new_paths[name] = path
-    #         else
-    #             profile = Profile(path, sim_params)
-    #             values = [profile.data[dt] .* profile_scales[name] .+ profile_addons[name] for dt in date_range]
-    #             new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
-    #             save_to_prf(collect(date_range), values, new_path)
-    #             new_paths[name] = path
-    #         end
-    #     end
-
-    #     # replace the profile names with the paths to the new profiles
-    #     function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,String})
-    #         for (k, v) in cfg
-    #             if v isa String && haskey(replacements, v)
-    #                 cfg[k] = replacements[v]
-    #             elseif v isa AbstractDict
-    #                 replace_profiles!(v, replacements)
-    #             end
-    #         end
-
-    #     end
-
-    #     replace_profiles!(cfg, new_paths)
     # end
 
     return cfg

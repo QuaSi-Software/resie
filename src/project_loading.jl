@@ -737,26 +737,12 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         default="nothing",
         description="Sets type of optimisation algorithm",
         display_name="optimisation type",
-        required=true,
+        required=false,
         conditionals=["run_optimisation", "is", true],
         options=["parametervariation", "monte_carlo_annealing", "Optim", "BlackBoxOptim", 
                  "Metaheuristics", "NLopt", "NOMAD"],
         type=String,
         json_type="string",
-        unit="-"
-    ),
-    "iterator" => (
-        default="product",
-        description="Selects the iterator to combine the optim_params. Can be one of " *
-                    "`product`, `zip` or `random_*` where the star is an integer " *
-                    "defining how many combinations are randomly chosen.",
-        display_name="Iterator for parametervariation",
-        required=false,
-        #TODO check if this is functioning like ; remove
-        options=["product", "zip", r"^random_\d+$"],
-        conditionals=[("type", "is", "parametervariation")],
-        type=String,
-        json_type="object",
         unit="-"
     ),
     "optim_params" => (
@@ -765,7 +751,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
                     "the optimisation. Definition follows the definition of components. " *
                     "See the documentation for more details.",
         display_name="optimisation parameters",
-        required=true,
+        required=false,
         conditionals=[("type", "is_not_nothing")],
         type=Dict{String,Any},
         json_type="object",
@@ -776,8 +762,11 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         description="Optimisation algorithm that is used from packages `Optim` and " *
                     "`BlackBoxOptim`",
         display_name="Optimisation algorithm",
-        required=true,
-        conditionals=[("type", "is_one_of", ("Optim", "BlackBoxOptim"))],
+        required=false,
+        conditionals=[("type", "is_one_of", 
+                       ("Optim", "BlackBoxOptim", "Metaheuristics", "NLopt", 
+                        "parametervariation")
+                       )],
         type=String,
         json_type="string",
         unit="-"
@@ -810,7 +799,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
                     "Currently only `sum` and `poly-2` are implemented. " *
                     "See the documentation for more details.",
         display_name="Objective function",
-        required=true,
+        required=false,
         type=String,
         json_type="string",
         unit="-"
@@ -833,12 +822,12 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         json_type="number",
         unit="-"
     ),
-    "f_tol_abs" => (
+    "max_time" => (
         default=nothing,
-        description="Absolute tolerance for the objective function",
-        display_name="Absolute tolerance objective function",
+        description="Set the maximum time in seconds before the optimisation stops.",
+        display_name="Max time",
         required=false,
-        type=Float64,
+        type=Int64,
         json_type="number",
         unit="-"
     ),
@@ -847,6 +836,17 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         description="Absolute tolerance for the objective parameters",
         display_name="Absolute tolerance objective parameters",
         required=false,
+        conditionals=[("type", "is_one_of", ("Optim", "NLopt", "NOMAD"))],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "f_tol_abs" => (
+        default=nothing,
+        description="Absolute tolerance for the objective function",
+        display_name="Absolute tolerance objective function",
+        required=false,
+        conditionals=[("type", "is_one_of", ("Optim", "NLopt"))],
         type=Float64,
         json_type="number",
         unit="-"
@@ -1498,27 +1498,25 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     optimiser["optim_params_values"] = []
     # Matrix with bounds with colums being lower_bound, upper_bound, start_value
     bounds = Array{Float64}(undef, 0, 3)
-    for (category, uacs) in pairs(optimiser_config["optim_params"])
-        for (uac, params) in pairs(uacs)
-            for (key_param, def) in pairs(params)
-                key = category * " " * uac * " " * key_param
-                push!(optimiser["optim_params_keys"], key)
-                if haskey(def, "values")
-                    push!(optimiser["optim_params_values"], def["values"])
-                    bounds = vcat(bounds,
-                                  [minimum(def["values"]) maximum(def["values"]) (minimum(def["values"]) +
-                                                                                  maximum(def["values"])) / 2])
-                elseif haskey(def, "min") && haskey(def, "max")
-                    values = range(; start=def["min"], stop=def["max"], length=100)
-                    push!(optimiser["optim_params_values"], values)
-                    start_val = ifelse(haskey(def, "start"), def["start"], (def["min"] + def["max"]) / 2)
-                    bounds = vcat(bounds, [def["min"] def["max"] start_val])
-                else
-                    def = Dict(Symbol(k) => v for (k, v) in def)
-                    values = range(; def...)
-                    push!(optimiser["optim_params_values"], values)
-                    bounds = vcat(bounds, [minimum(values) maximum(values) (minimum(values) + maximum(values)) / 2])
-                end
+    for (uac, params) in pairs(optimiser_config["optim_params"])
+        for (key_param, def) in pairs(params)
+            key = uac * " " * key_param
+            push!(optimiser["optim_params_keys"], key)
+            if haskey(def, "values")
+                push!(optimiser["optim_params_values"], def["values"])
+                bounds = vcat(bounds,
+                                [minimum(def["values"]) maximum(def["values"]) (minimum(def["values"]) +
+                                                                                maximum(def["values"])) / 2])
+            elseif haskey(def, "min") && haskey(def, "max")
+                values = range(; start=def["min"], stop=def["max"], length=100)
+                push!(optimiser["optim_params_values"], values)
+                start_val = ifelse(haskey(def, "start"), def["start"], (def["min"] + def["max"]) / 2)
+                bounds = vcat(bounds, [def["min"] def["max"] start_val])
+            else
+                def = Dict(Symbol(k) => v for (k, v) in def)
+                values = range(; def...)
+                push!(optimiser["optim_params_values"], values)
+                bounds = vcat(bounds, [minimum(values) maximum(values) (minimum(values) + maximum(values)) / 2])
             end
         end
     end
@@ -1561,15 +1559,20 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     end
 
     if optimiser_config["type"] == "parametervariation"
-        if optimiser_config["iterator"] == "product"
+        if optimiser_config["algorithm"] == "product"
             optimiser["iterator"] = Iterators.product(optimiser["optim_params_values"]...)
-        elseif optimiser_config["iterator"] == "zip"
+        elseif optimiser_config["algorithm"] == "zip"
             optimiser["iterator"] = zip(optimiser["optim_params_values"]...)
-        elseif split(optimiser_config["iterator"], "_")[1] == "random"
+        elseif split(optimiser_config["algorithm"], "_")[1] == "random"
             iter = Iterators.product(optimiser["optim_params_values"]...)
-            n_samples = min(parse(Int, split(optimiser_config["iterator"], "_")[2]),
+            n_samples = min(parse(Int, split(optimiser_config["algorithm"], "_")[2]),
                             length(iter))
             optimiser["iterator"] = rand(collect(iter), n_samples)
+        else
+            @error "Algorithm $(optimiser_config["algorithm"]) is not supported for type " *
+                   "`parametervariation`. Has to be one of `product`, `zip` or " *
+                   "`random_*`, where * is a integer]" *
+            throw(InputError())
         end
 
     elseif optimiser_config["type"] == "monte_carlo_annealing"
@@ -1615,6 +1618,15 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:f_calls_limit] = optimiser_config["max_runs"]
         end
+        if !isnothing(optimiser_config["max_time"])
+            optimiser["kwargs"][:time_limit] = optimiser_config["max_time"]
+        end
+        if !isnothing(optimiser_config["x_tol_abs"])
+            optimiser["kwargs"][:x_abstol] = optimiser_config["x_tol_abs"]
+        end
+        if !isnothing(optimiser_config["f_tol_abs"])
+            optimiser["kwargs"][:f_abstol] = optimiser_config["f_tol_abs"]
+        end
 
         push!(optimiser["args"], Optim.Options(; optimiser["kwargs"]...))
 
@@ -1641,6 +1653,9 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
         end
+        if !isnothing(optimiser_config["max_time"])
+            optimiser["kwargs"][:MaxTime] = optimiser_config["max_time"]
+        end
         if haskey(optimiser_config, "optim_kwargs")
             for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
                 optimiser["kwargs"][Symbol(keyword)] = val
@@ -1664,7 +1679,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         kwargs_general = Dict{Symbol,Any}()
         kwargs_alg = Dict{Symbol,Any}()
 
-        if haskey(optimiser_config, "max_runs") && optimiser_config["max_runs"] < 100
+        if !isnothing(optimiser_config["max_runs"]) && optimiser_config["max_runs"] < 100
             @warn "'max_runs' of optimiser are smaller than algorithm default for " *
                   "one generation of 100. This may lead to poor results."
             kwargs_alg[:N] = ceil(optimiser_config["max_runs"]/4)
@@ -1684,6 +1699,9 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         end
         if !isnothing(optimiser_config["max_runs"])
             kwargs_general[:f_calls_limit] = optimiser_config["max_runs"]
+        end
+        if !isnothing(optimiser_config["max_time"])
+            kwargs_general[:time_limit] = optimiser_config["max_time"]
         end
 
         if haskey(optimiser_config, "optim_kwargs")
@@ -1721,7 +1739,9 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:maxeval] = optimiser_config["max_runs"]
         end
-
+        if !isnothing(optimiser_config["max_time"])
+            optimiser["kwargs"][:maxtime] = optimiser_config["max_time"]
+        end
         if !isnothing(optimiser_config["x_tol_abs"])
             optimiser["kwargs"][:xtol_abs] = optimiser_config["x_tol_abs"]
         end
@@ -1757,6 +1777,9 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         if !isnothing(optimiser_config["max_runs"])
             kwargs_general[:max_bb_eval] = optimiser_config["max_runs"]
         end
+        if !isnothing(optimiser_config["max_time"])
+            kwargs_general[:max_time] = optimiser_config["max_time"]
+        end 
 
         if haskey(optimiser_config, "optim_kwargs")
             for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
@@ -1772,16 +1795,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                              fill("OBJ", optimiser["N_obj"]), bounds[:, 3]]
 
     else
-        #TODO double check what packages to implement
-        # x Metaheuristics for CMA-ES? and wide range of BB algorithms
-        #   -> brought 4 dependencies
-        # x NLopt for Pawel algorithms BOBYQA, COBYLA, ... and wide range of other algorithms
-        #   -> brought 2 dependencies
-        # x NOMAD for MADS (mesh adaptive direct search) algorithm thats supposedly good for heavy problems 
-        #   -> brought 13-17 additional dependencies
-        #TODO handle multi-objective since most algorithms support it 
-        # x handle input
-        # - plot outputs like pareto front -> example see optimisation-cli.jl
+        #TODO plot outputs like pareto front -> example see optimisation-cli.jl
     end
 
     return optimiser
@@ -1797,10 +1811,9 @@ function parse_objective_function(eff_def::String)::Tuple{Function,String}
         method = eff_def
     end
 
-    #TODO get more function definitions analog to different optimisation packages
     if method == "sum"
         f = x -> sum(Float64.(x))
-        #TODO check how to keep or define order
+    #TODO check how to keep or define order
     elseif method == "linear"
         params = parse.(Float64, split(data, ","))
         f = x -> sum(Float64.(x) .* params)
