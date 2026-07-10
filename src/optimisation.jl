@@ -105,13 +105,15 @@ function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
                      sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
                      output_lock::ReentrantLock,
                      results_lock::ReentrantLock;
-                     cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)::Union{Array{Float64},Float64}
+                     cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
+                     preparation_cache::Union{Nothing,PreparationCache}=nothing)::Union{Array{Float64},Float64}
     sample_params = Dict{String,Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
     run_ID = uuid4()
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          sample_params, run_ID, run_lock, output_lock;
                          suppress_all_output=sim_params["optimisation"]["disable_all_simulation_outputs"],
-                         cancel_flag=cancel_flag)
+                         cancel_flag=cancel_flag,
+                         preparation_cache=preparation_cache)
 
     lock(results_lock) do
         push!(all_results, results)
@@ -151,7 +153,8 @@ function monte_carlo_annealing!(all_results::Vector{Any}, io_settings::Dict{Stri
                                 project_config::OrderedDict{String,Any}, idx::Int64,
                                 run_ID::UUID, run_lock::ReentrantLock,
                                 output_lock::ReentrantLock, results_lock::ReentrantLock;
-                                cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)
+                                cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
+                                preparation_cache::Union{Nothing,PreparationCache}=nothing)
     optimiser = sim_params["optimisation"]
     # temperature schedule is simple inverse logistic curve
     temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimiser["iterator"]) - 0.5)))
@@ -182,7 +185,8 @@ function monte_carlo_annealing!(all_results::Vector{Any}, io_settings::Dict{Stri
     results = run_sample(io_settings, sim_params, optim_results_path, project_config,
                          sample_params, run_ID, run_lock, output_lock;
                          suppress_all_output=optimiser["disable_all_simulation_outputs"],
-                         cancel_flag=cancel_flag)
+                         cancel_flag=cancel_flag,
+                         preparation_cache=preparation_cache)
 
     # calculate minimum of results
     if any(!isnothing(obj))
@@ -339,7 +343,8 @@ and dispatches the corresponding optimisation workflow.
 """
 function perform_optimisation(io_settings::Dict{String,Any},
                               sim_params::Dict{String,Any},
-                              project_config::OrderedDict{String,Any})::Tuple{Bool,Vector{Any}}
+                              project_config::OrderedDict{String,Any};
+                              preparation_cache::Union{Nothing,PreparationCache}=nothing)::Tuple{Bool,Vector{Any}}
     # establish overarching locks for parallelization
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
@@ -350,6 +355,13 @@ function perform_optimisation(io_settings::Dict{String,Any},
     end
 
     optimiser = sim_params["optimisation"]
+
+    # calculate inputs that should be cashed
+    if preparation_cache !== nothing
+        @globalInfo "Prewarming preparation cache."
+        warmup_run_ID = uuid4()
+        prepare_inputs(project_config, warmup_run_ID; preparation_cache=preparation_cache)
+    end
 
     # ensure disabled file outputs for multi-thread simulations, as this can lead to troubles
     uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
@@ -368,6 +380,8 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
     # prepare result vector
     all_results = Vector{Any}()
+
+    @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
 
     if length(optimiser["iterator"]) > 1
         nr_runs = Atomic{Int}(1)
@@ -389,14 +403,18 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 if optimiser["type"] == "parametervariation"
                     optim_func!(all_results, io_settings, sim_params, optim_results_path,
                                 project_config, sample_values,
-                                run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+                                run_lock, output_lock, results_lock;
+                                cancel_flag=cancel_optimisation,
+                                preparation_cache=preparation_cache)
 
                 elseif optimiser["type"] == "monte_carlo_annealing"
                     # TODO this is not working currently...
                     monte_carlo_annealing!(all_results, io_settings, obj, obj_lock,
                                            sim_params, optim_results_path, project_config,
                                            sample_values, sample_ID,
-                                           run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+                                           run_lock, output_lock, results_lock;
+                                           cancel_flag=cancel_optimisation,
+                                           preparation_cache=preparation_cache)
                 end
                 runtime = round(Int, seconds(now() - start_time))
                 max_runs = length(optimiser["iterator"])
@@ -421,7 +439,9 @@ function perform_optimisation(io_settings::Dict{String,Any},
             try
                 optim_func!(all_results, io_settings, sim_params, optim_results_path,
                             project_config, sample_values,
-                            run_lock, output_lock, results_lock; cancel_flag=cancel_optimisation)
+                            run_lock, output_lock, results_lock;
+                            cancel_flag=cancel_optimisation,
+                            preparation_cache=preparation_cache)
             catch e
                 if e isa InterruptException
                     cancel_optimisation[] = true
