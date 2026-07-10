@@ -1498,8 +1498,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     optimiser["optim_params_values"] = []
     # Matrix with bounds with colums being lower_bound, upper_bound, start_value
     bounds = Array{Float64}(undef, 0, 3)
-    for (uac, params) in pairs(optimiser_config["optim_params"])
-        for (key_param, def) in pairs(params)
+    for (uac, params) in pairs(sort(optimiser_config["optim_params"]))
+        for (key_param, def) in pairs(sort(params))
             key = uac * " " * key_param
             push!(optimiser["optim_params_keys"], key)
             if haskey(def, "values")
