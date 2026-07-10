@@ -546,8 +546,8 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "matrix_plot_spec" => (
         default=nothing,
-        description="Specification for the matrix plot in custom mode. See documentation " *
-                    "for how this needs to be structured.",
+        description="Specification of the objective in the matrix plot in custom mode. " *
+                    "Has same structure as objective_params.",
         display_name="Matrix plot specification",
         required=false,
         conditionals=[("matrix_plot", "is", "custom")],
@@ -1671,8 +1671,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     optimiser["optim_params_values"] = []
     # Matrix with bounds with colums being lower_bound, upper_bound, start_value
     bounds = Array{Float64}(undef, 0, 3)
-    for (uac, params) in pairs(sort(optimiser_config["optim_params"]))
-        for (key_param, def) in pairs(sort(params))
+    for (uac, params) in pairs(sort(optimiser_config["optim_params"], by=lowercase))
+        for (key_param, def) in pairs(sort(params, by=lowercase))
             key = uac * " " * key_param
             if !(uac in keys(project_config["components"]) || 
                  uac in keys(project_config) ||
