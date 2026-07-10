@@ -514,14 +514,16 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     end
 
     @globalInfo "-- Now preparing inputs"
+    preparation_cache = PreparationCache()
 
     io_settings = get_io_settings(project_config)
-    sim_params = get_simulation_params(project_config, io_settings)
+    sim_params = get_simulation_params(project_config, io_settings;
+                                       preparation_cache=preparation_cache)
 
     if sim_params["optimisation"]["run_optimisation"]
         # perform multiple simulation runs
-        @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
-        success, all_results = perform_optimisation(io_settings, sim_params, project_config)
+        success, all_results = perform_optimisation(io_settings, sim_params, project_config;
+                                                    preparation_cache=preparation_cache)
 
         if success &&
            io_settings["matrix_plot"] != "nothing" &&
@@ -535,7 +537,9 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         run_lock = ReentrantLock()
         output_lock = ReentrantLock()
         _ = run_sample(io_settings, sim_params, nothing, project_config,
-                       nothing, run_ID, run_lock, output_lock; suppress_all_output=false)
+                       nothing, run_ID, run_lock, output_lock;
+                       suppress_all_output=false,
+                       preparation_cache=preparation_cache)
     end
 
     return success
@@ -566,7 +570,8 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
                     optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any},
                     sample_params::Union{Dict{String,Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock,
                     output_lock::ReentrantLock; suppress_all_output::Bool=false,
-                    cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)::OrderedDict{String,Any}
+                    cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
+                    preparation_cache::Union{Nothing,PreparationCache}=nothing)::OrderedDict{String,Any}
     start = now()
     if !isnothing(sample_params)
         project_config = create_variant(io_settings, sim_params, project_config, sample_params)
@@ -581,7 +586,8 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
     end
 
     try
-        sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID)
+        sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID;
+                                                                         preparation_cache=preparation_cache)
         @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
         lock(run_lock) do

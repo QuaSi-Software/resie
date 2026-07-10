@@ -7,6 +7,130 @@ using OrderedCollections: OrderedDict
 const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
 
+"""
+Shared preparation cache used during optimisation.
+
+The cache stores expensive, effectively read-only setup results that may be reused between
+simulation samples. Components themselves are intentionally not cached because component
+instances are mutable during a simulation run.
+"""
+mutable struct PreparationCache
+    lock::ReentrantLock
+    profiles::Dict{Any,Any}
+    weather_data::Dict{Any,Any}
+    operations::Dict{Any,Any}
+end
+
+PreparationCache() = PreparationCache(ReentrantLock(),
+                                      Dict{Any,Any}(),
+                                      Dict{Any,Any}(),
+                                      Dict{Any,Any}())
+
+function operation_cache_allowed(sim_params::Dict{String,Any})::Bool
+    optimiser = get(sim_params, "optimisation", Dict{String,Any}())
+
+    if !haskey(optimiser, "optim_params_keys")
+        return true
+    end
+
+    # Conservative blocklist. If one of these parameters is optimised, the component graph
+    # or the operation order may change, so the operation cache is disabled.
+    structural_params = Set(["type",
+                             "medium",
+                             "m_el_in",
+                             "m_heat_in",
+                             "m_heat_out",
+                             "m_heat_out_secondary",
+                             "has_secondary_interface",
+                             "primary_el_sources",
+                             "secondary_el_sources",
+                             "input_refs",
+                             "output_refs",
+                             "input_order",
+                             "output_order",
+                             "connections",
+                             "energy_flow"])
+
+    for key in optimiser["optim_params_keys"]
+        parts = split(key, " ")
+        if parts[end] in structural_params
+            return false
+        end
+    end
+
+    return true
+end
+
+function operation_cache_key(project_config::AbstractDict{String,Any},
+                             sim_params::Dict{String,Any})::String
+    optimiser = get(sim_params, "optimisation", Dict{String,Any}())
+
+    component_cfg = deepcopy(project_config["components"])
+
+    # Non-structural optimised component values should not invalidate the
+    # operation-order cache. 
+    if haskey(optimiser, "optim_params_keys")
+        for opt_key in optimiser["optim_params_keys"]
+            uac, param_key = split(opt_key, " ")
+            if haskey(component_cfg, uac) && haskey(component_cfg[uac], param_key)
+                component_cfg[uac][param_key] = "__OPTIMISED_NONSTRUCTURAL_VALUE__"
+            end
+        end
+    end
+
+    order_cfg = get(project_config, "order_of_operation", Any[])
+
+    return JSON.json(Dict(
+                         "components" => component_cfg,
+                         "order_of_operation" => order_cfg,
+                     ))
+end
+
+function build_operations(project_config::AbstractDict{String,Any},
+                          components::Grouping)::OrderOfOperations
+    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
+        operations = load_order_of_operations(project_config["order_of_operation"], components)
+        @info "The order of operations was successfully imported from the input file.\n" *
+              "Note that the order of operations has a major impact on the simulation " *
+              "result and should only be changed by experienced users!"
+        return operations
+    else
+        return calculate_order_of_operations(components)
+    end
+end
+
+function get_operations(project_config::AbstractDict{String,Any},
+                        components::Grouping,
+                        sim_params::Dict{String,Any},
+                        preparation_cache::Union{Nothing,PreparationCache})::OrderOfOperations
+    if preparation_cache === nothing || !operation_cache_allowed(sim_params)
+        return build_operations(project_config, components)
+    end
+
+    key = operation_cache_key(project_config, sim_params)
+
+    cached = lock(preparation_cache.lock) do
+        get(preparation_cache.operations, key, nothing)
+    end
+
+    if cached !== nothing
+        # Return a fresh vector so reorderings of the run-local operation vector cannot
+        # mutate the cached template.
+        return deepcopy(cached)
+    end
+
+    operations = build_operations(project_config, components)
+
+    lock(preparation_cache.lock) do
+        if !haskey(preparation_cache.operations, key)
+            preparation_cache.operations[key] = deepcopy(operations)
+        end
+    end
+
+    return operations
+end
+
+
 #! format: off
 const IO_SETTINGS_DEF = Dict{String,Any}(
     "base_path" => (
@@ -941,7 +1065,8 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::AbstractDict{String,Any},
-                               io_settings::Dict{String,Any})::Dict{String,Any}
+                               io_settings::Dict{String,Any};
+                               preparation_cache::Union{Nothing,PreparationCache}=nothing)::Dict{String,Any}
     # load time and step info directly, bypassing extraction and validation
     time_step,
     start_date,
@@ -982,6 +1107,10 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
                            "show_detailed_errors" => io_settings["show_detailed_errors"],
                        ))
 
+    if preparation_cache !== nothing
+        sim_params["preparation_cache"] = preparation_cache
+    end
+
     sim_params["economic_parameters"] = get_economic_parameters(project_config, sim_params)
     sim_params["emissions_parameters"] = get_emissions_parameters(project_config, sim_params)
     sim_params["optimisation"] = get_optimisation_parameters(project_config, sim_params)
@@ -1003,13 +1132,61 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
     # load weather profiles accessible for all components
     weather_file_path = sim_params["weather_file_path"]
     if weather_file_path !== nothing
-        # WeatherData() writes the latitude and longitude to sim_params if either of them is
-        # nothing at this point
-        sim_params["weather_data"] = WeatherData(sim_params["run_path"](weather_file_path),
-                                                 sim_params,
-                                                 guess_file_format(sim_params["run_path"](weather_file_path)),
-                                                 sim_params["weather_interpolation_type_solar"],
-                                                 sim_params["weather_interpolation_type_general"])
+        weather_path_abs = sim_params["run_path"](weather_file_path)
+
+        if preparation_cache === nothing
+            # WeatherData() writes the latitude and longitude to sim_params if either of them is
+            # nothing at this point
+            @globalInfo "Loading weather data."
+            sim_params["weather_data"] = WeatherData(weather_path_abs,
+                                                     sim_params,
+                                                     guess_file_format(weather_path_abs),
+                                                     sim_params["weather_interpolation_type_solar"],
+                                                     sim_params["weather_interpolation_type_general"])
+        else
+            # WeatherData may infer latitude, longitude, and time_zone from the file and write
+            # them into sim_params. Cache those inferred values together with the weather data.
+            key = (weather_path_abs,
+                   sim_params["start_date"],
+                   sim_params["end_date"],
+                   sim_params["time_step_seconds"],
+                   sim_params["weather_interpolation_type_solar"],
+                   sim_params["weather_interpolation_type_general"],
+                   sim_params["latitude"],
+                   sim_params["longitude"],
+                   sim_params["time_zone"])
+
+            entry = lock(preparation_cache.lock) do
+                get(preparation_cache.weather_data, key, nothing)
+            end
+
+            if entry === nothing
+                @globalInfo "Loading weather data."
+                weather_data = WeatherData(weather_path_abs,
+                                           sim_params,
+                                           guess_file_format(weather_path_abs),
+                                           sim_params["weather_interpolation_type_solar"],
+                                           sim_params["weather_interpolation_type_general"])
+
+                entry = (weather_data=weather_data,
+                         latitude=sim_params["latitude"],
+                         longitude=sim_params["longitude"],
+                         time_zone=sim_params["time_zone"])
+
+                lock(preparation_cache.lock) do
+                    if !haskey(preparation_cache.weather_data, key)
+                        preparation_cache.weather_data[key] = entry
+                    else
+                        entry = preparation_cache.weather_data[key]
+                    end
+                end
+            end
+
+            sim_params["weather_data"] = entry.weather_data
+            sim_params["latitude"] = entry.latitude
+            sim_params["longitude"] = entry.longitude
+            sim_params["time_zone"] = entry.time_zone
+        end
     end
 
     return sim_params
@@ -1029,21 +1206,16 @@ Construct and prepare parameters, energy system components and the order of oper
 -`Grouping`: The constructed energy system components
 -`OrderOfOperations`: Order of operations
 """
-function prepare_inputs(project_config::AbstractDict{String,Any}, run_ID::UUID)
+function prepare_inputs(project_config::AbstractDict{String,Any},
+                        run_ID::UUID;
+                        preparation_cache::Union{Nothing,PreparationCache}=nothing)
     io_settings = get_io_settings(project_config)
-    sim_params = get_simulation_params(project_config, io_settings)
+    sim_params = get_simulation_params(project_config, io_settings;
+                                       preparation_cache=preparation_cache)
     sim_params["run_ID"] = run_ID
 
     components = load_components(project_config["components"], sim_params)
-
-    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        operations = load_order_of_operations(project_config["order_of_operation"], components)
-        @info "The order of operations was successfully imported from the input file.\n" *
-              "Note that the order of operations has a major impact on the simulation " *
-              "result and should only be changed by experienced users!"
-    else
-        operations = calculate_order_of_operations(components)
-    end
+    operations = get_operations(project_config, components, sim_params, preparation_cache)
 
     return sim_params, io_settings, components, operations
 end
@@ -1505,8 +1677,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             if haskey(def, "values")
                 push!(optimiser["optim_params_values"], def["values"])
                 bounds = vcat(bounds,
-                                [minimum(def["values"]) maximum(def["values"]) (minimum(def["values"]) +
-                                                                                maximum(def["values"])) / 2])
+                              [minimum(def["values"]) maximum(def["values"]) (minimum(def["values"]) +
+                                                                              maximum(def["values"])) / 2])
             elseif haskey(def, "min") && haskey(def, "max")
                 values = range(; start=def["min"], stop=def["max"], length=100)
                 push!(optimiser["optim_params_values"], values)
@@ -1572,7 +1744,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             @error "Algorithm $(optimiser_config["algorithm"]) is not supported for type " *
                    "`parametervariation`. Has to be one of `product`, `zip` or " *
                    "`random_*`, where * is a integer]" *
-            throw(InputError())
+                   throw(InputError())
         end
 
     elseif optimiser_config["type"] == "monte_carlo_annealing"
@@ -1779,7 +1951,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         end
         if !isnothing(optimiser_config["max_time"])
             kwargs_general[:max_time] = optimiser_config["max_time"]
-        end 
+        end
 
         if haskey(optimiser_config, "optim_kwargs")
             for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
@@ -1813,7 +1985,7 @@ function parse_objective_function(eff_def::String)::Tuple{Function,String}
 
     if method == "sum"
         f = x -> sum(Float64.(x))
-    #TODO check how to keep or define order
+        #TODO check how to keep or define order
     elseif method == "linear"
         params = parse.(Float64, split(data, ","))
         f = x -> sum(Float64.(x) .* params)
