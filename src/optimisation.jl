@@ -201,7 +201,7 @@ function monte_carlo_annealing!(all_results::Vector{Any}, io_settings::Dict{Stri
 
         # calculate global measure and sort by it
         for res in all_results
-            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(parse_outkeys(optimiser["objective_params"]), obj))
+            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(optimiser["objective_params_keys"], obj))
         end
         sort!(all_results; by=x -> x["gm"])
     end
@@ -228,7 +228,8 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 """
 function calc_global_sensitivity!(model_function::Function, bounds::Array{Float64},
                                   all_results::Vector{Any},
-                                  sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
+                                  sim_params::Dict{String,Any}
+                                  )::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
     d = size(bounds, 1)
     deg = 3
     op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
@@ -365,15 +366,14 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
     # ensure disabled file outputs for multi-thread simulations, as this can lead to troubles
     uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
-                                      (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1) ||
-                                      (optimiser["type"] == "GlobalSensitivity" && Threads.nthreads() > 1)
+                                      (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1)
 
-    if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
-        throw(InputError("Parallel optimisation sample evaluation requires " *
-                         "`optimisation.disable_all_simulation_outputs = true`. " *
-                         "Plots.jl/GR output is not thread-safe when multiple samples write plots concurrently. " *
-                         "Either set `disable_all_simulation_outputs` to true or use a non-threaded optimiser."))
-    end
+    # if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
+    #     throw(InputError("Parallel optimisation sample evaluation requires " *
+    #                      "`optimisation.disable_all_simulation_outputs = true`. " *
+    #                      "Plots.jl/GR output is not thread-safe when multiple samples write plots concurrently. " *
+    #                      "Either set `disable_all_simulation_outputs` to true or use a non-threaded optimiser."))
+    # end
 
     # handle interruption via STR+C for parallel runs and optimisation
     cancel_optimisation = Threads.Atomic{Bool}(false)
@@ -423,6 +423,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
             catch e
                 if e isa InterruptException
                     cancel_optimisation[] = true
+                    println("InterruptException level @threads for loop")
                     continue
                 else
                     rethrow()
@@ -445,6 +446,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
             catch e
                 if e isa InterruptException
                     cancel_optimisation[] = true
+                    println("InterruptException level f")
                     rethrow()
                 else
                     rethrow()
@@ -484,6 +486,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
                                 catch e
                                     if e isa InterruptException
                                         cancel_optimisation[] = true
+                                        println("InterruptException level Metaheuristics")
                                     else
                                         rethrow()
                                     end
@@ -531,46 +534,17 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 end
                 prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f_nomad; optimiser["kwargs"]...)
                 NOMAD.solve(prob, optimiser["args"][end])
-
-            elseif optimiser["type"] == "GlobalSensitivity"
-                if Threads.nthreads() > 1
-                    f_wrap = function (sample_values)
-                        if size(sample_values, 2) > 1
-                            objectives = zeros(size(sample_values, 2))
-                            @threads for i in axes(sample_values, 2)
-                                if cancel_optimisation[]
-                                    continue
-                                end
-
-                                try
-                                    objectives[i] = f(sample_values[:, i])
-                                catch e
-                                    if e isa InterruptException
-                                        cancel_optimisation[] = true
-                                    else
-                                        rethrow()
-                                    end
-                                end
-                            end
-                            if cancel_optimisation[]
-                                throw(InterruptException())
-                            end
-                        else
-                            objectives = reshape(f(sample_values), 1, :)
-                        end
-                        return objectives
-                    end
-                else
-                    f_wrap = f
-                end
-
-                res = GlobalSensitivity.gsa(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
-                @globalInfo res
             end
 
             if optimiser["run_sensitivity"]
                 St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, sim_params)
-                @globalInfo "Global sensitivity: S_total: $St, S_first: $S1, RMSE surrogate: $rel_rmse, R2 surrogate: $r2"
+                width = length.(optimiser["optim_params_keys"])
+                @globalInfo "Global sensitivity: \n" *
+                            "\t $(join(optimiser["optim_params_keys"], "\t")) \n" *
+                            "S_total\t $(join(rpad.(round.(St, digits=3), width), "\t")) \n" *
+                            "S_first\t $(join(rpad.(round.(S1, digits=3), width), "\t")) \n" *
+                            "Surrogate RMSE: $(round(rel_rmse, digits=3)), " *
+                            "R2: $(round(r2, digits=3))"
             end
 
             runtime = round(Int, seconds(now() - start_time))
