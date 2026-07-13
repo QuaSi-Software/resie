@@ -304,33 +304,25 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
         output_data = OrderedDict{String,AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
 
-        function write_optim_results!(params::Dict{String,Any},
+        function write_optim_results!(params::Array{String},
                                       output_data::OrderedDict{String,AbstractArray},
                                       res::Dict{String,Union{Array{Float64},Float64}})
-            for (func, spec) in pairs(params)
+            for key in params
+                func = split(key, " ")[1]
+                spec = key[length(func)+2:end]
                 if func == "sum"
-                    keys = parse_outkeys(spec)
-                    for key in keys
-                        res["sum $key"] = sum(output_data[key])
-                    end
+                    res[key] = sum(output_data[spec])
                 elseif func == "mean"
-                    keys = parse_outkeys(spec)
-                    for key in keys
-                        res["mean $key"] = sum(output_data[key]) / length(output_data[key])
-                    end
+                    res[key] = sum(output_data[spec]) / length(output_data[spec])
                 elseif func == "economic"
-                    for key in spec
-                        res["$func $key"] = getfield(economic_result, Symbol(key))
-                    end
+                    res[key] = getfield(economic_result, Symbol(spec))
                 elseif func == "emissions"
-                    for key in spec
-                        res["$func $key"] = getfield(emissions_result, Symbol(key))
-                    end
+                    res[key] = getfield(emissions_result, Symbol(spec))
                 end
             end
         end
         # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
-        write_optim_results!(sim_params["optimisation"]["objective_params"], output_data,
+        write_optim_results!(sim_params["optimisation"]["objective_params_keys"], output_data,
                              optim_results)
         # calculate objective from the results 
         optim_results["objective"] = sim_params["optimisation"]["objective_function"](values(optim_results))
@@ -622,18 +614,10 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         end
 
         if sim_params["optimisation"]["run_optimisation"]
-            for (func, spec) in pairs(sim_params["optimisation"]["objective_params"])
-                if func == "sum" || func == "mean"
-                    keys = parse_outkeys(spec)
-                    for key in keys
-                        results["$func $key"] = NaN
-                    end
-                elseif func == "economic" || func == "emissions"
-                    for key in spec
-                        results["$func $key"] = NaN
-                    end
-                end
+            for key in sim_params["optimisation"]["objective_params_keys"]
+                results[key] = NaN
             end
+
             results["objective"] = Inf
             if io_settings["matrix_plot"] == "custom"
                 for (func, spec) in pairs(io_settings["matrix_plot_spec"])

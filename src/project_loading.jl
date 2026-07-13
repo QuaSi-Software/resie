@@ -1707,23 +1707,27 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
     # read and parse objective_params
     optimiser["objective_keys_sum_mean"] = Dict{String,Any}()
-    optimiser["objective_params"] = Dict{String,Any}()
+    optimiser["objective_params_keys"] = String[]
     if !isnothing(optimiser_config["objective_params"])
-        for (obj, value) in pairs(optimiser_config["objective_params"])
-            optimiser["objective_params"][obj] = value
-            if obj == "sum" || obj == "mean"
-                optimiser["objective_keys_sum_mean"] = value
-            elseif obj != "economic" && obj != "emissions"
-                @error "Objective parameter {$obj: $value} could not be read. $obj has " *
+        for (func, spec) in pairs(optimiser_config["objective_params"])
+            if func == "sum" || func == "mean"
+                spec = parse_outkeys(spec)
+            elseif func != "economic" && func != "emissions"
+                @error "Objective parameter {$func: $value} could not be read. $func has " *
                        "to be one of 'sum', 'mean', 'economic', 'emissions'."
                 throw(InputError())
             end
-            if obj == "economic" && !sim_params["economic_parameters"]["calculate_economy"]
+
+            for key in spec
+                push!(optimiser["objective_params_keys"], func * " " * key)
+            end
+
+            if func == "economic" && !sim_params["economic_parameters"]["calculate_economy"]
                 @error "For optimisation, the objective parameter `economic` is chosen, " *
                        "but the flag `calculate_economy` is set to false. Activate it in " *
                        "the `economic_parameters` section."
                 throw(InputError())
-            elseif obj == "emissions" && !sim_params["emissions_parameters"]["calculate_emissions"]
+            elseif func == "emissions" && !sim_params["emissions_parameters"]["calculate_emissions"]
                 @error "For optimisation, the objective parameter `emissions` is chosen, " *
                        "but the flag `calculate_emissions` is set to false. Activate it " *
                        "in the `emissions_parameters` section."
@@ -1733,7 +1737,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         optimiser["objective_function"], f_obj_name = parse_objective_function(optimiser_config["objective_function"])
         if f_obj_name == "multi-objective"
-            optimiser["N_obj"] = length(optimiser["objective_params"])
+            optimiser["N_obj"] = length(optimiser["objective_params_keys"])
         else
             optimiser["N_obj"] = 1
         end
