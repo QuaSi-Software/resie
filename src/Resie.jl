@@ -529,7 +529,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
            io_settings["matrix_plot"] != "nothing" &&
            sim_params["optimisation"]["N_obj"] == 1 &&
            !isempty(all_results)
-            create_matrix_plot(all_results, io_settings, sim_params)
+            create_optimisation_diagnostic_plots(all_results, io_settings, sim_params)
         end
     else
         # perform single simulation run

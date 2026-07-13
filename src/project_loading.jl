@@ -555,10 +555,10 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="object",
         unit="-"
     ),
-    "matrix_plot_file_path" => (
-        default="./output/matrix_plot.html",
-        description="File path to where the matrix plot will be written",
-        display_name="Matrix plot file path",
+    "optim_plots_file_path" => (
+        default="./output/optim_plots",
+        description="File path to where the optimisation result plots will be written",
+        display_name="Optim plots file path",
         required=false,
         type=String,
         json_type="string",
@@ -1657,7 +1657,7 @@ end
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")
 
-function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{String,Any}, 
+function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{String,Any},
                         project_config::AbstractDict{String,Any})::Dict{String,Any}
     optimiser = Dict{String,Any}()
     optimiser["type"] = optimiser_config["type"]
@@ -1671,18 +1671,17 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     optimiser["optim_params_values"] = []
     # Matrix with bounds with colums being lower_bound, upper_bound, start_value
     bounds = Array{Float64}(undef, 0, 3)
-    for (uac, params) in pairs(sort(optimiser_config["optim_params"], by=lowercase))
-        for (key_param, def) in pairs(sort(params, by=lowercase))
+    for (uac, params) in pairs(sort(optimiser_config["optim_params"]; by=lowercase))
+        for (key_param, def) in pairs(sort(params; by=lowercase))
             key = uac * " " * key_param
-            if !(uac in keys(project_config["components"]) || 
+            if !(uac in keys(project_config["components"]) ||
                  uac in keys(project_config) ||
-                 key_param in keys(project_config["components"][uac]) || 
-                 key_param in keys(project_config[uac])
-                 )
-               # end of expression
+                 key_param in keys(project_config["components"][uac]) ||
+                 key_param in keys(project_config[uac]))
+                # end of expression
                 @error "$key of optim_params is not a parameter in the input file. " *
                        "Check for spelling errors or the description in the documentation."
-                throw(InputError()) 
+                throw(InputError())
             end
             push!(optimiser["optim_params_keys"], key)
             if haskey(def, "values")

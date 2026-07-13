@@ -1288,8 +1288,19 @@ function aggregate_csv(input_path::AbstractString,
     return true
 end
 
-# create matrix with 2d plots with each parameter over each other parameter and show "objective" as color 
-function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any}, sim_params::Dict{String,Any})
+# ------------------------------------------------------------------------------------------
+# Optimisation plotting
+# ------------------------------------------------------------------------------------------
+
+"""
+    create_matrix_plot(results, io_settings, sim_params)
+
+Create a scatter-plot matrix of all optimisation parameters. The selected objective is used
+as marker colour and the best objective value is highlighted.
+"""
+function create_matrix_plot(results::Vector{Any},
+                            io_settings::Dict{String,Any},
+                            sim_params::Dict{String,Any})
     if io_settings["matrix_plot"] == "default"
         obj_key = "objective"
     elseif io_settings["matrix_plot"] == "custom"
@@ -1301,28 +1312,1641 @@ function create_matrix_plot(results::Vector{Any}, io_settings::Dict{String,Any},
         end
     end
     param_names = sim_params["optimisation"]["optim_params_keys"]
-    N = length(param_names)
-    results_dict = Dict(k => [d[k] for d in results] for k in keys(results[1]))
-    objective = results_dict[obj_key]
-    objective = replace(objective, NaN=>missing)
-    min_obj = minimum(skipmissing(objective))
-    low_quartile_obj = sort(objective)[length(objective) ÷ 4]
-    scatter_traces = splom(; dimensions=[attr(; label=k, values=results_dict[k]) for k in param_names],
-                           marker=attr(; color=objective,
-                                       colorscale=reverse(ColorSchemes.viridis),
-                                       cmin=min_obj,
-                                       cmax=low_quartile_obj,
-                                       showscale=true,
-                                       line=attr(; color="red", width=objective .== min_obj * 1),
-                                       colorbar=attr(; title=obj_key)),
-                           text=string.(objective),
-                           hovertemplate="%{x}, %{y}, %{text}")
-    p = plot(scatter_traces)
+    results_dict = optimisation_results_dict(results)
 
-    file_path = sim_params["run_path"](io_settings["matrix_plot_file_path"])
+    if !haskey(results_dict, obj_key)
+        @error("Cannot create matrix plot: objective key \"$obj_key\" not found in results.")
+    end
+
+    missing_params = filter(param -> !haskey(results_dict, param), param_names)
+    if !isempty(missing_params)
+        error("Cannot create matrix plot. Missing parameters: $(join(missing_params, ", ")).")
+    end
+
+    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
+                                       for value in results_dict[obj_key]]
+    valid_objective = Float64[value for value in skipmissing(objective)]
+    if isempty(valid_objective)
+        @error("Cannot create matrix plot: no finite objective values.")
+    end
+
+    cmin, cmax = optimisation_color_bounds(valid_objective)
+    min_objective = minimum(valid_objective)
+    line_width = [value !== missing && value == min_objective ? 2 : 0
+                  for value in objective]
+
+    trace = splom(;
+                  dimensions=[attr(; label=param, values=results_dict[param])
+                              for param in param_names],
+                  marker=attr(; color=objective,
+                              colorscale=reverse(ColorSchemes.viridis),
+                              cmin=cmin,
+                              cmax=cmax,
+                              showscale=true,
+                              line=attr(; color="red", width=line_width),
+                              colorbar=attr(; title=obj_key)),
+                  text=string.(objective),
+                  hovertemplate="%{x}, %{y}<br>$obj_key = %{text}<extra></extra>")
+
+    p = plot(trace)
+    file_path = optimisation_plot_path(sim_params, io_settings, "matrix_plot")
     savefig(p, file_path)
+
+    return file_path
 end
 
+"""
+    optimisation_results_dict(results)
+
+Collect every result column in a dictionary of vectors. Missing entries are represented by
+`missing`.
+"""
+function optimisation_results_dict(results::Vector{Any})::Dict{String,Vector{Any}}
+    if isempty(results)
+        @error("Cannot create optimisation plots: results are empty.")
+    end
+
+    all_keys = unique([String(key) for result in results for key in keys(result)])
+
+    return Dict(key => [haskey(result, key) ? result[key] : missing for result in results]
+                for key in all_keys)
+end
+
+"""
+    is_finite_number(value)
+
+Return `true` for finite real values.
+"""
+is_finite_number(value)::Bool = value isa Real && isfinite(Float64(value))
+
+"""
+    optimisation_plot_path(sim_params, io_settings, suffix)
+
+Create a plot path derived from `optim_plots_file_path`.
+"""
+function optimisation_plot_path(sim_params::Dict{String,Any},
+                                io_settings::Dict{String,Any},
+                                suffix::String)::String
+    base_path = sim_params["run_path"](io_settings["optim_plots_file_path"])
+    dir, filename = splitdir(base_path)
+    root, _ = splitext(filename)
+    ext = ".html"  # html only here
+    return joinpath(dir, "$(root)_$(suffix)$(ext)")
+end
+
+"""
+    safe_plot_name(name)
+
+Convert a result key to a filename-safe string.
+"""
+safe_plot_name(name::AbstractString)::String = replace(name, r"[^A-Za-z0-9_]+" => "_")
+
+"""
+    optimisation_color_bounds(values)
+
+Return robust colour limits. The upper colour limit is based on the lower quartile to retain
+contrast around good objective values.
+"""
+function optimisation_color_bounds(values::Vector{Float64})::Tuple{Float64,Float64}
+    if isempty(values)
+        @error("Cannot determine colour bounds from an empty vector.")
+    end
+
+    sorted_values = sort(values)
+    cmin = first(sorted_values)
+    cmax = sorted_values[max(1, cld(length(sorted_values), 4))]
+
+    if !isfinite(cmax) || cmax <= cmin
+        cmax = last(sorted_values)
+    end
+
+    if cmax <= cmin
+        cmax = cmin + max(abs(cmin) * 1.0e-9, 1.0e-9)
+    end
+
+    return cmin, cmax
+end
+
+"""
+    create_objective_convergence_plot(results, io_settings, sim_params)
+
+Create a plot containing the objective value of every run and the best value found so far.
+"""
+function create_objective_convergence_plot(results::Vector{Any},
+                                           io_settings::Dict{String,Any},
+                                           sim_params::Dict{String,Any})
+    obj_key = "objective"
+    results_dict = optimisation_results_dict(results)
+
+    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
+                                       for value in results_dict[obj_key]]
+    valid_objective = Float64[value for value in skipmissing(objective)]
+    if isempty(valid_objective)
+        @error("Cannot create convergence plot: no finite objective values.")
+    end
+
+    best_so_far = Vector{Union{Missing,Float64}}(missing, length(objective))
+    current_best = Inf
+
+    for idx in eachindex(objective)
+        if objective[idx] !== missing
+            current_best = min(current_best, objective[idx])
+        end
+        if isfinite(current_best)
+            best_so_far[idx] = current_best
+        end
+    end
+
+    use_log_axis = all(value -> value > 0.0, valid_objective)
+
+    objective_trace = scatter(; x=eachindex(objective),
+                              y=objective,
+                              mode="markers",
+                              name=obj_key,
+                              text=["run $idx<br>$obj_key = $(objective[idx])"
+                                    for idx in eachindex(objective)],
+                              hovertemplate="%{text}<extra></extra>")
+
+    best_trace = scatter(; x=eachindex(best_so_far),
+                         y=best_so_far,
+                         mode="lines",
+                         name="Best so far",
+                         hovertemplate="run %{x}<br>best = %{y}<extra></extra>")
+
+    layout = Layout(; title="Optimisation convergence",
+                    xaxis=attr(; title="Run"),
+                    yaxis=attr(; title=obj_key,
+                               type=use_log_axis ? "log" : "linear"))
+
+    p = plot([objective_trace, best_trace], layout)
+    file_path = optimisation_plot_path(sim_params, io_settings, "convergence")
+    savefig(p, file_path)
+
+    return file_path
+end
+
+"""
+    create_objective_parameter_plots(results, io_settings, sim_params)
+
+Create one objective-versus-parameter plot for every optimisation parameter.
+"""
+function create_objective_parameter_plots(results::Vector{Any},
+                                          io_settings::Dict{String,Any},
+                                          sim_params::Dict{String,Any})
+    obj_key = "objective"
+    param_names = sim_params["optimisation"]["optim_params_keys"]
+    results_dict = optimisation_results_dict(results)
+
+    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
+                                       for value in results_dict[obj_key]]
+    valid_objective = Float64[value for value in skipmissing(objective)]
+    if isempty(valid_objective)
+        @error("Cannot create parameter plots: no finite objective values.")
+    end
+
+    use_log_axis = all(value -> value > 0.0, valid_objective)
+    saved_paths = String[]
+
+    for param_name in param_names
+        if !haskey(results_dict, param_name)
+            @warn "Skipping objective-versus-parameter plot. Parameter \"$param_name\" was not found in results."
+            continue
+        end
+
+        param_values = results_dict[param_name]
+        valid_idx = [idx
+                     for idx in eachindex(objective)
+                     if objective[idx] !== missing && is_finite_number(param_values[idx])]
+
+        if isempty(valid_idx)
+            @warn "Skipping objective-versus-parameter plot for \"$param_name\": no valid points."
+            continue
+        end
+
+        x_values = Float64[Float64(param_values[idx]) for idx in valid_idx]
+        obj_values = Float64[objective[idx] for idx in valid_idx]
+        best_local_idx = argmin(obj_values)
+        best_global_idx = valid_idx[best_local_idx]
+        cmin, cmax = optimisation_color_bounds(obj_values)
+
+        runs_trace = scatter(; x=x_values,
+                             y=obj_values,
+                             mode="markers",
+                             name="Runs",
+                             marker=attr(; color=obj_values,
+                                         colorscale=reverse(ColorSchemes.viridis),
+                                         cmin=cmin,
+                                         cmax=cmax,
+                                         showscale=true,
+                                         colorbar=attr(; title=obj_key)),
+                             text=["run $(valid_idx[idx])<br>$param_name = $(x_values[idx])" *
+                                   "<br>$obj_key = $(obj_values[idx])"
+                                   for idx in eachindex(valid_idx)],
+                             hovertemplate="%{text}<extra></extra>")
+
+        best_trace = scatter(; x=[x_values[best_local_idx]],
+                             y=[obj_values[best_local_idx]],
+                             mode="markers",
+                             name="Best",
+                             marker=attr(; symbol="x", size=14),
+                             text=["best run $best_global_idx<br>$param_name = $(x_values[best_local_idx])" *
+                                   "<br>$obj_key = $(obj_values[best_local_idx])"],
+                             hovertemplate="%{text}<extra></extra>")
+
+        layout = Layout(; title="Objective vs $param_name",
+                        xaxis=attr(; title=param_name),
+                        yaxis=attr(; title=obj_key,
+                                   type=use_log_axis ? "log" : "linear"))
+
+        p = plot([runs_trace, best_trace], layout)
+        file_path = optimisation_plot_path(sim_params,
+                                           io_settings,
+                                           "objective_vs_$(safe_plot_name(param_name))")
+        savefig(p, file_path)
+        push!(saved_paths, file_path)
+    end
+
+    return saved_paths
+end
+
+"""
+    create_parallel_coordinates_plot(results, io_settings, sim_params;
+                                                objective_keys=nothing)
+
+Create a filterable parallel-coordinates plot. Optimisation parameters and result axes are
+visually separated. A floating control panel permits precise axis zooming.
+"""
+function create_parallel_coordinates_plot(results::Vector{Any},
+                                          io_settings::Dict{String,Any},
+                                          sim_params::Dict{String,Any};
+                                          objective_keys=nothing)
+    obj_key = "objective"
+    param_names = sim_params["optimisation"]["optim_params_keys"]
+    results_dict = optimisation_results_dict(results)
+
+    all_objective_keys = optimisation_objective_axis_keys(results,
+                                                          sim_params,
+                                                          obj_key;
+                                                          objective_keys=objective_keys)
+    individual_objective_keys = filter(!=(obj_key), all_objective_keys)
+    is_multiobjective = !isempty(individual_objective_keys)
+    required_keys = unique(vcat(param_names, all_objective_keys))
+    missing_keys = filter(key -> !haskey(results_dict, key), required_keys)
+
+    if !isempty(missing_keys)
+        @error("Cannot create parallel-coordinates plot. Missing result keys: " * join(missing_keys, ", "))
+    end
+
+    valid_idx = [idx
+                 for idx in eachindex(results)
+                 if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
+    if isempty(valid_idx)
+        @error("Cannot create parallel-coordinates plot: no complete numeric result rows.")
+    end
+
+    objective_values = Dict(
+        key => Float64[Float64(results_dict[key][idx])
+                       for idx in valid_idx]
+        for key in all_objective_keys)
+    primary_values = objective_values[obj_key]
+    dimensions = Any[]
+
+    # parameter axes
+    for param_name in param_names
+        values = Float64[Float64(results_dict[param_name][idx]) for idx in valid_idx]
+        push!(dimensions, attr(; label=param_name, values=values))
+    end
+
+    if is_multiobjective
+        # individual objective axes
+        for key in individual_objective_keys
+            push!(dimensions, attr(; label=key, values=objective_values[key]))
+        end
+
+        if !all(value -> value > 0.0, primary_values)
+            @error("Cannot display log10($obj_key): the combined objective contains non-positive values.")
+        end
+
+        color_values = log10.(primary_values)
+        color_title = "log10($obj_key)"
+        push!(dimensions, attr(; label=color_title, values=color_values))
+    else
+        color_values = primary_values
+        color_title = obj_key
+        push!(dimensions, attr(; label=obj_key, values=primary_values))
+    end
+
+    cmin, cmax = optimisation_color_bounds(color_values)
+    n_parameters = length(param_names)
+    n_dimensions = length(dimensions)
+    n_results = n_dimensions - n_parameters
+
+    # keep full outer labels visible and leave room for group labels
+    plot_x_min = 0.035
+    plot_x_max = 0.955
+    plot_y_max = 0.915
+    group_boundary = if n_dimensions > 1
+        plot_x_min +
+        ((n_parameters - 0.5) / (n_dimensions - 1)) * (plot_x_max - plot_x_min)
+    else
+        plot_x_max
+    end
+
+    trace = parcoords(; ids=string.(valid_idx),
+                      domain=attr(; x=[plot_x_min, plot_x_max], y=[0.0, plot_y_max]),
+                      labelfont=attr(; size=11),
+                      line=attr(; color=color_values,
+                                colorscale=reverse(ColorSchemes.viridis),
+                                cmin=cmin,
+                                cmax=cmax,
+                                showscale=true,
+                                colorbar=attr(; title=color_title,
+                                              len=0.82,
+                                              y=0.45,
+                                              x=0.985,
+                                              xanchor="left",
+                                              xpad=2,
+                                              thickness=13)),
+                      unselected=attr(; line=attr(; color="rgb(145,145,145)",
+                                                  opacity=0.20)),
+                      dimensions=dimensions)
+
+    group_shapes, group_annotations = parallel_group_decorations(n_parameters,
+                                                                 n_results,
+                                                                 plot_x_min,
+                                                                 group_boundary,
+                                                                 plot_x_max,
+                                                                 plot_y_max)
+    layout = Layout(;
+                    title=attr(; text="Interactive Optimisation Design Space",
+                               x=0.5,
+                               xanchor="center",
+                               y=0.997,
+                               yanchor="top",
+                               font=attr(; size=18)),
+                    margin=attr(; t=42, b=24, l=28, r=58),
+                    shapes=group_shapes,
+                    annotations=group_annotations)
+
+    p = plot(trace, layout)
+    file_path = optimisation_plot_path(sim_params,
+                                       io_settings,
+                                       "parallel_coordinates")
+    savefig(p, file_path)
+    inject_parallel_axis_zoom_controls!(file_path)
+
+    return file_path
+end
+
+"""
+    parallel_group_decorations(n_parameters, n_results, plot_x_min, group_boundary,
+                               plot_x_max, plot_y_max)
+
+Create background regions, group labels and the separator for a parallel-coordinates plot.
+"""
+function parallel_group_decorations(n_parameters::Int,
+                                    n_results::Int,
+                                    plot_x_min::Float64,
+                                    group_boundary::Float64,
+                                    plot_x_max::Float64,
+                                    plot_y_max::Float64)
+    shapes = Any[]
+    annotations = Any[]
+    groups = [(enabled=n_parameters > 0,
+               label="Variable parameters",
+               x0=plot_x_min,
+               x1=group_boundary,
+               fill="rgba(70,130,180,0.07)",
+               text_color="rgb(55,90,120)"),
+              (enabled=n_results > 0,
+               label="Results",
+               x0=group_boundary,
+               x1=plot_x_max,
+               fill="rgba(220,140,50,0.07)",
+               text_color="rgb(140,85,30)")]
+
+    for group in groups
+        group.enabled || continue
+
+        push!(shapes,
+              attr(; type="rect",
+                   xref="paper",
+                   yref="paper",
+                   x0=group.x0,
+                   x1=group.x1,
+                   y0=0.0,
+                   y1=plot_y_max,
+                   fillcolor=group.fill,
+                   line=attr(; width=0),
+                   layer="below"))
+
+        push!(annotations,
+              attr(; text="<b>$(group.label)</b>",
+                   x=(group.x0 + group.x1) / 2,
+                   y=0.992,
+                   xref="paper",
+                   yref="paper",
+                   showarrow=false,
+                   xanchor="center",
+                   yanchor="top",
+                   font=attr(; size=11, color=group.text_color)))
+    end
+
+    if n_parameters > 0 && n_results > 0
+        push!(shapes,
+              attr(; type="line",
+                   xref="paper",
+                   yref="paper",
+                   x0=group_boundary,
+                   x1=group_boundary,
+                   y0=0.0,
+                   y1=plot_y_max,
+                   line=attr(; color="rgba(80,80,80,0.65)",
+                             width=2,
+                             dash="dot"),
+                   layer="above"))
+    end
+
+    return shapes, annotations
+end
+
+"""
+    optimisation_objective_axis_keys(results, sim_params, primary_obj_key;
+                                     objective_keys=nothing)
+
+Return the result columns displayed as objective or KPI axes.
+"""
+function optimisation_objective_axis_keys(results::Vector{Any},
+                                          sim_params::Dict{String,Any},
+                                          primary_obj_key::String;
+                                          objective_keys=nothing)::Vector{String}
+    if isempty(results)
+        @error("Cannot determine objective axes: results are empty.")
+    end
+
+    param_names = sim_params["optimisation"]["optim_params_keys"]
+
+    if objective_keys !== nothing
+        selected_keys = unique(String.(objective_keys))
+        primary_obj_key in selected_keys || pushfirst!(selected_keys, primary_obj_key)
+
+        missing_keys = [key for key in selected_keys
+                        if !any(result -> haskey(result, key), results)]
+        if !isempty(missing_keys)
+            @error("Cannot create objective axes. Missing result keys: " * join(missing_keys, ", "))
+        end
+        return selected_keys
+    end
+
+    excluded_keys = Set(vcat(param_names, ["error", "run", "run_id", "sample_id"]))
+    all_result_keys = unique([String(key) for result in results for key in keys(result)])
+    detected_keys = String[]
+
+    for key in all_result_keys
+        key in excluded_keys && continue
+        values = [haskey(result, key) ? result[key] : missing for result in results]
+        any(is_finite_number, values) && push!(detected_keys, key)
+    end
+
+    filter!(key -> key != primary_obj_key, detected_keys)
+    pushfirst!(detected_keys, primary_obj_key)
+
+    return unique(detected_keys)
+end
+
+"""
+    inject_parallel_axis_zoom_controls!(file_path)
+
+Inject a floating axis-zoom panel into a saved parallel-coordinates HTML plot.
+"""
+function inject_parallel_axis_zoom_controls!(file_path::String)
+    html = read(file_path, String)
+
+    injection = raw"""
+<script>
+(function () {
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll(".js-plotly-plot");
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupControls, 200);
+            return;
+        }
+
+        if (document.getElementById("parallel-axis-zoom-controls")) {
+            return;
+        }
+
+        const traceIndex = gd.data.findIndex(
+            trace => trace.type === "parcoords"
+        );
+
+        if (traceIndex < 0) {
+            return;
+        }
+
+        const dims = gd.data[traceIndex].dimensions;
+
+        const originalRanges = dims.map(
+            dimension =>
+                Array.isArray(dimension.range)
+                    ? dimension.range.slice()
+                    : null
+        );
+
+        document.documentElement.style.height = "100%";
+        document.body.style.height = "100%";
+        document.body.style.margin = "0";
+        document.body.style.overflow = "hidden";
+
+        gd.style.width = "100vw";
+        gd.style.height = "100vh";
+
+        Plotly.Plots.resize(gd);
+
+        const panel = document.createElement("details");
+        panel.id = "parallel-axis-zoom-controls";
+        panel.open = false;
+
+        panel.style.position = "fixed";
+        panel.style.top = "10px";
+        panel.style.right = "12px";
+        panel.style.zIndex = "10000";
+        panel.style.fontFamily = "Arial, sans-serif";
+        panel.style.fontSize = "13px";
+        panel.style.background = "rgba(255,255,255,0.96)";
+        panel.style.border = "1px solid #bbb";
+        panel.style.borderRadius = "6px";
+        panel.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+        panel.style.maxWidth = "360px";
+
+        const summary = document.createElement("summary");
+        summary.textContent = "Axis zoom";
+        summary.style.cursor = "pointer";
+        summary.style.fontWeight = "600";
+        summary.style.padding = "7px 10px";
+        summary.style.userSelect = "none";
+
+        panel.appendChild(summary);
+
+        const content = document.createElement("div");
+        content.style.padding = "2px 10px 10px 10px";
+        content.style.display = "grid";
+        content.style.gridTemplateColumns = "auto 1fr";
+        content.style.gap = "7px";
+        content.style.alignItems = "center";
+
+        panel.appendChild(content);
+
+        function addLabel(text) {
+            const label = document.createElement("span");
+            label.textContent = text;
+            content.appendChild(label);
+        }
+
+        const axisSelect = document.createElement("select");
+        axisSelect.style.width = "220px";
+        axisSelect.style.maxWidth = "220px";
+
+        dims.forEach((dimension, index) => {
+            const option = document.createElement("option");
+            option.value = index;
+            option.textContent =
+                dimension.label || ("Axis " + (index + 1));
+
+            axisSelect.appendChild(option);
+        });
+
+        addLabel("Axis");
+        content.appendChild(axisSelect);
+
+        const minInput = document.createElement("input");
+        minInput.type = "number";
+        minInput.step = "any";
+        minInput.style.width = "130px";
+
+        addLabel("Minimum");
+        content.appendChild(minInput);
+
+        const maxInput = document.createElement("input");
+        maxInput.type = "number";
+        maxInput.step = "any";
+        maxInput.style.width = "130px";
+
+        addLabel("Maximum");
+        content.appendChild(maxInput);
+
+        const buttonRow = document.createElement("div");
+        buttonRow.style.gridColumn = "1 / span 2";
+        buttonRow.style.display = "flex";
+        buttonRow.style.flexWrap = "wrap";
+        buttonRow.style.gap = "6px";
+        buttonRow.style.marginTop = "3px";
+
+        content.appendChild(buttonRow);
+
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Apply";
+        buttonRow.appendChild(applyButton);
+
+        const resetButton = document.createElement("button");
+        resetButton.textContent = "Reset axis";
+        buttonRow.appendChild(resetButton);
+
+        const resetAllButton = document.createElement("button");
+        resetAllButton.textContent = "Reset all";
+        buttonRow.appendChild(resetAllButton);
+
+        const hint = document.createElement("div");
+        hint.textContent =
+            "Zoom first, then drag on an axis to filter.";
+        hint.style.gridColumn = "1 / span 2";
+        hint.style.color = "#666";
+        hint.style.fontSize = "11px";
+        hint.style.marginTop = "2px";
+
+        content.appendChild(hint);
+
+        document.body.appendChild(panel);
+
+        function currentDimensionIndex() {
+            return Number(axisSelect.value);
+        }
+
+        function finiteValues(index) {
+            return gd.data[traceIndex]
+                .dimensions[index]
+                .values
+                .filter(
+                    value =>
+                        typeof value === "number" &&
+                        Number.isFinite(value)
+                );
+        }
+
+        function formatInputValue(value) {
+            return Number(value.toPrecision(8)).toString();
+        }
+
+        function updateInputValues() {
+            const index = currentDimensionIndex();
+            const dimension =
+                gd.data[traceIndex].dimensions[index];
+
+            const values = finiteValues(index);
+
+            if (values.length === 0) {
+                minInput.value = "";
+                maxInput.value = "";
+                return;
+            }
+
+            if (
+                Array.isArray(dimension.range) &&
+                dimension.range.length === 2 &&
+                Number.isFinite(dimension.range[0]) &&
+                Number.isFinite(dimension.range[1])
+            ) {
+                minInput.value =
+                    formatInputValue(dimension.range[0]);
+
+                maxInput.value =
+                    formatInputValue(dimension.range[1]);
+            } else {
+                minInput.value =
+                    formatInputValue(Math.min(...values));
+
+                maxInput.value =
+                    formatInputValue(Math.max(...values));
+            }
+        }
+
+        axisSelect.addEventListener(
+            "change",
+            updateInputValues
+        );
+
+        applyButton.addEventListener("click", function () {
+            const index = currentDimensionIndex();
+            const minimum = Number(minInput.value);
+            const maximum = Number(maxInput.value);
+
+            if (
+                !Number.isFinite(minimum) ||
+                !Number.isFinite(maximum) ||
+                minimum >= maximum
+            ) {
+                alert("Please enter a valid minimum and maximum.");
+                return;
+            }
+
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, dimensionIndex) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (dimensionIndex === index) {
+                            copied.range = [
+                                minimum,
+                                maximum
+                            ];
+
+                            delete copied.constraintrange;
+                        }
+
+                        return copied;
+                    }
+                );
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions]
+                },
+                [traceIndex]
+            ).then(updateInputValues);
+        });
+
+        resetButton.addEventListener("click", function () {
+            const index = currentDimensionIndex();
+
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, dimensionIndex) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (dimensionIndex === index) {
+                            if (originalRanges[index] === null) {
+                                delete copied.range;
+                            } else {
+                                copied.range =
+                                    originalRanges[index].slice();
+                            }
+
+                            delete copied.constraintrange;
+                        }
+
+                        return copied;
+                    }
+                );
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions]
+                },
+                [traceIndex]
+            ).then(updateInputValues);
+        });
+
+        resetAllButton.addEventListener("click", function () {
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, index) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (originalRanges[index] === null) {
+                            delete copied.range;
+                        } else {
+                            copied.range =
+                                originalRanges[index].slice();
+                        }
+
+                        delete copied.constraintrange;
+
+                        return copied;
+                    }
+                );
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions]
+                },
+                [traceIndex]
+            ).then(updateInputValues);
+        });
+
+        window.addEventListener("resize", function () {
+            Plotly.Plots.resize(gd);
+        });
+
+        updateInputValues();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupControls
+        );
+    } else {
+        setupControls();
+    }
+})();
+</script>
+"""
+
+    if occursin("</body>", html)
+        html = replace(html,
+                       "</body>" => injection * "\n</body>")
+    else
+        html *= injection
+    end
+
+    write(file_path, html)
+
+    return file_path
+end
+
+"""
+    create_interactive_3d_optimisation_plot(results, io_settings, sim_params;
+                                            objective_keys=nothing, x_key=nothing,
+                                            y_key=nothing, z_key=nothing, color_key=nothing,
+                                            objective_sense=:min)
+
+Create an interactive 3D optimisation explorer with selectable axes, colour variable and
+independent axis zoom controls.
+"""
+function create_interactive_3d_optimisation_plot(results::Vector{Any},
+                                                 io_settings::Dict{String,Any},
+                                                 sim_params::Dict{String,Any};
+                                                 objective_keys=nothing,
+                                                 x_key=nothing,
+                                                 y_key=nothing,
+                                                 z_key=nothing,
+                                                 color_key=nothing,
+                                                 objective_sense::Symbol=:min)
+    if !(objective_sense in (:min, :max))
+        @error("objective_sense must be :min or :max.")
+    end
+
+    obj_key = "objective"
+    param_names = sim_params["optimisation"]["optim_params_keys"]
+    results_dict = optimisation_results_dict(results)
+
+    all_objective_keys = optimisation_objective_axis_keys(results,
+                                                          sim_params,
+                                                          obj_key;
+                                                          objective_keys=objective_keys)
+    individual_objective_keys = filter(!=(obj_key), all_objective_keys)
+    is_multiobjective = !isempty(individual_objective_keys)
+    source_keys = unique(vcat(param_names, all_objective_keys))
+    missing_keys = filter(key -> !haskey(results_dict, key), source_keys)
+
+    if !isempty(missing_keys)
+        @error("Cannot create 3D plot. Missing result keys: $(join(missing_keys, ", ")).")
+    end
+
+    valid_idx = [idx for idx in eachindex(results)
+                 if all(key -> is_finite_number(results_dict[key][idx]), source_keys)]
+    if isempty(valid_idx)
+        @error("Cannot create 3D plot: no complete numeric result rows.")
+    end
+
+    source_data = Dict(key => Float64[Float64(results_dict[key][idx])
+                                      for idx in valid_idx]
+                       for key in source_keys)
+    primary_values = source_data[obj_key]
+    axis_data = Dict{String,Vector{Float64}}()
+    axis_keys = String[]
+
+    # parameter axes
+    for key in param_names
+        axis_data[key] = source_data[key]
+        push!(axis_keys, key)
+    end
+
+    if is_multiobjective
+        # individual objectives and combined objective
+        for key in individual_objective_keys
+            axis_data[key] = source_data[key]
+            push!(axis_keys, key)
+        end
+
+        if !all(value -> value > 0.0, primary_values)
+            @error("Cannot create log10($obj_key): the objective contains non-positive values.")
+        end
+
+        default_objective_key = "log10($obj_key)"
+        axis_data[default_objective_key] = log10.(primary_values)
+        push!(axis_keys, default_objective_key)
+    else
+        default_objective_key = obj_key
+        axis_data[obj_key] = primary_values
+        push!(axis_keys, obj_key)
+    end
+
+    unique!(axis_keys)
+    if length(axis_keys) < 3
+        @error("The 3D plot requires at least three selectable numeric quantities.")
+    end
+
+    function select_axis_key(explicit_key,
+                             preferred_keys::Vector{String},
+                             used_keys::Vector{String})::String
+        if explicit_key !== nothing
+            selected = String(explicit_key)
+            selected in axis_keys || @error("Axis key \"$selected\" is not available.")
+            selected in used_keys &&
+                @error("The x, y and z axes must use different keys.")
+            return selected
+        end
+
+        for candidate in unique(vcat(preferred_keys, axis_keys))
+            if candidate in axis_keys && !(candidate in used_keys)
+                return candidate
+            end
+        end
+
+        @error("Cannot find a distinct axis key.")
+    end
+
+    x_selected = select_axis_key(x_key, param_names, String[])
+    y_preferred = length(param_names) >= 2 ? param_names[2:end] : axis_keys
+    y_selected = select_axis_key(y_key, y_preferred, [x_selected])
+    z_selected = select_axis_key(z_key,
+                                 [default_objective_key],
+                                 [x_selected, y_selected])
+    color_selected = color_key === nothing ? default_objective_key : String(color_key)
+    if !(color_selected in axis_keys)
+        !error("Colour key \"$color_selected\" is not available.")
+    end
+
+    best_local_idx = objective_sense == :min ? argmin(primary_values) : argmax(primary_values)
+    color_values = axis_data[color_selected]
+    cmin = minimum(color_values)
+    cmax = maximum(color_values)
+    if cmax <= cmin
+        cmax = cmin + max(abs(cmin), 1.0) * 1.0e-9
+    end
+
+    hover_text = ["run $(valid_idx[idx])" *
+                  "<br>$x_selected = $(axis_data[x_selected][idx])" *
+                  "<br>$y_selected = $(axis_data[y_selected][idx])" *
+                  "<br>$z_selected = $(axis_data[z_selected][idx])" *
+                  "<br>$color_selected = $(axis_data[color_selected][idx])"
+                  for idx in eachindex(valid_idx)]
+
+    runs_trace = PlotlyJS.scatter(; type="scatter3d",
+                                  x=axis_data[x_selected],
+                                  y=axis_data[y_selected],
+                                  z=axis_data[z_selected],
+                                  mode="markers",
+                                  name="Optimisation runs",
+                                  marker=attr(; size=5,
+                                              opacity=0.75,
+                                              color=color_values,
+                                              colorscale=reverse(ColorSchemes.viridis),
+                                              cmin=cmin,
+                                              cmax=cmax,
+                                              showscale=true,
+                                              colorbar=attr(; title=color_selected,
+                                                            thickness=16),
+                                              line=attr(; width=0.3,
+                                                        color="rgba(50,50,50,0.35)")),
+                                  text=hover_text,
+                                  hovertemplate="%{text}<extra></extra>")
+
+    best_trace = PlotlyJS.scatter(; type="scatter3d",
+                                  x=[axis_data[x_selected][best_local_idx]],
+                                  y=[axis_data[y_selected][best_local_idx]],
+                                  z=[axis_data[z_selected][best_local_idx]],
+                                  mode="markers",
+                                  name="Best objective",
+                                  marker=attr(; size=9,
+                                              symbol="diamond",
+                                              color="black",
+                                              line=attr(; color="white", width=1.5)),
+                                  text=[hover_text[best_local_idx]],
+                                  hovertemplate="%{text}<extra></extra>")
+
+    layout = Layout(; title=attr(; text="Interactive 3D Optimisation Explorer",
+                                 x=0.5,
+                                 xanchor="center"),
+                    scene=attr(; xaxis=attr(; title=x_selected, autorange=true),
+                               yaxis=attr(; title=y_selected, autorange=true),
+                               zaxis=attr(; title=z_selected, autorange=true),
+                               aspectmode="cube",
+                               camera=attr(; eye=attr(; x=1.35, y=1.35, z=1.10))),
+                    margin=attr(; t=60, b=20, l=20, r=90),
+                    height=720)
+
+    p = plot([runs_trace, best_trace], layout)
+    file_path = optimisation_plot_path(sim_params, io_settings, "interactive_3d")
+    if lowercase(splitext(file_path)[2]) !== ".html"
+        @error("The interactive 3D plot requires an HTML output path.")
+    end
+
+    mkpath(dirname(file_path))
+    savefig(p, file_path)
+    inject_3d_axis_selection_controls!(file_path,
+                                       axis_data,
+                                       axis_keys,
+                                       valid_idx,
+                                       best_local_idx,
+                                       x_selected,
+                                       y_selected,
+                                       z_selected,
+                                       color_selected)
+
+    return file_path
+end
+
+"""
+    inject_3d_axis_selection_controls!(file_path, axis_data, axis_keys, run_ids,
+                                       best_local_idx, initial_x, initial_y, initial_z,
+                                       initial_color)
+
+Inject axis selection, colour selection, camera reset and axis-zoom controls into a saved
+3D optimisation HTML plot.
+"""
+function inject_3d_axis_selection_controls!(file_path::String,
+                                            axis_data::Dict{String,Vector{Float64}},
+                                            axis_keys::Vector{String},
+                                            run_ids::Vector{Int},
+                                            best_local_idx::Int,
+                                            initial_x::String,
+                                            initial_y::String,
+                                            initial_z::String,
+                                            initial_color::String)
+    html = read(file_path, String)
+
+    json_for_html(value) = replace(JSON.json(value),
+                                   "</" => "<\\/")
+
+    data_json = json_for_html(axis_data)
+    keys_json = json_for_html(axis_keys)
+    runs_json = json_for_html(run_ids)
+
+    x_json = json_for_html(initial_x)
+    y_json = json_for_html(initial_y)
+    z_json = json_for_html(initial_z)
+    color_json = json_for_html(initial_color)
+
+    best_index = best_local_idx - 1
+
+    injection = """
+<script>
+(function () {
+    const plotData = $data_json;
+    const axisKeys = $keys_json;
+    const runIds = $runs_json;
+    const bestIndex = $best_index;
+
+    const initialSelection = {
+        x: $x_json,
+        y: $y_json,
+        z: $z_json,
+        color: $color_json
+    };
+
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll(".js-plotly-plot");
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupControls, 200);
+            return;
+        }
+
+        if (document.getElementById("optimisation-3d-controls")) {
+            return;
+        }
+
+        const runTraceIndex = gd.data.findIndex(
+            trace =>
+                trace.type === "scatter3d" &&
+                trace.name === "Optimisation runs"
+        );
+
+        const bestTraceIndex = gd.data.findIndex(
+            trace =>
+                trace.type === "scatter3d" &&
+                trace.name === "Best objective"
+        );
+
+        if (runTraceIndex < 0 || bestTraceIndex < 0) {
+            return;
+        }
+
+        const initialCamera =
+            gd.layout.scene && gd.layout.scene.camera
+                ? JSON.parse(JSON.stringify(gd.layout.scene.camera))
+                : {
+                    eye: {
+                        x: 1.35,
+                        y: 1.35,
+                        z: 1.10
+                    }
+                };
+
+        const manualRanges = {
+            x: null,
+            y: null,
+            z: null
+        };
+
+        const controls = document.createElement("div");
+        controls.id = "optimisation-3d-controls";
+        controls.style.fontFamily = "Arial, sans-serif";
+        controls.style.fontSize = "13px";
+        controls.style.margin = "8px 0 4px 0";
+        controls.style.padding = "10px";
+        controls.style.border = "1px solid #ccc";
+        controls.style.borderRadius = "5px";
+        controls.style.display = "flex";
+        controls.style.alignItems = "center";
+        controls.style.flexWrap = "wrap";
+        controls.style.gap = "10px";
+
+        function createSelect(labelText, values, initialValue) {
+            const container = document.createElement("label");
+            container.style.display = "flex";
+            container.style.alignItems = "center";
+            container.style.gap = "5px";
+
+            const label = document.createElement("span");
+            label.textContent = labelText;
+
+            const select = document.createElement("select");
+            select.style.maxWidth = "280px";
+
+            values.forEach(value => {
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = value;
+                select.appendChild(option);
+            });
+
+            select.value = initialValue;
+
+            container.appendChild(label);
+            container.appendChild(select);
+            controls.appendChild(container);
+
+            return select;
+        }
+
+        const xSelect = createSelect(
+            "X axis:",
+            axisKeys,
+            initialSelection.x
+        );
+
+        const ySelect = createSelect(
+            "Y axis:",
+            axisKeys,
+            initialSelection.y
+        );
+
+        const zSelect = createSelect(
+            "Z axis:",
+            axisKeys,
+            initialSelection.z
+        );
+
+        const colorSelect = createSelect(
+            "Color:",
+            axisKeys,
+            initialSelection.color
+        );
+
+        const resetSelectionButton = document.createElement("button");
+        resetSelectionButton.textContent = "Reset selection";
+        controls.appendChild(resetSelectionButton);
+
+        const resetViewButton = document.createElement("button");
+        resetViewButton.textContent = "Reset view";
+        controls.appendChild(resetViewButton);
+
+        const separator = document.createElement("span");
+        separator.style.width = "1px";
+        separator.style.height = "28px";
+        separator.style.background = "#bbb";
+        separator.style.margin = "0 4px";
+        controls.appendChild(separator);
+
+        const zoomLabel = document.createElement("span");
+        zoomLabel.textContent = "Axis zoom:";
+        controls.appendChild(zoomLabel);
+
+        const zoomAxisSelect = document.createElement("select");
+
+        [
+            ["x", "X axis"],
+            ["y", "Y axis"],
+            ["z", "Z axis"]
+        ].forEach(entry => {
+            const option = document.createElement("option");
+            option.value = entry[0];
+            option.textContent = entry[1];
+            zoomAxisSelect.appendChild(option);
+        });
+
+        controls.appendChild(zoomAxisSelect);
+
+        const zoomMinInput = document.createElement("input");
+        zoomMinInput.type = "number";
+        zoomMinInput.step = "any";
+        zoomMinInput.style.width = "120px";
+        controls.appendChild(zoomMinInput);
+
+        const zoomMaxInput = document.createElement("input");
+        zoomMaxInput.type = "number";
+        zoomMaxInput.step = "any";
+        zoomMaxInput.style.width = "120px";
+        controls.appendChild(zoomMaxInput);
+
+        const applyZoomButton = document.createElement("button");
+        applyZoomButton.textContent = "Apply zoom";
+        controls.appendChild(applyZoomButton);
+
+        const resetZoomButton = document.createElement("button");
+        resetZoomButton.textContent = "Reset axis";
+        controls.appendChild(resetZoomButton);
+
+        gd.parentNode.insertBefore(controls, gd);
+
+        function formatValue(value) {
+            if (!Number.isFinite(value)) {
+                return String(value);
+            }
+
+            const absolute = Math.abs(value);
+
+            if (
+                absolute !== 0 &&
+                (absolute >= 100000 || absolute < 0.001)
+            ) {
+                return value.toExponential(4);
+            }
+
+            return Number(value.toPrecision(6)).toString();
+        }
+
+        function inputValue(value) {
+            return Number(value.toPrecision(8)).toString();
+        }
+
+        function colorBounds(values) {
+            const finite = values.filter(Number.isFinite);
+
+            let minimum = Math.min(...finite);
+            let maximum = Math.max(...finite);
+
+            if (!(maximum > minimum)) {
+                const delta =
+                    Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+                maximum = minimum + delta;
+            }
+
+            return [minimum, maximum];
+        }
+
+        function selectedKeyForAxis(axis) {
+            if (axis === "x") {
+                return xSelect.value;
+            }
+
+            if (axis === "y") {
+                return ySelect.value;
+            }
+
+            return zSelect.value;
+        }
+
+        function dataRangeForAxis(axis) {
+            const key = selectedKeyForAxis(axis);
+
+            const values = plotData[key].filter(
+                value =>
+                    typeof value === "number" &&
+                    Number.isFinite(value)
+            );
+
+            if (values.length === 0) {
+                return null;
+            }
+
+            let minimum = Math.min(...values);
+            let maximum = Math.max(...values);
+
+            if (!(maximum > minimum)) {
+                const delta =
+                    Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+                minimum -= delta;
+                maximum += delta;
+            }
+
+            return [minimum, maximum];
+        }
+
+        function updateAxisZoomInputs() {
+            const axis = zoomAxisSelect.value;
+
+            const range =
+                manualRanges[axis] !== null
+                    ? manualRanges[axis]
+                    : dataRangeForAxis(axis);
+
+            if (range === null) {
+                zoomMinInput.value = "";
+                zoomMaxInput.value = "";
+                return;
+            }
+
+            zoomMinInput.value = inputValue(range[0]);
+            zoomMaxInput.value = inputValue(range[1]);
+        }
+
+        function hoverText(xKey, yKey, zKey, colorKey) {
+            return plotData[xKey].map((value, index) =>
+                "run " + runIds[index] +
+                "<br>" + xKey + " = " +
+                formatValue(plotData[xKey][index]) +
+                "<br>" + yKey + " = " +
+                formatValue(plotData[yKey][index]) +
+                "<br>" + zKey + " = " +
+                formatValue(plotData[zKey][index]) +
+                "<br>" + colorKey + " = " +
+                formatValue(plotData[colorKey][index])
+            );
+        }
+
+        function updateDisabledOptions() {
+            const selected = [
+                xSelect.value,
+                ySelect.value,
+                zSelect.value
+            ];
+
+            [xSelect, ySelect, zSelect].forEach(select => {
+                Array.from(select.options).forEach(option => {
+                    option.disabled =
+                        option.value !== select.value &&
+                        selected.includes(option.value);
+                });
+            });
+        }
+
+        function updatePlot(resetAxisRanges) {
+            const xKey = xSelect.value;
+            const yKey = ySelect.value;
+            const zKey = zSelect.value;
+            const colorKey = colorSelect.value;
+
+            const text = hoverText(
+                xKey,
+                yKey,
+                zKey,
+                colorKey
+            );
+
+            const bounds = colorBounds(plotData[colorKey]);
+
+            const currentCamera =
+                gd.layout.scene && gd.layout.scene.camera
+                    ? JSON.parse(
+                        JSON.stringify(gd.layout.scene.camera)
+                    )
+                    : initialCamera;
+
+            const runUpdate = {
+                x: [plotData[xKey]],
+                y: [plotData[yKey]],
+                z: [plotData[zKey]],
+                text: [text],
+                "marker.color": [plotData[colorKey]],
+                "marker.cmin": bounds[0],
+                "marker.cmax": bounds[1],
+                "marker.colorbar.title.text": colorKey
+            };
+
+            const bestUpdate = {
+                x: [[plotData[xKey][bestIndex]]],
+                y: [[plotData[yKey][bestIndex]]],
+                z: [[plotData[zKey][bestIndex]]],
+                text: [[text[bestIndex]]]
+            };
+
+            if (resetAxisRanges) {
+                manualRanges.x = null;
+                manualRanges.y = null;
+                manualRanges.z = null;
+            }
+
+            Promise.all([
+                Plotly.restyle(
+                    gd,
+                    runUpdate,
+                    [runTraceIndex]
+                ),
+
+                Plotly.restyle(
+                    gd,
+                    bestUpdate,
+                    [bestTraceIndex]
+                )
+            ]).then(function () {
+                const layoutUpdate = {
+                    "scene.xaxis.title.text": xKey,
+                    "scene.yaxis.title.text": yKey,
+                    "scene.zaxis.title.text": zKey,
+                    "scene.aspectmode": "cube",
+                    "scene.camera": currentCamera
+                };
+
+                if (resetAxisRanges) {
+                    layoutUpdate["scene.xaxis.range"] = null;
+                    layoutUpdate["scene.yaxis.range"] = null;
+                    layoutUpdate["scene.zaxis.range"] = null;
+
+                    layoutUpdate["scene.xaxis.autorange"] = true;
+                    layoutUpdate["scene.yaxis.autorange"] = true;
+                    layoutUpdate["scene.zaxis.autorange"] = true;
+                }
+
+                return Plotly.relayout(
+                    gd,
+                    layoutUpdate
+                );
+            }).then(function () {
+                updateAxisZoomInputs();
+            });
+
+            updateDisabledOptions();
+        }
+
+        xSelect.addEventListener("change", function () {
+            updatePlot(true);
+        });
+
+        ySelect.addEventListener("change", function () {
+            updatePlot(true);
+        });
+
+        zSelect.addEventListener("change", function () {
+            updatePlot(true);
+        });
+
+        colorSelect.addEventListener("change", function () {
+            updatePlot(false);
+        });
+
+        zoomAxisSelect.addEventListener(
+            "change",
+            updateAxisZoomInputs
+        );
+
+        applyZoomButton.addEventListener("click", function () {
+            const axis = zoomAxisSelect.value;
+            const minimum = Number(zoomMinInput.value);
+            const maximum = Number(zoomMaxInput.value);
+
+            if (
+                !Number.isFinite(minimum) ||
+                !Number.isFinite(maximum) ||
+                minimum >= maximum
+            ) {
+                alert(
+                    "Please enter a valid minimum and maximum."
+                );
+                return;
+            }
+
+            manualRanges[axis] = [
+                minimum,
+                maximum
+            ];
+
+            const update = {};
+
+            update[
+                "scene." + axis + "axis.range"
+            ] = [
+                minimum,
+                maximum
+            ];
+
+            update[
+                "scene." + axis + "axis.autorange"
+            ] = false;
+
+            Plotly.relayout(gd, update);
+        });
+
+        resetZoomButton.addEventListener("click", function () {
+            const axis = zoomAxisSelect.value;
+
+            manualRanges[axis] = null;
+
+            const update = {};
+
+            update[
+                "scene." + axis + "axis.range"
+            ] = null;
+
+            update[
+                "scene." + axis + "axis.autorange"
+            ] = true;
+
+            Plotly.relayout(
+                gd,
+                update
+            ).then(function () {
+                updateAxisZoomInputs();
+            });
+        });
+
+        resetSelectionButton.addEventListener(
+            "click",
+            function () {
+                xSelect.value = initialSelection.x;
+                ySelect.value = initialSelection.y;
+                zSelect.value = initialSelection.z;
+                colorSelect.value = initialSelection.color;
+
+                updatePlot(true);
+            }
+        );
+
+        resetViewButton.addEventListener(
+            "click",
+            function () {
+                Plotly.relayout(gd, {
+                    "scene.camera": initialCamera
+                });
+            }
+        );
+
+        updateDisabledOptions();
+        updateAxisZoomInputs();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupControls
+        );
+    } else {
+        setupControls();
+    }
+})();
+</script>
+"""
+
+    if occursin("</body>", html)
+        html = replace(html,
+                       "</body>" => injection * "\n</body>")
+    else
+        html *= injection
+    end
+
+    write(file_path, html)
+
+    return file_path
+end
+
+"""
+    create_optimisation_diagnostic_plots(results, io_settings, sim_params)
+
+Create all optimisation diagnostic plots and return their output paths.
+"""
+function create_optimisation_diagnostic_plots(results::Vector{Any},
+                                              io_settings::Dict{String,Any},
+                                              sim_params::Dict{String,Any})
+    matrix = create_matrix_plot(results, io_settings, sim_params)
+    convergence = create_objective_convergence_plot(results, io_settings, sim_params)
+    parameter_plots = create_objective_parameter_plots(results, io_settings, sim_params)
+    parallel_coordinates = create_parallel_coordinates_plot(results,
+                                                            io_settings,
+                                                            sim_params)
+    interactive_3d = create_interactive_3d_optimisation_plot(results,
+                                                             io_settings,
+                                                             sim_params)
+
+    return (; matrix,
+            convergence,
+            parameter_plots,
+            parallel_coordinates,
+            interactive_3d)
+end
+
+# TODO remove
 function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:",
                         "# profile_start_date_format:", "# timestamp_format:",
@@ -1341,6 +2965,7 @@ function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepat
     @info "Profile file at $filepath created."
 end
 
+# TODO remove
 function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:",
                         "# time_zone:", "# interpolation_type:"]
