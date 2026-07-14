@@ -943,6 +943,22 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         json_type="object",
         unit="-"
     ),
+    "objective_senses" => (
+        default=nothing,
+        description="Defines whether each objective is minimised or maximised " *
+                    "for objective_function=`multi-objective`. Keys must exactly " *
+                    "match the flattened objective parameter names. Allowed " *
+                    "values are `min` and `max`. If omitted, all objectives are " *
+                    "minimised.",
+        display_name="Objective directions",
+        required=false,
+        conditionals=[
+            ("objective_function", "is", "multi-objective"),
+        ],
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-",
+    ),
     "disable_all_simulation_outputs" => (
         default=true,
         description="Disables all simulation outputs written to the hard drive during optimisation.",
@@ -1761,8 +1777,13 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         if f_obj_name == "multi-objective"
             optimiser["N_obj"] = length(optimiser["objective_params_keys"])
+            optimiser["objective_senses"],
+            optimiser["objective_signs"] = parse_objective_senses(optimiser["objective_params_keys"],
+                                                                  optimiser_config["objective_senses"])
         else
             optimiser["N_obj"] = 1
+            optimiser["objective_senses"] = Dict{String,Symbol}()
+            optimiser["objective_signs"] = Float64[]
         end
     end
 
@@ -2082,4 +2103,58 @@ function parse_objective_function(eff_def::String,
     end
 
     return f, method, parsed_factors
+end
+
+function parse_objective_senses(objective_keys::Vector{String},
+                                configured_senses)::Tuple{Dict{String,Symbol},Vector{Float64}}
+    if configured_senses === nothing
+        senses = Dict{String,Symbol}(
+            key => :min
+            for key in objective_keys
+        )
+    else
+        normalized = Dict{String,Any}(
+            String(key) => value
+            for (key, value) in pairs(configured_senses)
+        )
+
+        configured_keys = collect(keys(normalized))
+
+        missing_keys = setdiff(objective_keys,
+                               configured_keys)
+
+        unknown_keys = setdiff(configured_keys,
+                               objective_keys)
+
+        if !isempty(missing_keys)
+            @error("objective_senses is missing directions for: " *
+                   join(missing_keys, ", "),)
+            throw(InputError())
+        end
+
+        if !isempty(unknown_keys)
+            @error("objective_senses contains unknown objective keys: " *
+                   join(unknown_keys, ", "),)
+            throw(InputError())
+        end
+
+        senses = Dict{String,Symbol}()
+
+        for key in objective_keys
+            sense = Symbol(lowercase(strip(String(normalized[key]))))
+
+            if !(sense in (:min, :max))
+                @error("The objective sense for \"$key\" must be " *
+                       "`min` or `max`, got \"$(normalized[key])\".",)
+                throw(InputError())
+            end
+
+            senses[key] = sense
+        end
+    end
+
+    signs = Float64[senses[key] == :min ? 1.0 : -1.0
+                    for key in objective_keys]
+
+    return senses, signs
 end

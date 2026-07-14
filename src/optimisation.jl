@@ -119,7 +119,18 @@ function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
         push!(all_results, results)
     end
 
-    return results["objective"]
+    return return objective_for_optimiser(results, sim_params["optimisation"])
+end
+
+function objective_for_optimiser(results::AbstractDict, optimiser::Dict{String,Any})
+    objective = results["objective"]
+
+    if optimiser["N_obj"] == 1
+        return objective
+    end
+
+    # apply signs for each objective for multi-objective optimisation
+    return Float64.(objective) .* optimiser["objective_signs"]
 end
 
 """
@@ -228,8 +239,7 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 """
 function calc_global_sensitivity!(model_function::Function, bounds::Array{Float64},
                                   all_results::Vector{Any},
-                                  sim_params::Dict{String,Any}
-                                  )::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
+                                  sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
     d = size(bounds, 1)
     deg = 3
     op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
