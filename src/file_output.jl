@@ -3663,54 +3663,64 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
             );
         }
 
+        const originalUnselectedOpacity =
+            gd.data[traceIndex].unselected &&
+            gd.data[traceIndex].unselected.line &&
+            isFiniteNumber(
+                gd.data[traceIndex].unselected.line.opacity
+            )
+                ? gd.data[traceIndex].unselected.line.opacity
+                : 0.20;
+
         document.documentElement.style.height = "100%";
+        document.documentElement.style.overflow = "hidden";
         document.body.style.height = "100%";
+        document.body.style.width = "100%";
         document.body.style.margin = "0";
         document.body.style.overflow = "hidden";
+        document.body.style.display = "flex";
+        document.body.style.flexDirection = "column";
 
-        gd.style.width = "100vw";
-        gd.style.height = "100vh";
-
-        Plotly.Plots.resize(gd);
-
-        const panel = document.createElement("details");
+        const panel = document.createElement("div");
         panel.id = "parallel-axis-zoom-controls";
-        panel.open = false;
-
-        panel.style.position = "fixed";
-        panel.style.top = "10px";
-        panel.style.right = "12px";
+        panel.style.flex = "0 0 auto";
+        panel.style.width = "100%";
+        panel.style.boxSizing = "border-box";
         panel.style.zIndex = "10000";
         panel.style.fontFamily = "Arial, sans-serif";
         panel.style.fontSize = "13px";
-        panel.style.background = "rgba(255,255,255,0.96)";
-        panel.style.border = "1px solid #bbb";
-        panel.style.borderRadius = "6px";
-        panel.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-        panel.style.maxWidth = "360px";
-
-        const summary = document.createElement("summary");
-        summary.textContent = "Axis zoom";
-        summary.style.cursor = "pointer";
-        summary.style.fontWeight = "600";
-        summary.style.padding = "7px 10px";
-        summary.style.userSelect = "none";
-
-        panel.appendChild(summary);
+        panel.style.background = "rgba(255,255,255,0.98)";
+        panel.style.borderBottom = "1px solid #bbb";
+        panel.style.boxShadow = "0 1px 5px rgba(0,0,0,0.12)";
 
         const content = document.createElement("div");
-        content.style.padding = "2px 10px 10px 10px";
-        content.style.display = "grid";
-        content.style.gridTemplateColumns = "auto 1fr";
-        content.style.gap = "7px";
+        content.style.padding = "6px 10px";
+        content.style.display = "flex";
+        content.style.flexWrap = "wrap";
+        content.style.gap = "6px 12px";
         content.style.alignItems = "center";
 
         panel.appendChild(content);
 
-        function addLabel(text) {
+        const heading = document.createElement("span");
+        heading.textContent = "Parallel-coordinate settings";
+        heading.style.fontWeight = "600";
+        heading.style.marginRight = "4px";
+        content.appendChild(heading);
+
+        function addControl(labelText, control) {
+            const group = document.createElement("label");
+            group.style.display = "inline-flex";
+            group.style.alignItems = "center";
+            group.style.gap = "5px";
+            group.style.whiteSpace = "nowrap";
+
             const label = document.createElement("span");
-            label.textContent = text;
-            content.appendChild(label);
+            label.textContent = labelText;
+
+            group.appendChild(label);
+            group.appendChild(control);
+            content.appendChild(group);
         }
 
         const axisSelect = document.createElement("select");
@@ -3726,36 +3736,28 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
             axisSelect.appendChild(option);
         });
 
-        addLabel("Axis");
-        content.appendChild(axisSelect);
+        addControl("Axis", axisSelect);
 
         const minInput = document.createElement("input");
         minInput.type = "number";
         minInput.step = "any";
-        minInput.style.width = "130px";
-
-        addLabel("Minimum");
-        content.appendChild(minInput);
+        minInput.style.width = "110px";
+        addControl("Minimum", minInput);
 
         const maxInput = document.createElement("input");
         maxInput.type = "number";
         maxInput.step = "any";
-        maxInput.style.width = "130px";
-
-        addLabel("Maximum");
-        content.appendChild(maxInput);
+        maxInput.style.width = "110px";
+        addControl("Maximum", maxInput);
 
         const buttonRow = document.createElement("div");
-        buttonRow.style.gridColumn = "1 / span 2";
-        buttonRow.style.display = "flex";
+        buttonRow.style.display = "inline-flex";
         buttonRow.style.flexWrap = "wrap";
         buttonRow.style.gap = "6px";
-        buttonRow.style.marginTop = "3px";
-
         content.appendChild(buttonRow);
 
         const applyButton = document.createElement("button");
-        applyButton.textContent = "Apply";
+        applyButton.textContent = "Apply axis";
         buttonRow.appendChild(applyButton);
 
         const resetButton = document.createElement("button");
@@ -3766,17 +3768,55 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         resetAllButton.textContent = "Reset all";
         buttonRow.appendChild(resetAllButton);
 
-        const hint = document.createElement("div");
+        const opacityInput = document.createElement("input");
+        opacityInput.type = "number";
+        opacityInput.min = "0";
+        opacityInput.max = "100";
+        opacityInput.step = "1";
+        opacityInput.style.width = "65px";
+        opacityInput.value =
+            String(Math.round(originalUnselectedOpacity * 100));
+
+        const opacityGroup = document.createElement("label");
+        opacityGroup.style.display = "inline-flex";
+        opacityGroup.style.alignItems = "center";
+        opacityGroup.style.gap = "5px";
+        opacityGroup.style.whiteSpace = "nowrap";
+        opacityGroup.style.marginLeft = "auto";
+
+        const opacityLabel = document.createElement("span");
+        opacityLabel.textContent = "Unselected opacity (%)";
+
+        opacityGroup.appendChild(opacityLabel);
+        opacityGroup.appendChild(opacityInput);
+        content.appendChild(opacityGroup);
+
+        const hint = document.createElement("span");
         hint.textContent =
-            "Zoom first, then drag on an axis to filter.";
-        hint.style.gridColumn = "1 / span 2";
+            "Press Enter to apply values. Drag on an axis to filter.";
         hint.style.color = "#666";
         hint.style.fontSize = "11px";
-        hint.style.marginTop = "2px";
-
+        hint.style.whiteSpace = "nowrap";
         content.appendChild(hint);
 
-        document.body.appendChild(panel);
+        document.body.insertBefore(panel, document.body.firstChild);
+
+        gd.style.flex = "0 0 auto";
+        gd.style.width = "100vw";
+        gd.style.minHeight = "0";
+
+        function resizePlotToViewport() {
+            const panelHeight =
+                panel.getBoundingClientRect().height;
+
+            gd.style.height =
+                Math.max(100, window.innerHeight - panelHeight) +
+                "px";
+
+            Plotly.Plots.resize(gd);
+        }
+
+        window.setTimeout(resizePlotToViewport, 0);
 
         function currentDimensionIndex() {
             return Number(axisSelect.value);
@@ -3835,7 +3875,40 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
             updateInputValues
         );
 
-        applyButton.addEventListener("click", function () {
+        function applyOpacity() {
+            const opacityPercent = Number(opacityInput.value);
+
+            if (
+                !Number.isFinite(opacityPercent) ||
+                opacityPercent < 0 ||
+                opacityPercent > 100
+            ) {
+                alert(
+                    "Unselected opacity must be between 0 and 100 percent."
+                );
+
+                opacityInput.value =
+                    String(
+                        Math.round(
+                            gd.data[traceIndex]
+                                .unselected.line.opacity * 100
+                        )
+                    );
+
+                return;
+            }
+
+            Plotly.restyle(
+                gd,
+                {
+                    "unselected.line.opacity":
+                        opacityPercent / 100
+                },
+                [traceIndex]
+            );
+        }
+
+        function applyAxisRange() {
             const index = currentDimensionIndex();
             const minimum = Number(minInput.value);
             const maximum = Number(maxInput.value);
@@ -3878,7 +3951,27 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                 updateInputValues();
                 return updateVisibleColorBounds();
             });
-        });
+        }
+
+        function applyOnEnter(input, callback) {
+            input.addEventListener("keydown", function (event) {
+                if (event.key !== "Enter") {
+                    return;
+                }
+
+                event.preventDefault();
+                callback();
+            });
+        }
+
+        applyOnEnter(minInput, applyAxisRange);
+        applyOnEnter(maxInput, applyAxisRange);
+        applyOnEnter(opacityInput, applyOpacity);
+
+        applyButton.addEventListener(
+            "click",
+            applyAxisRange
+        );
 
         resetButton.addEventListener("click", function () {
             const index = currentDimensionIndex();
@@ -3936,10 +4029,15 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     }
                 );
 
+            opacityInput.value =
+                String(Math.round(originalUnselectedOpacity * 100));
+
             Plotly.restyle(
                 gd,
                 {
-                    dimensions: [newDimensions]
+                    dimensions: [newDimensions],
+                    "unselected.line.opacity":
+                        originalUnselectedOpacity
                 },
                 [traceIndex]
             ).then(function () {
@@ -3971,11 +4069,13 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
             }
         });
 
-        window.addEventListener("resize", function () {
-            Plotly.Plots.resize(gd);
-        });
+        window.addEventListener(
+            "resize",
+            resizePlotToViewport
+        );
 
         updateInputValues();
+        resizePlotToViewport();
     }
 
     if (document.readyState === "loading") {
@@ -4821,7 +4921,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
             updateAxisZoomInputs
         );
 
-        applyZoomButton.addEventListener("click", function () {
+        function applyZoomRange() {
             const axis = zoomAxisSelect.value;
             const minimum = Number(zoomMinInput.value);
             const maximum = Number(zoomMaxInput.value);
@@ -4862,7 +4962,23 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 updateAxisZoomInputs();
                 return updateColorRangeFromVisibleAxes();
             });
+        }
+
+        [zoomMinInput, zoomMaxInput].forEach(input => {
+            input.addEventListener("keydown", function (event) {
+                if (event.key !== "Enter") {
+                    return;
+                }
+
+                event.preventDefault();
+                applyZoomRange();
+            });
         });
+
+        applyZoomButton.addEventListener(
+            "click",
+            applyZoomRange
+        );
 
         resetZoomButton.addEventListener("click", function () {
             const axis = zoomAxisSelect.value;
