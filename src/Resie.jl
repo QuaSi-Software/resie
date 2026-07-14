@@ -322,15 +322,14 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             end
         end
         # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
-        write_optim_results!(sim_params["optimisation"]["objective_params_keys"], output_data,
-                             optim_results)
+        write_optim_results!(sim_params["optimisation"]["objective_params_keys"], output_data, optim_results)
         # calculate objective from the results 
-        optim_results["objective"] = sim_params["optimisation"]["objective_function"](values(optim_results))
+        objective_values = [optim_results[key] for key in sim_params["optimisation"]["objective_params_keys"]]
+        optim_results["objective"] = sim_params["optimisation"]["objective_function"](objective_values)
 
         # write necessary values for matrix_plot in the global result dictionary that is returned by run_simulation_loop()
         if io_settings["matrix_plot"] == "custom"
-            write_optim_results!(io_settings["matrix_plot_spec"], output_data,
-                                 optim_results)
+            write_optim_results!(io_settings["matrix_plot_spec"], output_data, optim_results)
         end
     end
 
