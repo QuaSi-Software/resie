@@ -378,6 +378,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
     uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
                                       (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1)
 
+    # TODO Why is this deactivated?
     # if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
     #     throw(InputError("Parallel optimisation sample evaluation requires " *
     #                      "`optimisation.disable_all_simulation_outputs = true`. " *
@@ -394,50 +395,94 @@ function perform_optimisation(io_settings::Dict{String,Any},
     @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
 
     if length(optimiser["iterator"]) > 1
-        nr_runs = Atomic{Int}(1)
         if optimiser["type"] == "monte_carlo_annealing"
             obj = Array{Union{Float64,Nothing}}(nothing)
             obj_lock = ReentrantLock()
         end
-        @threads for sample_values in collect(optimiser["iterator"])
-            if cancel_optimisation[]
-                continue
-            end
+        try
+            # handling status
+            variation_start_time = now()
+            completed_runs = Atomic{Int}(0)
+            max_runs = length(optimiser["iterator"])
+            worker_count = min(Threads.nthreads(), max_runs)
 
-            try
-                run_nr = nr_runs[]
-                atomic_add!(nr_runs, 1)
-                start_time = now()
-
-                # decide which algorithm to run based on type of optimiser
-                if optimiser["type"] == "parametervariation"
-                    optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                                project_config, sample_values,
-                                run_lock, output_lock, results_lock;
-                                cancel_flag=cancel_optimisation,
-                                preparation_cache=preparation_cache)
-
-                elseif optimiser["type"] == "monte_carlo_annealing"
-                    # TODO this is not working currently...
-                    monte_carlo_annealing!(all_results, io_settings, obj, obj_lock,
-                                           sim_params, optim_results_path, project_config,
-                                           sample_values, sample_ID,
-                                           run_lock, output_lock, results_lock;
-                                           cancel_flag=cancel_optimisation,
-                                           preparation_cache=preparation_cache)
-                end
-                runtime = round(Int, seconds(now() - start_time))
-                max_runs = length(optimiser["iterator"])
-                eta = round(Int, (max_runs - run_nr) * runtime / Threads.nthreads() / 60)
-                @globalInfo "[$run_nr/$max_runs] → completed in $runtime s. ETA: $eta min"
-            catch e
-                if e isa InterruptException
-                    cancel_optimisation[] = true
-                    println("InterruptException level @threads for loop")
+            @threads for sample_values in collect(optimiser["iterator"])
+                if cancel_optimisation[]
                     continue
-                else
-                    rethrow()
                 end
+
+                try
+                    run_start_time = now()
+
+                    # decide which algorithm to run based on type of optimiser
+                    if optimiser["type"] == "parametervariation"
+                        normalised_sample_values = sample_values isa Real ?
+                                                   Float64(sample_values) :
+                                                   Float64.(collect(sample_values))
+
+                        optim_func!(all_results,
+                                    io_settings,
+                                    sim_params,
+                                    optim_results_path,
+                                    project_config,
+                                    normalised_sample_values,
+                                    run_lock,
+                                    output_lock,
+                                    results_lock;
+                                    cancel_flag=cancel_optimisation,
+                                    preparation_cache=preparation_cache)
+
+                    elseif optimiser["type"] == "monte_carlo_annealing"
+                        # TODO this is not working currently...
+                        monte_carlo_annealing!(all_results,
+                                               io_settings,
+                                               obj,
+                                               obj_lock,
+                                               sim_params,
+                                               optim_results_path,
+                                               project_config,
+                                               sample_values,
+                                               sample_ID,
+                                               run_lock,
+                                               output_lock,
+                                               results_lock;
+                                               cancel_flag=cancel_optimisation,
+                                               preparation_cache=preparation_cache)
+                    end
+
+                    runtime_seconds = round(Int, seconds(now() - run_start_time))
+                    runtime_minutes, runtime_remaining_seconds = divrem(runtime_seconds, 60)
+                    completed = atomic_add!(completed_runs, 1) + 1
+                    elapsed_seconds = max(1, round(Int, seconds(now() - variation_start_time)))
+                    if completed < worker_count
+                        eta_text = "calculating..."
+                    else
+                        results_per_second = completed / elapsed_seconds
+                        eta_seconds = round(Int, (max_runs - completed) / results_per_second)
+                        eta_minutes, eta_remaining_seconds = divrem(max(eta_seconds, 0), 60)
+                        eta_text = "$eta_minutes min $(lpad(eta_remaining_seconds, 2, '0')) s"
+                    end
+
+                    @globalInfo "[$completed/$max_runs] → completed in " *
+                                "$runtime_minutes min " *
+                                "$(lpad(runtime_remaining_seconds, 2, '0')) s. " *
+                                "ETA: $eta_text"
+                catch e
+                    if e isa InterruptException
+                        cancel_optimisation[] = true
+                        continue
+                    else
+                        rethrow()
+                    end
+                end
+            end
+        catch e
+            if e isa InterruptException
+                # Handles Ctrl+C delivered to the task coordinating @threads.
+                cancel_optimisation[] = true
+                @globalInfo "Parameter variation interrupted by user."
+            else
+                rethrow()
             end
         end
     else
