@@ -1316,6 +1316,7 @@ function create_matrix_plot(results::Vector{Any},
 
     if !haskey(results_dict, obj_key)
         @error("Cannot create matrix plot: objective key \"$obj_key\" not found in results.")
+        return ""
     end
 
     missing_params = filter(param -> !haskey(results_dict, param), param_names)
@@ -1328,6 +1329,7 @@ function create_matrix_plot(results::Vector{Any},
     valid_objective = Float64[value for value in skipmissing(objective)]
     if isempty(valid_objective)
         @error("Cannot create matrix plot: no finite objective values.")
+        return ""
     end
 
     cmin, cmax = optimisation_color_bounds(valid_objective)
@@ -1364,6 +1366,7 @@ Collect every result column in a dictionary of vectors. Missing entries are repr
 function optimisation_results_dict(results::Vector{Any})::Dict{String,Vector{Any}}
     if isempty(results)
         @error("Cannot create optimisation plots: results are empty.")
+        return Dict{String,Vector{Any}}()
     end
 
     all_keys = unique([String(key) for result in results for key in keys(result)])
@@ -1410,6 +1413,7 @@ contrast around good objective values.
 function optimisation_color_bounds(values::Vector{Float64})::Tuple{Float64,Float64}
     if isempty(values)
         @error("Cannot determine colour bounds from an empty vector.")
+        return 0, 0
     end
 
     sorted_values = sort(values)
@@ -1443,6 +1447,7 @@ function create_objective_convergence_plot(results::Vector{Any},
     valid_objective = Float64[value for value in skipmissing(objective)]
     if isempty(valid_objective)
         @error("Cannot create convergence plot: no finite objective values.")
+        return ""
     end
 
     best_so_far = Vector{Union{Missing,Float64}}(missing, length(objective))
@@ -1502,6 +1507,7 @@ function create_objective_parameter_plots(results::Vector{Any},
     valid_objective = Float64[value for value in skipmissing(objective)]
     if isempty(valid_objective)
         @error("Cannot create parameter plots: no finite objective values.")
+        return ""
     end
 
     use_log_axis = all(value -> value > 0.0, valid_objective)
@@ -1595,6 +1601,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
 
     if !isempty(missing_keys)
         @error("Cannot create parallel-coordinates plot. Missing result keys: " * join(missing_keys, ", "))
+        return ""
     end
 
     valid_idx = [idx
@@ -1602,6 +1609,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                  if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
     if isempty(valid_idx)
         @error("Cannot create parallel-coordinates plot: no complete numeric result rows.")
+        return ""
     end
 
     objective_values = Dict(
@@ -1625,6 +1633,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
 
         if !all(value -> value > 0.0, primary_values)
             @error("Cannot display log10($obj_key): the combined objective contains non-positive values.")
+            return ""
         end
 
         color_values = log10.(primary_values)
@@ -1782,6 +1791,7 @@ function optimisation_objective_axis_keys(results::Vector{Any},
                                           objective_keys=nothing)::Vector{String}
     if isempty(results)
         @error("Cannot determine objective axes: results are empty.")
+        return []
     end
 
     param_names = sim_params["optimisation"]["optim_params_keys"]
@@ -1794,6 +1804,7 @@ function optimisation_objective_axis_keys(results::Vector{Any},
                         if !any(result -> haskey(result, key), results)]
         if !isempty(missing_keys)
             @error("Cannot create objective axes. Missing result keys: " * join(missing_keys, ", "))
+            return []
         end
         return selected_keys
     end
@@ -2186,6 +2197,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                                  objective_sense::Symbol=:min)
     if !(objective_sense in (:min, :max))
         @error("objective_sense must be :min or :max.")
+        return ""
     end
 
     obj_key = "objective"
@@ -2203,12 +2215,14 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
 
     if !isempty(missing_keys)
         @error("Cannot create 3D plot. Missing result keys: $(join(missing_keys, ", ")).")
+        return ""
     end
 
     valid_idx = [idx for idx in eachindex(results)
                  if all(key -> is_finite_number(results_dict[key][idx]), source_keys)]
     if isempty(valid_idx)
         @error("Cannot create 3D plot: no complete numeric result rows.")
+        return ""
     end
 
     source_data = Dict(key => Float64[Float64(results_dict[key][idx])
@@ -2233,6 +2247,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
 
         if !all(value -> value > 0.0, primary_values)
             @error("Cannot create log10($obj_key): the objective contains non-positive values.")
+            return ""
         end
 
         default_objective_key = "log10($obj_key)"
@@ -2245,8 +2260,9 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
     end
 
     unique!(axis_keys)
-    if length(axis_keys) < 3
-        @error("The 3D plot requires at least three selectable numeric quantities.")
+    if isempty(axis_keys)
+        @error("The 3D plot requires at least one selectable numeric quantity.")
+        return ""
     end
 
     function select_axis_key(explicit_key,
@@ -2254,19 +2270,31 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                              used_keys::Vector{String})::String
         if explicit_key !== nothing
             selected = String(explicit_key)
-            selected in axis_keys || @error("Axis key \"$selected\" is not available.")
-            selected in used_keys &&
-                @error("The x, y and z axes must use different keys.")
+            if !(selected in axis_keys)
+                @error("Axis key \"$selected\" is not available.")
+                return ""
+            end
             return selected
         end
 
-        for candidate in unique(vcat(preferred_keys, axis_keys))
+        # Prefer different default axes when enough quantities are available,
+        # but permit repeated quantities on two or all three axes.
+        candidates = unique(vcat(preferred_keys, axis_keys))
+
+        for candidate in candidates
             if candidate in axis_keys && !(candidate in used_keys)
                 return candidate
             end
         end
 
-        @error("Cannot find a distinct axis key.")
+        for candidate in candidates
+            if candidate in axis_keys
+                return candidate
+            end
+        end
+
+        @error("Cannot find an available axis key.")
+        return ""
     end
 
     x_selected = select_axis_key(x_key, param_names, String[])
@@ -2278,6 +2306,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
     color_selected = color_key === nothing ? default_objective_key : String(color_key)
     if !(color_selected in axis_keys)
         !error("Colour key \"$color_selected\" is not available.")
+        return ""
     end
 
     best_local_idx = objective_sense == :min ? argmin(primary_values) : argmax(primary_values)
@@ -2288,11 +2317,13 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
         cmax = cmin + max(abs(cmin), 1.0) * 1.0e-9
     end
 
+    # Always show all optimisation parameters in the hover tooltip.
+    # Selected axis/colour quantities are appended only when not already present.
+    hover_keys = unique(vcat(param_names,
+                             [x_selected, y_selected, z_selected, color_selected]))
+
     hover_text = ["run $(valid_idx[idx])" *
-                  "<br>$x_selected = $(axis_data[x_selected][idx])" *
-                  "<br>$y_selected = $(axis_data[y_selected][idx])" *
-                  "<br>$z_selected = $(axis_data[z_selected][idx])" *
-                  "<br>$color_selected = $(axis_data[color_selected][idx])"
+                  join(("<br>$key = $(axis_data[key][idx])" for key in hover_keys))
                   for idx in eachindex(valid_idx)]
 
     runs_trace = PlotlyJS.scatter(; type="scatter3d",
@@ -2309,7 +2340,11 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                               cmax=cmax,
                                               showscale=true,
                                               colorbar=attr(; title=color_selected,
-                                                            thickness=16),
+                                                            thickness=16,
+                                                            x=1.02,
+                                                            xanchor="left",
+                                                            y=0.50,
+                                                            len=0.72),
                                               line=attr(; width=0.3,
                                                         color="rgba(50,50,50,0.35)")),
                                   text=hover_text,
@@ -2336,13 +2371,18 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                zaxis=attr(; title=z_selected, autorange=true),
                                aspectmode="cube",
                                camera=attr(; eye=attr(; x=1.35, y=1.35, z=1.10))),
-                    margin=attr(; t=60, b=20, l=20, r=90),
+                    legend=attr(; x=1.16,
+                                xanchor="left",
+                                y=1.0,
+                                yanchor="top"),
+                    margin=attr(; t=60, b=20, l=20, r=250),
                     height=720)
 
     p = plot([runs_trace, best_trace], layout)
     file_path = optimisation_plot_path(sim_params, io_settings, "interactive_3d")
     if lowercase(splitext(file_path)[2]) !== ".html"
         @error("The interactive 3D plot requires an HTML output path.")
+        return ""
     end
 
     mkpath(dirname(file_path))
@@ -2350,6 +2390,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
     inject_3d_axis_selection_controls!(file_path,
                                        axis_data,
                                        axis_keys,
+                                       param_names,
                                        valid_idx,
                                        best_local_idx,
                                        x_selected,
@@ -2361,9 +2402,9 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
 end
 
 """
-    inject_3d_axis_selection_controls!(file_path, axis_data, axis_keys, run_ids,
-                                       best_local_idx, initial_x, initial_y, initial_z,
-                                       initial_color)
+    inject_3d_axis_selection_controls!(file_path, axis_data, axis_keys,
+                                       parameter_keys, run_ids, best_local_idx,
+                                       initial_x, initial_y, initial_z, initial_color)
 
 Inject axis selection, colour selection, camera reset and axis-zoom controls into a saved
 3D optimisation HTML plot.
@@ -2371,6 +2412,7 @@ Inject axis selection, colour selection, camera reset and axis-zoom controls int
 function inject_3d_axis_selection_controls!(file_path::String,
                                             axis_data::Dict{String,Vector{Float64}},
                                             axis_keys::Vector{String},
+                                            parameter_keys::Vector{String},
                                             run_ids::Vector{Int},
                                             best_local_idx::Int,
                                             initial_x::String,
@@ -2384,6 +2426,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
     data_json = json_for_html(axis_data)
     keys_json = json_for_html(axis_keys)
+    parameter_keys_json = json_for_html(parameter_keys)
     runs_json = json_for_html(run_ids)
 
     x_json = json_for_html(initial_x)
@@ -2398,6 +2441,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
 (function () {
     const plotData = $data_json;
     const axisKeys = $keys_json;
+    const parameterKeys = $parameter_keys_json;
     const runIds = $runs_json;
     const bestIndex = $best_index;
 
@@ -2467,11 +2511,26 @@ function inject_3d_axis_selection_controls!(file_path::String,
         controls.style.border = "1px solid #ccc";
         controls.style.borderRadius = "5px";
         controls.style.display = "flex";
-        controls.style.alignItems = "center";
-        controls.style.flexWrap = "wrap";
-        controls.style.gap = "10px";
+        controls.style.flexDirection = "column";
+        controls.style.alignItems = "stretch";
+        controls.style.gap = "8px";
+        controls.style.overflowX = "auto";
 
-        function createSelect(labelText, values, initialValue) {
+        function createControlRow() {
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.flexWrap = "nowrap";
+            row.style.gap = "10px";
+            row.style.minWidth = "max-content";
+            controls.appendChild(row);
+            return row;
+        }
+
+        const selectionRow = createControlRow();
+        const scalingRow = createControlRow();
+
+        function createSelect(parent, labelText, values, initialValue) {
             const container = document.createElement("label");
             container.style.display = "flex";
             container.style.alignItems = "center";
@@ -2494,30 +2553,34 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
             container.appendChild(label);
             container.appendChild(select);
-            controls.appendChild(container);
+            parent.appendChild(container);
 
             return select;
         }
 
         const xSelect = createSelect(
+            selectionRow,
             "X axis:",
             axisKeys,
             initialSelection.x
         );
 
         const ySelect = createSelect(
+            selectionRow,
             "Y axis:",
             axisKeys,
             initialSelection.y
         );
 
         const zSelect = createSelect(
+            selectionRow,
             "Z axis:",
             axisKeys,
             initialSelection.z
         );
 
         const colorSelect = createSelect(
+            selectionRow,
             "Color:",
             axisKeys,
             initialSelection.color
@@ -2525,22 +2588,15 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
         const resetSelectionButton = document.createElement("button");
         resetSelectionButton.textContent = "Reset selection";
-        controls.appendChild(resetSelectionButton);
+        selectionRow.appendChild(resetSelectionButton);
 
         const resetViewButton = document.createElement("button");
         resetViewButton.textContent = "Reset view";
-        controls.appendChild(resetViewButton);
-
-        const separator = document.createElement("span");
-        separator.style.width = "1px";
-        separator.style.height = "28px";
-        separator.style.background = "#bbb";
-        separator.style.margin = "0 4px";
-        controls.appendChild(separator);
+        selectionRow.appendChild(resetViewButton);
 
         const zoomLabel = document.createElement("span");
-        zoomLabel.textContent = "Axis zoom:";
-        controls.appendChild(zoomLabel);
+        zoomLabel.textContent = "Axis scaling:";
+        scalingRow.appendChild(zoomLabel);
 
         const zoomAxisSelect = document.createElement("select");
 
@@ -2555,27 +2611,31 @@ function inject_3d_axis_selection_controls!(file_path::String,
             zoomAxisSelect.appendChild(option);
         });
 
-        controls.appendChild(zoomAxisSelect);
+        scalingRow.appendChild(zoomAxisSelect);
 
         const zoomMinInput = document.createElement("input");
         zoomMinInput.type = "number";
         zoomMinInput.step = "any";
         zoomMinInput.style.width = "120px";
-        controls.appendChild(zoomMinInput);
+        scalingRow.appendChild(zoomMinInput);
 
         const zoomMaxInput = document.createElement("input");
         zoomMaxInput.type = "number";
         zoomMaxInput.step = "any";
         zoomMaxInput.style.width = "120px";
-        controls.appendChild(zoomMaxInput);
+        scalingRow.appendChild(zoomMaxInput);
 
         const applyZoomButton = document.createElement("button");
         applyZoomButton.textContent = "Apply zoom";
-        controls.appendChild(applyZoomButton);
+        scalingRow.appendChild(applyZoomButton);
 
         const resetZoomButton = document.createElement("button");
         resetZoomButton.textContent = "Reset axis";
-        controls.appendChild(resetZoomButton);
+        scalingRow.appendChild(resetZoomButton);
+
+        const resetAllZoomButton = document.createElement("button");
+        resetAllZoomButton.textContent = "Reset all axes";
+        scalingRow.appendChild(resetAllZoomButton);
 
         gd.parentNode.insertBefore(controls, gd);
 
@@ -2601,7 +2661,15 @@ function inject_3d_axis_selection_controls!(file_path::String,
         }
 
         function colorBounds(values) {
-            const finite = values.filter(Number.isFinite);
+            const finite = values.filter(
+                value =>
+                    typeof value === "number" &&
+                    Number.isFinite(value)
+            );
+
+            if (finite.length === 0) {
+                return null;
+            }
 
             let minimum = Math.min(...finite);
             let maximum = Math.max(...finite);
@@ -2610,7 +2678,8 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 const delta =
                     Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
 
-                maximum = minimum + delta;
+                minimum -= delta;
+                maximum += delta;
             }
 
             return [minimum, maximum];
@@ -2626,6 +2695,80 @@ function inject_3d_axis_selection_controls!(file_path::String,
             }
 
             return zSelect.value;
+        }
+
+        function updateZoomAxisLabels() {
+            const axisLabels = {
+                x: "X axis",
+                y: "Y axis",
+                z: "Z axis"
+            };
+
+            Array.from(zoomAxisSelect.options).forEach(option => {
+                const axis = option.value;
+                option.textContent =
+                    axisLabels[axis] +
+                    " (" +
+                    selectedKeyForAxis(axis) +
+                    ")";
+            });
+        }
+
+        function visiblePointIndices() {
+            const visible = [];
+            const pointCount = plotData[colorSelect.value].length;
+
+            for (let index = 0; index < pointCount; index += 1) {
+                const isVisible = ["x", "y", "z"].every(axis => {
+                    const range = manualRanges[axis];
+
+                    if (range === null) {
+                        return true;
+                    }
+
+                    const key = selectedKeyForAxis(axis);
+                    const value = plotData[key][index];
+
+                    return (
+                        typeof value === "number" &&
+                        Number.isFinite(value) &&
+                        value >= range[0] &&
+                        value <= range[1]
+                    );
+                });
+
+                if (isVisible) {
+                    visible.push(index);
+                }
+            }
+
+            return visible;
+        }
+
+        function currentColorBounds() {
+            const colorValues = plotData[colorSelect.value];
+            const visibleValues = visiblePointIndices().map(
+                index => colorValues[index]
+            );
+
+            return (
+                colorBounds(visibleValues) ||
+                colorBounds(colorValues) ||
+                [0.0, 1.0]
+            );
+        }
+
+        function updateColorRangeFromVisibleAxes() {
+            const bounds = currentColorBounds();
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "marker.cmin": bounds[0],
+                    "marker.cmax": bounds[1]
+                },
+                [runTraceIndex]
+            );
         }
 
         function dataRangeForAxis(axis) {
@@ -2674,32 +2817,26 @@ function inject_3d_axis_selection_controls!(file_path::String,
         }
 
         function hoverText(xKey, yKey, zKey, colorKey) {
-            return plotData[xKey].map((value, index) =>
-                "run " + runIds[index] +
-                "<br>" + xKey + " = " +
-                formatValue(plotData[xKey][index]) +
-                "<br>" + yKey + " = " +
-                formatValue(plotData[yKey][index]) +
-                "<br>" + zKey + " = " +
-                formatValue(plotData[zKey][index]) +
-                "<br>" + colorKey + " = " +
-                formatValue(plotData[colorKey][index])
+            // Show every optimisation parameter and preserve selected
+            // non-parameter axis/colour quantities without duplicate lines.
+            const hoverKeys = Array.from(
+                new Set([
+                    ...parameterKeys,
+                    xKey,
+                    yKey,
+                    zKey,
+                    colorKey
+                ])
             );
-        }
 
-        function updateDisabledOptions() {
-            const selected = [
-                xSelect.value,
-                ySelect.value,
-                zSelect.value
-            ];
+            return plotData[xKey].map((value, index) => {
+                const valueLines = hoverKeys.map(
+                    key =>
+                        "<br>" + key + " = " +
+                        formatValue(plotData[key][index])
+                );
 
-            [xSelect, ySelect, zSelect].forEach(select => {
-                Array.from(select.options).forEach(option => {
-                    option.disabled =
-                        option.value !== select.value &&
-                        selected.includes(option.value);
-                });
+                return "run " + runIds[index] + valueLines.join("");
             });
         }
 
@@ -2709,6 +2846,12 @@ function inject_3d_axis_selection_controls!(file_path::String,
             const zKey = zSelect.value;
             const colorKey = colorSelect.value;
 
+            if (resetAxisRanges) {
+                manualRanges.x = null;
+                manualRanges.y = null;
+                manualRanges.z = null;
+            }
+
             const text = hoverText(
                 xKey,
                 yKey,
@@ -2716,7 +2859,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 colorKey
             );
 
-            const bounds = colorBounds(plotData[colorKey]);
+            const bounds = currentColorBounds();
 
             const currentCamera =
                 gd.layout.scene && gd.layout.scene.camera
@@ -2742,12 +2885,6 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 z: [[plotData[zKey][bestIndex]]],
                 text: [[text[bestIndex]]]
             };
-
-            if (resetAxisRanges) {
-                manualRanges.x = null;
-                manualRanges.y = null;
-                manualRanges.z = null;
-            }
 
             Promise.all([
                 Plotly.restyle(
@@ -2785,10 +2922,11 @@ function inject_3d_axis_selection_controls!(file_path::String,
                     layoutUpdate
                 );
             }).then(function () {
+                updateZoomAxisLabels();
                 updateAxisZoomInputs();
             });
 
-            updateDisabledOptions();
+            updateZoomAxisLabels();
         }
 
         xSelect.addEventListener("change", function () {
@@ -2846,7 +2984,13 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 "scene." + axis + "axis.autorange"
             ] = false;
 
-            Plotly.relayout(gd, update);
+            Plotly.relayout(
+                gd,
+                update
+            ).then(function () {
+                updateAxisZoomInputs();
+                return updateColorRangeFromVisibleAxes();
+            });
         });
 
         resetZoomButton.addEventListener("click", function () {
@@ -2869,6 +3013,25 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 update
             ).then(function () {
                 updateAxisZoomInputs();
+                return updateColorRangeFromVisibleAxes();
+            });
+        });
+
+        resetAllZoomButton.addEventListener("click", function () {
+            manualRanges.x = null;
+            manualRanges.y = null;
+            manualRanges.z = null;
+
+            Plotly.relayout(gd, {
+                "scene.xaxis.range": null,
+                "scene.yaxis.range": null,
+                "scene.zaxis.range": null,
+                "scene.xaxis.autorange": true,
+                "scene.yaxis.autorange": true,
+                "scene.zaxis.autorange": true
+            }).then(function () {
+                updateAxisZoomInputs();
+                return updateColorRangeFromVisibleAxes();
             });
         });
 
@@ -2893,8 +3056,9 @@ function inject_3d_axis_selection_controls!(file_path::String,
             }
         );
 
-        updateDisabledOptions();
+        updateZoomAxisLabels();
         updateAxisZoomInputs();
+        updateColorRangeFromVisibleAxes();
     }
 
     if (document.readyState === "loading") {
@@ -2929,15 +3093,16 @@ Create all optimisation diagnostic plots and return their output paths.
 function create_optimisation_diagnostic_plots(results::Vector{Any},
                                               io_settings::Dict{String,Any},
                                               sim_params::Dict{String,Any})
-    matrix = create_matrix_plot(results, io_settings, sim_params)
+    if io_settings["matrix_plot"] != "nothing" &&
+       sim_params["optimisation"]["N_obj"] == 1
+        matrix = create_matrix_plot(results, io_settings, sim_params)
+    else
+        matrix = ""
+    end
     convergence = create_objective_convergence_plot(results, io_settings, sim_params)
     parameter_plots = create_objective_parameter_plots(results, io_settings, sim_params)
-    parallel_coordinates = create_parallel_coordinates_plot(results,
-                                                            io_settings,
-                                                            sim_params)
-    interactive_3d = create_interactive_3d_optimisation_plot(results,
-                                                             io_settings,
-                                                             sim_params)
+    parallel_coordinates = create_parallel_coordinates_plot(results, io_settings, sim_params)
+    interactive_3d = create_interactive_3d_optimisation_plot(results, io_settings, sim_params)
 
     return (; matrix,
             convergence,

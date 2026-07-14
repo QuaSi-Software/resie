@@ -309,7 +309,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                       res::Dict{String,Union{Array{Float64},Float64}})
             for key in params
                 func = split(key, " ")[1]
-                spec = key[length(func)+2:end]
+                spec = key[(length(func) + 2):end]
                 if func == "sum"
                     res[key] = sum(output_data[spec])
                 elseif func == "mean"
@@ -517,10 +517,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         success, all_results = perform_optimisation(io_settings, sim_params, project_config;
                                                     preparation_cache=preparation_cache)
 
-        if success &&
-           io_settings["matrix_plot"] != "nothing" &&
-           sim_params["optimisation"]["N_obj"] == 1 &&
-           !isempty(all_results)
+        if !isempty(all_results)
             create_optimisation_diagnostic_plots(all_results, io_settings, sim_params)
         end
     else
