@@ -919,13 +919,28 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
     ),
     "objective_function" => (
         default="sum",
-        description="The function which is used to combine multiple objective_params. " *
-                    "Currently only `sum` and `poly-2` are implemented. " *
-                    "See the documentation for more details.",
+        description="Defines how objective_params are combined. Supported values are " *
+                    "`sum`, `linear` and `multi-objective`. For `linear`, coefficients " *
+                    "must be supplied by objective_factors using the flattened objective " *
+                    "parameter names as keys.",
         display_name="Objective function",
         required=false,
+        options=["sum", "linear", "multi-objective"],
         type=String,
         json_type="string",
+        unit="-"
+    ),
+    "objective_factors" => (
+        default=nothing,
+        description="Named coefficients for objective_function=`linear`. Every flattened " *
+                    "objective parameter key must occur exactly once. Example: " *
+                    "{\"economic total_annuity\": 1.0, " *
+                    "\"sum GridOut m_e_ac_230v IN\": -2.0}.",
+        display_name="Linear objective factors",
+        required=false,
+        conditionals=[("objective_function", "is", "linear")],
+        type=Dict{String,Any},
+        json_type="object",
         unit="-"
     ),
     "disable_all_simulation_outputs" => (
@@ -1734,7 +1749,16 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             end
         end
 
-        optimiser["objective_function"], f_obj_name = parse_objective_function(optimiser_config["objective_function"])
+        # Canonical internal order. Linear factor assignment does not depend on this
+        # order because factors are matched by objective name.
+        sort!(optimiser["objective_params_keys"]; by=lowercase)
+
+        optimiser["objective_function"],
+        f_obj_name,
+        optimiser["objective_factors"] = parse_objective_function(optimiser_config["objective_function"],
+                                                                  optimiser["objective_params_keys"],
+                                                                  optimiser_config["objective_factors"])
+
         if f_obj_name == "multi-objective"
             optimiser["N_obj"] = length(optimiser["objective_params_keys"])
         else
@@ -1831,7 +1855,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                        "objective_function or algorithm 'borg_moea'."
                 throw(InputError())
             end
-            optimiser["kwargs"][:FitnessScheme] = BlackBoxOptim.ParetoFitnessScheme{2}(; is_minimizing=true)
+            optimiser["kwargs"][:FitnessScheme] = BlackBoxOptim.ParetoFitnessScheme{optimiser["N_obj"]}(;
+                                                                                                        is_minimizing=true)
         end
 
         optimiser["kwargs"][:Method] = alg
@@ -1989,29 +2014,72 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     return optimiser
 end
 
-function parse_objective_function(eff_def::String)::Tuple{Function,String}
-    splitted = split(eff_def, ":")
+function parse_objective_function(eff_def::String,
+                                  objective_keys::Vector{String},
+                                  configured_factors)::Tuple{Function,String,Dict{String,Float64}}
+    method = lowercase(strip(eff_def))
+    has_configured_factors = configured_factors !== nothing && !isempty(configured_factors)
 
-    if length(splitted) > 1
-        method = lowercase(splitted[1])
-        data = splitted[2]
-    else
-        method = eff_def
-    end
+    parsed_factors = Dict{String,Float64}()
 
     if method == "sum"
         f = x -> sum(Float64.(x))
-        #TODO check how to keep or define order
     elseif method == "linear"
-        params = parse.(Float64, split(data, ","))
-        f = x -> sum(Float64.(x) .* params)
+        if !has_configured_factors
+            @error("objective_function=\"linear\" requires objective_factors.")
+            throw(InputError())
+        end
+
+        configured_keys = String.(collect(keys(configured_factors)))
+        missing_keys = setdiff(objective_keys, configured_keys)
+        unknown_keys = setdiff(configured_keys, objective_keys)
+
+        if !isempty(missing_keys)
+            @error("objective_factors is missing coefficients for: " *
+                   join(missing_keys, ", "))
+            throw(InputError())
+        end
+
+        if !isempty(unknown_keys)
+            @error("objective_factors contains unknown objective keys: " *
+                   join(unknown_keys, ", "))
+            throw(InputError())
+        end
+
+        for key in objective_keys
+            raw_factor = configured_factors[key]
+
+            parsed_factors[key] = try
+                raw_factor isa Number ?
+                Float64(raw_factor) :
+                parse(Float64, String(raw_factor))
+            catch
+                @error("The objective factor for \"$key\" must be numeric, got " *
+                       "\"$raw_factor\".")
+                throw(InputError())
+            end
+        end
+
+        # The vector is derived from explicit names. Its order only follows the
+        # canonical objective key order used by Resie for objective_values.
+        ordered_factors = Float64[parsed_factors[key] for key in objective_keys]
+
+        f = x -> begin
+            values = Float64.(x)
+            if length(values) != length(ordered_factors)
+                throw(ArgumentError("Objective value count ($(length(values))) does not match " *
+                                    "factor count ($(length(ordered_factors)))."))
+            end
+            sum(values .* ordered_factors)
+        end
+
     elseif method == "multi-objective"
         f = x -> collect(Float64.(x))
     else
-        @error "Cannot parse objective function from: $eff_def. Has to be one of 'sum', " *
-               "'linear:[coefficients]', 'multi-objective'"
+        @error("Cannot parse objective function from: $eff_def. Has to be one of " *
+               "'sum', 'linear', 'multi-objective'.")
         throw(InputError())
     end
 
-    return f, method
+    return f, method, parsed_factors
 end
