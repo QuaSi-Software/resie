@@ -1293,64 +1293,160 @@ end
 # ------------------------------------------------------------------------------------------
 
 """
-    create_matrix_plot(results, io_settings, sim_params)
+    create_matrix_plot(results, io_settings, sim_params; ...)
 
-Create a scatter-plot matrix of all optimisation parameters. The selected objective is used
-as marker colour and the best objective value is highlighted.
+Create a scatter-plot matrix of all optimisation parameters. For a single objective, the best
+point is highlighted. For multiple objectives, all Pareto-optimal points are highlighted. Marker
+colour uses the selected objective, defaulting to the first objective in vector order.
 """
 function create_matrix_plot(results::Vector{Any},
                             io_settings::Dict{String,Any},
-                            sim_params::Dict{String,Any})
-    if io_settings["matrix_plot"] == "default"
-        obj_key = "objective"
-    elseif io_settings["matrix_plot"] == "custom"
-        func, spec = first(pairs(io_settings["matrix_plot_spec"]))
-        if func == "sum" || func == "mean"
-            obj_key = func * " " * parse_outkeys(spec)[1]
-        elseif func == "economic" || func == "emissions"
-            obj_key = func * " " * spec[1]
-        end
-    end
-    param_names = sim_params["optimisation"]["optim_params_keys"]
-    results_dict = optimisation_results_dict(results)
-
-    if !haskey(results_dict, obj_key)
-        @error("Cannot create matrix plot: objective key \"$obj_key\" not found in results.")
-        return ""
-    end
+                            sim_params::Dict{String,Any};
+                            objective_keys=nothing,
+                            objective_senses=nothing,
+                            color_key=nothing)
+    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
+    results_dict = spec.results_dict
+    isempty(spec.objective_keys) && return ""
 
     missing_params = filter(param -> !haskey(results_dict, param), param_names)
     if !isempty(missing_params)
-        error("Cannot create matrix plot. Missing parameters: $(join(missing_params, ", ")).")
-    end
-
-    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
-                                       for value in results_dict[obj_key]]
-    valid_objective = Float64[value for value in skipmissing(objective)]
-    if isempty(valid_objective)
-        @error("Cannot create matrix plot: no finite objective values.")
+        @error("Cannot create matrix plot. Missing parameters: $(join(missing_params, ", ")).")
         return ""
     end
 
-    cmin, cmax = optimisation_color_bounds(valid_objective)
-    min_objective = minimum(valid_objective)
-    line_width = [value !== missing && value == min_objective ? 2 : 0
-                  for value in objective]
+    configured_color_key = color_key === nothing ? nothing : String(color_key)
+
+    if configured_color_key === nothing &&
+       get(io_settings, "matrix_plot", "default") == "custom"
+        func, plot_spec = first(pairs(io_settings["matrix_plot_spec"]))
+
+        if func == "sum" || func == "mean"
+            configured_color_key = func * " " * parse_outkeys(plot_spec)[1]
+        elseif func == "economic" || func == "emissions"
+            configured_color_key = func * " " * plot_spec[1]
+        end
+    end
+
+    if configured_color_key === nothing ||
+       !haskey(results_dict, configured_color_key) ||
+       !any(is_finite_number, results_dict[configured_color_key])
+        configured_color_key = first(spec.objective_keys)
+    end
+
+    senses = optimisation_objective_senses(spec.objective_keys,
+                                           sim_params;
+                                           objective_senses=objective_senses)
+    isempty(senses) && return ""
+
+    required_keys = unique(vcat(param_names,
+                                spec.objective_keys,
+                                [configured_color_key]))
+
+    valid_idx = [idx
+                 for idx in eachindex(results)
+                 if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
+
+    if isempty(valid_idx)
+        @error("Cannot create matrix plot: no complete numeric result rows.")
+        return ""
+    end
+
+    parameter_values = Dict(
+        key => Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+        for key in param_names
+    )
+
+    objective_matrix = hcat([Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+                             for key in spec.objective_keys]...)
+
+    color_values = Float64[Float64(results_dict[configured_color_key][idx])
+                           for idx in valid_idx]
+
+    highlight_mask = if spec.is_multiobjective
+        pareto_front_mask(objective_matrix,
+                          [senses[key] for key in spec.objective_keys])
+    else
+        mask = falses(length(valid_idx))
+        sense = get(senses, first(spec.objective_keys), :min)
+        best_index = sense == :min ?
+                     argmin(objective_matrix[:, 1]) :
+                     argmax(objective_matrix[:, 1])
+        mask[best_index] = true
+        mask
+    end
+
+    line_width = [highlight_mask[idx] ? 2 : 0
+                  for idx in eachindex(valid_idx)]
+
+    color_sense = get(senses,
+                      configured_color_key,
+                      :min)
+
+    # Static matrix-specific colour range:
+    # show approximately the best 25% with the full colour gradient.
+    sorted_color_values = sort(color_values)
+    number_of_values = length(sorted_color_values)
+    number_of_best_values = max(1,
+                                cld(number_of_values, 4))
+
+    if color_sense == :max
+        first_best_index = number_of_values -
+                           number_of_best_values +
+                           1
+
+        cmin = sorted_color_values[first_best_index]
+        cmax = last(sorted_color_values)
+    else
+        cmin = first(sorted_color_values)
+        cmax = sorted_color_values[number_of_best_values]
+    end
+
+    # Fall back to the complete range when the selected quartile has
+    # no width, for example with identical or very few values.
+    if !isfinite(cmin) ||
+       !isfinite(cmax) ||
+       cmax <= cmin
+        cmin = first(sorted_color_values)
+        cmax = last(sorted_color_values)
+    end
+
+    # Plotly requires two distinct colour limits.
+    if cmax <= cmin
+        delta = max(abs(cmin), 1.0) *
+                1.0e-9
+
+        cmin -= delta
+        cmax += delta
+    end
+    hover_keys = unique(vcat(param_names, spec.objective_keys))
+    hover_text = ["run $(valid_idx[local_index])" *
+                  join(("<br>$key = $(results_dict[key][valid_idx[local_index]])"
+                        for key in hover_keys))
+                  for local_index in eachindex(valid_idx)]
 
     trace = splom(;
-                  dimensions=[attr(; label=param, values=results_dict[param])
+                  dimensions=[attr(; label=param,
+                                   values=parameter_values[param])
                               for param in param_names],
-                  marker=attr(; color=objective,
-                              colorscale=reverse(ColorSchemes.viridis),
+                  marker=attr(; color=color_values,
+                              colorscale=objective_colorscale(color_sense),
                               cmin=cmin,
                               cmax=cmax,
                               showscale=true,
                               line=attr(; color="red", width=line_width),
-                              colorbar=attr(; title=obj_key)),
-                  text=string.(objective),
-                  hovertemplate="%{x}, %{y}<br>$obj_key = %{text}<extra></extra>")
+                              colorbar=attr(; title=configured_color_key)),
+                  text=hover_text,
+                  hovertemplate="%{text}<extra></extra>")
 
-    p = plot(trace)
+    title = spec.is_multiobjective ?
+            "Optimisation parameter matrix — red outline: Pareto solutions" :
+            "Optimisation parameter matrix — red outline: best solution"
+
+    p = plot(trace, Layout(; title=title))
     file_path = optimisation_plot_path(sim_params, io_settings, "matrix_plot")
     savefig(p, file_path)
 
@@ -1358,10 +1454,28 @@ function create_matrix_plot(results::Vector{Any},
 end
 
 """
+    result_value(result, key)
+
+Read a result entry using either a string or symbol key. Return `missing` when the key is absent.
+"""
+function result_value(result, key::String)
+    if haskey(result, key)
+        return result[key]
+    end
+
+    symbol_key = Symbol(key)
+    if haskey(result, symbol_key)
+        return result[symbol_key]
+    end
+
+    return missing
+end
+
+"""
     optimisation_results_dict(results)
 
 Collect every result column in a dictionary of vectors. Missing entries are represented by
-`missing`.
+`missing`. String and symbol result keys are handled consistently.
 """
 function optimisation_results_dict(results::Vector{Any})::Dict{String,Vector{Any}}
     if isempty(results)
@@ -1371,14 +1485,14 @@ function optimisation_results_dict(results::Vector{Any})::Dict{String,Vector{Any
 
     all_keys = unique([String(key) for result in results for key in keys(result)])
 
-    return Dict(key => [haskey(result, key) ? result[key] : missing for result in results]
+    return Dict(key => [result_value(result, key) for result in results]
                 for key in all_keys)
 end
 
 """
     is_finite_number(value)
 
-Return `true` for finite real values.
+Return `true` for finite scalar real values.
 """
 is_finite_number(value)::Bool = value isa Real && isfinite(Float64(value))
 
@@ -1393,7 +1507,7 @@ function optimisation_plot_path(sim_params::Dict{String,Any},
     base_path = sim_params["run_path"](io_settings["optim_plots_file_path"])
     dir, filename = splitdir(base_path)
     root, _ = splitext(filename)
-    ext = ".html"  # html only here
+    ext = ".html"
     return joinpath(dir, "$(root)_$(suffix)$(ext)")
 end
 
@@ -1407,269 +1521,1821 @@ safe_plot_name(name::AbstractString)::String = replace(name, r"[^A-Za-z0-9_]+" =
 """
     optimisation_color_bounds(values)
 
-Return robust colour limits. The upper colour limit is based on the lower quartile to retain
-contrast around good objective values.
+Return colour limits spanning the complete finite value range.
 """
 function optimisation_color_bounds(values::Vector{Float64})::Tuple{Float64,Float64}
     if isempty(values)
         @error("Cannot determine colour bounds from an empty vector.")
-        return 0, 0
+        return 0.0, 1.0
     end
 
-    sorted_values = sort(values)
-    cmin = first(sorted_values)
-    cmax = sorted_values[max(1, cld(length(sorted_values), 4))]
-
-    if !isfinite(cmax) || cmax <= cmin
-        cmax = last(sorted_values)
-    end
+    cmin = minimum(values)
+    cmax = maximum(values)
 
     if cmax <= cmin
-        cmax = cmin + max(abs(cmin) * 1.0e-9, 1.0e-9)
+        delta = max(abs(cmin), 1.0) * 1.0e-9
+        cmin -= delta
+        cmax += delta
     end
 
     return cmin, cmax
 end
 
 """
-    create_objective_convergence_plot(results, io_settings, sim_params)
+    objective_colorscale(sense)
 
-Create a plot containing the objective value of every run and the best value found so far.
+Use bright colours for favourable values: low values for minimisation and high values for
+maximisation.
+"""
+function objective_colorscale(sense::Symbol)
+    sense == :max ? ColorSchemes.viridis : reverse(ColorSchemes.viridis)
+end
+
+"""
+    optimisation_objective_spec(results, sim_params; objective_keys=nothing)
+
+Resolve the scalar objective columns used by the plots.
+
+Single-objective results keep the scalar `"objective"` column, including objectives derived
+from sum, mean, economic or emissions calculations.
+
+For vector-valued multi-objective results, the objective names are taken from
+`objective_keys` when supplied, otherwise from
+`sim_params["optimisation"]["objective_params_keys"]`. The named scalar columns already stored
+in every optimisation result are used directly; no numerical value matching or predefined
+objective categories are required.
+"""
+function optimisation_objective_spec(results::Vector{Any},
+                                     sim_params::Dict{String,Any};
+                                     objective_keys=nothing)
+    results_dict = optimisation_results_dict(results)
+    isempty(results_dict) &&
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=false,
+                vector_objective=false)
+
+    objective_column = get(results_dict,
+                           "objective",
+                           Any[missing for _ in eachindex(results)])
+
+    vector_lengths = Int[length(value)
+                         for value in objective_column
+                         if value isa AbstractVector || value isa Tuple]
+
+    vector_objective = !isempty(vector_lengths)
+
+    if !vector_objective
+        if haskey(results_dict, "objective") &&
+           any(is_finite_number, results_dict["objective"])
+            return (; results_dict,
+                    objective_keys=["objective"],
+                    is_multiobjective=false,
+                    vector_objective=false)
+        end
+
+        @error("Cannot create optimisation plots: no finite scalar objective was found.")
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=false,
+                vector_objective=false)
+    end
+
+    n_objectives = first(vector_lengths)
+
+    if any(length_value -> length_value != n_objectives,
+           vector_lengths)
+        @error("Cannot create optimisation plots: vector-valued objective entries have inconsistent lengths.")
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    selected_keys = if objective_keys !== nothing
+        String.(objective_keys)
+    elseif haskey(sim_params, "optimisation") &&
+           haskey(sim_params["optimisation"], "objective_params_keys")
+        String.(sim_params["optimisation"]["objective_params_keys"])
+    else
+        String[]
+    end
+
+    if isempty(selected_keys)
+        @error("Multi-objective plotting requires the ordered objective parameter keys in " *
+               "sim_params[\"optimisation\"][\"objective_params_keys\"] or via objective_keys.")
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    if length(selected_keys) != n_objectives
+        @error("The number of objective parameter keys ($(length(selected_keys))) does not match " *
+               "the vector objective length ($n_objectives).")
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    duplicate_keys = [key
+                      for key in unique(selected_keys)
+                      if count(==(key), selected_keys) > 1]
+
+    if !isempty(duplicate_keys)
+        @error("Objective parameter keys must be unique: " *
+               join(duplicate_keys, ", "))
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    missing_keys = [key
+                    for key in selected_keys
+                    if !haskey(results_dict, key)]
+
+    if !isempty(missing_keys)
+        @error("Cannot create multi-objective plots. Objective result columns are missing: " *
+               join(missing_keys, ", "))
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    invalid_keys = [key
+                    for key in selected_keys
+                    if !any(is_finite_number, results_dict[key])]
+
+    if !isempty(invalid_keys)
+        @error("Cannot create multi-objective plots. Objective result columns contain no finite " *
+               "scalar values: " * join(invalid_keys, ", "))
+        return (; results_dict,
+                objective_keys=String[],
+                is_multiobjective=n_objectives > 1,
+                vector_objective=true)
+    end
+
+    return (; results_dict,
+            objective_keys=selected_keys,
+            is_multiobjective=n_objectives > 1,
+            vector_objective=true)
+end
+
+"""
+    optimisation_result_axis_keys(results, results_dict, sim_params, objective_keys)
+
+Return selectable scalar result axes. True objective columns are listed first, followed by other
+finite scalar result or KPI columns. Parameters and metadata are excluded.
+"""
+function optimisation_result_axis_keys(results::Vector{Any},
+                                       results_dict::Dict{String,Vector{Any}},
+                                       sim_params::Dict{String,Any},
+                                       objective_keys::Vector{String})::Vector{String}
+    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    excluded_keys = Set(vcat(param_names,
+                             ["error",
+                              "run",
+                              "run_id",
+                              "sample_id"]))
+
+    ordered_result_keys = unique([String(key) for result in results for key in keys(result)])
+    ordered_keys = unique(vcat(objective_keys,
+                               ordered_result_keys,
+                               collect(keys(results_dict))))
+
+    return [key
+            for key in ordered_keys
+            if !(key in excluded_keys) &&
+                   haskey(results_dict, key) &&
+                   any(is_finite_number, results_dict[key])]
+end
+
+"""
+    optimisation_objective_senses(objective_keys, sim_params; objective_senses=nothing)
+
+Resolve one `:min` or `:max` sense for each objective. The keyword may be a single symbol, a
+vector in objective order or a dictionary keyed by objective name. If omitted, the function
+uses `sim_params["optimisation"]["objective_senses"]` when available and otherwise defaults to
+`:min`.
+"""
+function optimisation_objective_senses(objective_keys::Vector{String},
+                                       sim_params::Dict{String,Any};
+                                       objective_senses=nothing)::Dict{String,Symbol}
+    configured = objective_senses
+
+    if configured === nothing &&
+       haskey(sim_params, "optimisation") &&
+       haskey(sim_params["optimisation"], "objective_senses")
+        configured = sim_params["optimisation"]["objective_senses"]
+    end
+
+    resolved = Dict{String,Symbol}()
+
+    if configured === nothing
+        for key in objective_keys
+            resolved[key] = :min
+        end
+    elseif configured isa Symbol
+        for key in objective_keys
+            resolved[key] = configured
+        end
+    elseif configured isa AbstractVector
+        if length(configured) != length(objective_keys)
+            @error("The number of objective senses ($(length(configured))) does not match the number of objectives ($(length(objective_keys))).")
+            return Dict{String,Symbol}()
+        end
+
+        for (key, sense) in zip(objective_keys, configured)
+            resolved[key] = sense isa Symbol ? sense : Symbol(sense)
+        end
+    elseif configured isa AbstractDict
+        for key in objective_keys
+            if haskey(configured, key)
+                resolved[key] = configured[key] isa Symbol ? configured[key] : Symbol(configured[key])
+            elseif haskey(configured, Symbol(key))
+                resolved[key] = configured[Symbol(key)] isa Symbol ? configured[Symbol(key)] :
+                                Symbol(configured[Symbol(key)])
+            else
+                resolved[key] = :min
+            end
+        end
+    else
+        @error("objective_senses must be nothing, :min, :max, a vector or a dictionary.")
+        return Dict{String,Symbol}()
+    end
+
+    invalid = [key for key in objective_keys if !(resolved[key] in (:min, :max))]
+    if !isempty(invalid)
+        @error("Objective senses must be :min or :max. Invalid entries: " *
+               join(["$key => $(resolved[key])" for key in invalid], ", "))
+        return Dict{String,Symbol}()
+    end
+
+    return resolved
+end
+
+"""
+    pareto_front_mask(objective_values, senses)
+
+Return a mask identifying nondominated rows. Every objective may independently be minimised or
+maximised.
+"""
+function pareto_front_mask(objective_values::Matrix{Float64},
+                           senses::Vector{Symbol})::BitVector
+    n_points, n_objectives = size(objective_values)
+
+    if length(senses) != n_objectives
+        throw(ArgumentError("The number of objective senses must match the objective columns."))
+    end
+
+    losses = copy(objective_values)
+
+    for objective_index in 1:n_objectives
+        if senses[objective_index] == :max
+            losses[:, objective_index] .*= -1.0
+        elseif senses[objective_index] != :min
+            throw(ArgumentError("Objective sense must be :min or :max."))
+        end
+    end
+
+    is_pareto = trues(n_points)
+
+    for candidate_index in 1:n_points
+        for other_index in 1:n_points
+            candidate_index == other_index && continue
+
+            no_worse = all(losses[other_index, :] .<= losses[candidate_index, :])
+            strictly_better = any(losses[other_index, :] .< losses[candidate_index, :])
+
+            if no_worse && strictly_better
+                is_pareto[candidate_index] = false
+                break
+            end
+        end
+    end
+
+    return is_pareto
+end
+
+"""
+    create_objective_convergence_plot(results, io_settings, sim_params; ...)
+
+Create one convergence plot.
+
+For a single-objective run, the existing convergence plot is retained. For a multi-objective
+run, one HTML file is created with an objective dropdown. The selected objective determines the
+evaluation points, objective-specific best-so-far line, y-axis label and linear/log axis mode.
 """
 function create_objective_convergence_plot(results::Vector{Any},
                                            io_settings::Dict{String,Any},
-                                           sim_params::Dict{String,Any})
-    obj_key = "objective"
-    results_dict = optimisation_results_dict(results)
+                                           sim_params::Dict{String,Any};
+                                           objective_keys=nothing,
+                                           objective_senses=nothing)
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
+    results_dict = spec.results_dict
+    isempty(spec.objective_keys) && return ""
 
-    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
-                                       for value in results_dict[obj_key]]
-    valid_objective = Float64[value for value in skipmissing(objective)]
-    if isempty(valid_objective)
+    senses = optimisation_objective_senses(spec.objective_keys,
+                                           sim_params;
+                                           objective_senses=objective_senses)
+    isempty(senses) && return ""
+
+    objective_data = Dict{String,Vector{Union{Nothing,Float64}}}()
+    best_data = Dict{String,Vector{Union{Nothing,Float64}}}()
+    use_log_axis = Dict{String,Bool}()
+    available_objective_keys = String[]
+
+    for objective_key in spec.objective_keys
+        objective = Union{Nothing,Float64}[is_finite_number(value) ?
+                                           Float64(value) :
+                                           nothing
+                                           for value in results_dict[objective_key]]
+
+        valid_objective = Float64[value
+                                  for value in objective
+                                  if value !== nothing]
+
+        if isempty(valid_objective)
+            @warn "Skipping convergence objective: no finite values." objective_key
+            continue
+        end
+
+        sense = senses[objective_key]
+        best_so_far = Vector{Union{Nothing,Float64}}(undef,
+                                                     length(objective))
+        fill!(best_so_far, nothing)
+
+        current_best = sense == :min ? Inf : -Inf
+
+        for idx in eachindex(objective)
+            value = objective[idx]
+
+            if value !== nothing
+                current_best = sense == :min ?
+                               min(current_best, value) :
+                               max(current_best, value)
+            end
+
+            if isfinite(current_best)
+                best_so_far[idx] = current_best
+            end
+        end
+
+        objective_data[objective_key] = objective
+        best_data[objective_key] = best_so_far
+        use_log_axis[objective_key] = all(value -> value > 0.0, valid_objective)
+
+        push!(available_objective_keys,
+              objective_key)
+    end
+
+    if isempty(available_objective_keys)
         @error("Cannot create convergence plot: no finite objective values.")
         return ""
     end
 
-    best_so_far = Vector{Union{Missing,Float64}}(missing, length(objective))
-    current_best = Inf
+    initial_objective_key = first(available_objective_keys)
 
-    for idx in eachindex(objective)
-        if objective[idx] !== missing
-            current_best = min(current_best, objective[idx])
-        end
-        if isfinite(current_best)
-            best_so_far[idx] = current_best
-        end
-    end
+    initial_objective = objective_data[initial_objective_key]
+    initial_best = best_data[initial_objective_key]
 
-    use_log_axis = all(value -> value > 0.0, valid_objective)
+    objective_hover_text = ["run $idx<br>$initial_objective_key = " *
+                            format_convergence_value(initial_objective[idx])
+                            for idx in eachindex(initial_objective)]
 
-    objective_trace = scatter(; x=eachindex(objective),
-                              y=objective,
+    best_hover_text = ["run $idx<br>best $initial_objective_key = " *
+                       format_convergence_value(initial_best[idx])
+                       for idx in eachindex(initial_best)]
+
+    objective_trace = scatter(; x=collect(eachindex(initial_objective)),
+                              y=initial_objective,
                               mode="markers",
-                              name=obj_key,
-                              text=["run $idx<br>$obj_key = $(objective[idx])"
-                                    for idx in eachindex(objective)],
+                              name=initial_objective_key,
+                              text=objective_hover_text,
                               hovertemplate="%{text}<extra></extra>")
 
-    best_trace = scatter(; x=eachindex(best_so_far),
-                         y=best_so_far,
+    best_trace = scatter(; x=collect(eachindex(initial_best)),
+                         y=initial_best,
                          mode="lines",
                          name="Best so far",
-                         hovertemplate="run %{x}<br>best = %{y}<extra></extra>")
+                         text=best_hover_text,
+                         hovertemplate="%{text}<extra></extra>")
 
-    layout = Layout(; title="Optimisation convergence",
+    title = spec.is_multiobjective ?
+            "Objective convergence: $initial_objective_key" :
+            "Objective convergence"
+
+    layout = Layout(; title=title,
                     xaxis=attr(; title="Run"),
-                    yaxis=attr(; title=obj_key,
-                               type=use_log_axis ? "log" : "linear"))
+                    yaxis=attr(; title=initial_objective_key,
+                               type=use_log_axis[initial_objective_key] ?
+                                    "log" :
+                                    "linear"))
 
-    p = plot([objective_trace, best_trace], layout)
-    file_path = optimisation_plot_path(sim_params, io_settings, "convergence")
-    savefig(p, file_path)
+    plot_object = plot([objective_trace, best_trace], layout)
+
+    # Use the same output suffix for single- and multi-objective runs.
+    file_path = optimisation_plot_path(sim_params,
+                                       io_settings,
+                                       "convergence")
+
+    savefig(plot_object, file_path)
+
+    if spec.is_multiobjective &&
+       length(available_objective_keys) > 1
+        inject_convergence_objective_controls!(file_path,
+                                               objective_data,
+                                               best_data,
+                                               available_objective_keys,
+                                               use_log_axis,
+                                               collect(eachindex(results)),
+                                               initial_objective_key)
+    end
 
     return file_path
 end
 
 """
-    create_objective_parameter_plots(results, io_settings, sim_params)
+    format_convergence_value(value)
 
-Create one objective-versus-parameter plot for every optimisation parameter.
+Format a convergence value for initial Plotly hover text.
 """
-function create_objective_parameter_plots(results::Vector{Any},
-                                          io_settings::Dict{String,Any},
-                                          sim_params::Dict{String,Any})
-    obj_key = "objective"
-    param_names = sim_params["optimisation"]["optim_params_keys"]
-    results_dict = optimisation_results_dict(results)
-
-    objective = Union{Missing,Float64}[is_finite_number(value) ? Float64(value) : missing
-                                       for value in results_dict[obj_key]]
-    valid_objective = Float64[value for value in skipmissing(objective)]
-    if isempty(valid_objective)
-        @error("Cannot create parameter plots: no finite objective values.")
-        return ""
-    end
-
-    use_log_axis = all(value -> value > 0.0, valid_objective)
-    saved_paths = String[]
-
-    for param_name in param_names
-        if !haskey(results_dict, param_name)
-            @warn "Skipping objective-versus-parameter plot. Parameter \"$param_name\" was not found in results."
-            continue
-        end
-
-        param_values = results_dict[param_name]
-        valid_idx = [idx
-                     for idx in eachindex(objective)
-                     if objective[idx] !== missing && is_finite_number(param_values[idx])]
-
-        if isempty(valid_idx)
-            @warn "Skipping objective-versus-parameter plot for \"$param_name\": no valid points."
-            continue
-        end
-
-        x_values = Float64[Float64(param_values[idx]) for idx in valid_idx]
-        obj_values = Float64[objective[idx] for idx in valid_idx]
-        best_local_idx = argmin(obj_values)
-        best_global_idx = valid_idx[best_local_idx]
-        cmin, cmax = optimisation_color_bounds(obj_values)
-
-        runs_trace = scatter(; x=x_values,
-                             y=obj_values,
-                             mode="markers",
-                             name="Runs",
-                             marker=attr(; color=obj_values,
-                                         colorscale=reverse(ColorSchemes.viridis),
-                                         cmin=cmin,
-                                         cmax=cmax,
-                                         showscale=true,
-                                         colorbar=attr(; title=obj_key)),
-                             text=["run $(valid_idx[idx])<br>$param_name = $(x_values[idx])" *
-                                   "<br>$obj_key = $(obj_values[idx])"
-                                   for idx in eachindex(valid_idx)],
-                             hovertemplate="%{text}<extra></extra>")
-
-        best_trace = scatter(; x=[x_values[best_local_idx]],
-                             y=[obj_values[best_local_idx]],
-                             mode="markers",
-                             name="Best",
-                             marker=attr(; symbol="x", size=14),
-                             text=["best run $best_global_idx<br>$param_name = $(x_values[best_local_idx])" *
-                                   "<br>$obj_key = $(obj_values[best_local_idx])"],
-                             hovertemplate="%{text}<extra></extra>")
-
-        layout = Layout(; title="Objective vs $param_name",
-                        xaxis=attr(; title=param_name),
-                        yaxis=attr(; title=obj_key,
-                                   type=use_log_axis ? "log" : "linear"))
-
-        p = plot([runs_trace, best_trace], layout)
-        file_path = optimisation_plot_path(sim_params,
-                                           io_settings,
-                                           "objective_vs_$(safe_plot_name(param_name))")
-        savefig(p, file_path)
-        push!(saved_paths, file_path)
-    end
-
-    return saved_paths
+function format_convergence_value(value::Union{Nothing,Float64})::String
+    value === nothing && return "missing"
+    return string(value)
 end
 
 """
-    create_parallel_coordinates_plot(results, io_settings, sim_params;
-                                                objective_keys=nothing)
+    inject_convergence_objective_controls!(file_path, objective_data, best_data,
+                                           objective_keys, use_log_axis, run_ids,
+                                           initial_objective_key)
 
-Create a filterable parallel-coordinates plot. Optimisation parameters and result axes are
-visually separated. A floating control panel permits precise axis zooming.
+Inject an objective dropdown into a multi-objective convergence HTML plot. Changing the selected
+objective updates the evaluation points, objective-specific best-so-far line, plot title, hover
+text, y-axis label and linear/log scale.
+"""
+function inject_convergence_objective_controls!(file_path::String,
+                                                objective_data::Dict{String,
+                                                                     Vector{Union{Nothing,Float64}}},
+                                                best_data::Dict{String,
+                                                                Vector{Union{Nothing,Float64}}},
+                                                objective_keys::Vector{String},
+                                                use_log_axis::Dict{String,Bool},
+                                                run_ids::Vector{Int},
+                                                initial_objective_key::String)
+    html = read(file_path, String)
+
+    json_for_html(value) = replace(JSON.json(value),
+                                   "</" => "<\\/")
+
+    objective_data_json = json_for_html(objective_data)
+    best_data_json = json_for_html(best_data)
+    objective_keys_json = json_for_html(objective_keys)
+    use_log_axis_json = json_for_html(use_log_axis)
+    run_ids_json = json_for_html(run_ids)
+    initial_objective_json = json_for_html(initial_objective_key)
+
+    injection = """
+<script>
+(function () {
+    const objectiveData = $objective_data_json;
+    const bestData = $best_data_json;
+    const objectiveKeys = $objective_keys_json;
+    const useLogAxis = $use_log_axis_json;
+    const runIds = $run_ids_json;
+    const initialObjective = $initial_objective_json;
+
+    function findPlotlyDiv() {
+        const divs =
+            document.querySelectorAll(".js-plotly-plot");
+
+        return divs.length > 0 ?
+            divs[0] :
+            null;
+    }
+
+    function formatValue(value) {
+        if (
+            typeof value !== "number" ||
+            !Number.isFinite(value)
+        ) {
+            return "missing";
+        }
+
+        const absolute = Math.abs(value);
+
+        if (
+            absolute !== 0 &&
+            (absolute >= 100000 || absolute < 0.001)
+        ) {
+            return value.toExponential(4);
+        }
+
+        return Number(
+            value.toPrecision(6)
+        ).toString();
+    }
+
+    function objectiveHoverText(objectiveKey) {
+        return objectiveData[objectiveKey].map(
+            (value, index) =>
+                "run " + runIds[index] +
+                "<br>" + objectiveKey + " = " +
+                formatValue(value)
+        );
+    }
+
+    function bestHoverText(objectiveKey) {
+        return bestData[objectiveKey].map(
+            (value, index) =>
+                "run " + runIds[index] +
+                "<br>best " + objectiveKey + " = " +
+                formatValue(value)
+        );
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (
+            gd === null ||
+            !gd.data ||
+            gd.data.length < 2
+        ) {
+            window.setTimeout(
+                setupControls,
+                200
+            );
+            return;
+        }
+
+        if (
+            document.getElementById(
+                "convergence-objective-controls"
+            )
+        ) {
+            return;
+        }
+
+        const objectiveTraceIndex = 0;
+        const bestTraceIndex = 1;
+
+        const controls =
+            document.createElement("div");
+
+        controls.id =
+            "convergence-objective-controls";
+        controls.style.fontFamily =
+            "Arial, sans-serif";
+        controls.style.fontSize =
+            "13px";
+        controls.style.margin =
+            "8px 0 4px 0";
+        controls.style.padding =
+            "10px";
+        controls.style.border =
+            "1px solid #ccc";
+        controls.style.borderRadius =
+            "5px";
+        controls.style.display =
+            "flex";
+        controls.style.alignItems =
+            "center";
+        controls.style.gap =
+            "8px";
+        controls.style.width =
+            "fit-content";
+        controls.style.maxWidth =
+            "calc(100% - 24px)";
+
+        const label =
+            document.createElement("label");
+
+        label.style.display =
+            "flex";
+        label.style.alignItems =
+            "center";
+        label.style.gap =
+            "6px";
+
+        const labelText =
+            document.createElement("span");
+
+        labelText.textContent =
+            "Objective:";
+
+        const select =
+            document.createElement("select");
+
+        select.style.maxWidth =
+            "420px";
+
+        objectiveKeys.forEach(
+            objectiveKey => {
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    objectiveKey;
+                option.textContent =
+                    objectiveKey;
+
+                select.appendChild(
+                    option
+                );
+            }
+        );
+
+        select.value =
+            initialObjective;
+
+        label.appendChild(
+            labelText
+        );
+        label.appendChild(
+            select
+        );
+        controls.appendChild(
+            label
+        );
+
+        gd.parentNode.insertBefore(
+            controls,
+            gd
+        );
+
+        // Fit the controls and convergence graph into the browser viewport.
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height =
+            "100%";
+        document.documentElement.style.overflow =
+            "hidden";
+        document.body.style.height =
+            "100%";
+        document.body.style.margin =
+            "0";
+        document.body.style.overflow =
+            "hidden";
+
+        plotParent.style.height =
+            "100vh";
+        plotParent.style.width =
+            "100%";
+        plotParent.style.display =
+            "flex";
+        plotParent.style.flexDirection =
+            "column";
+        plotParent.style.overflow =
+            "hidden";
+        plotParent.style.minHeight =
+            "0";
+
+        controls.style.flex =
+            "0 0 auto";
+        controls.style.boxSizing =
+            "border-box";
+        controls.style.margin =
+            "8px 12px 4px 12px";
+
+        gd.style.flex =
+            "1 1 auto";
+        gd.style.minHeight =
+            "0";
+        gd.style.width =
+            "100%";
+
+        function resizeConvergencePlot() {
+            const parentTop =
+                plotParent
+                    .getBoundingClientRect()
+                    .top;
+
+            const controlsHeight =
+                controls
+                    .getBoundingClientRect()
+                    .height;
+
+            const availableHeight =
+                Math.max(
+                    320,
+                    window.innerHeight -
+                        parentTop -
+                        controlsHeight -
+                        16
+                );
+
+            gd.style.height =
+                availableHeight + "px";
+            gd.style.width =
+                "100%";
+
+            return Plotly.relayout(
+                gd,
+                {
+                    autosize: true,
+                    height: availableHeight
+                }
+            ).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        function applyObjective(
+            resetYAxis
+        ) {
+            const objectiveKey =
+                select.value;
+
+            const objectiveUpdate = {
+                y: [
+                    objectiveData[
+                        objectiveKey
+                    ]
+                ],
+                name: objectiveKey,
+                text: [
+                    objectiveHoverText(
+                        objectiveKey
+                    )
+                ]
+            };
+
+            const bestUpdate = {
+                y: [
+                    bestData[
+                        objectiveKey
+                    ]
+                ],
+                text: [
+                    bestHoverText(
+                        objectiveKey
+                    )
+                ]
+            };
+
+            return Promise.all([
+                Plotly.restyle(
+                    gd,
+                    objectiveUpdate,
+                    [objectiveTraceIndex]
+                ),
+                Plotly.restyle(
+                    gd,
+                    bestUpdate,
+                    [bestTraceIndex]
+                )
+            ]).then(function () {
+                const layoutUpdate = {
+                    "title.text":
+                        "Objective convergence: " +
+                        objectiveKey,
+                    "yaxis.title.text":
+                        objectiveKey,
+                    "yaxis.type":
+                        useLogAxis[objectiveKey] ?
+                            "log" :
+                            "linear"
+                };
+
+                if (resetYAxis) {
+                    layoutUpdate[
+                        "yaxis.range"
+                    ] = null;
+                    layoutUpdate[
+                        "yaxis.autorange"
+                    ] = true;
+                }
+
+                return Plotly.relayout(
+                    gd,
+                    layoutUpdate
+                );
+            });
+        }
+
+        select.addEventListener(
+            "change",
+            function () {
+                applyObjective(true);
+            }
+        );
+
+        resizeConvergencePlot();
+
+        window.addEventListener(
+            "resize",
+            resizeConvergencePlot
+        );
+    }
+
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupControls
+        );
+    } else {
+        setupControls();
+    }
+})();
+</script>
+"""
+
+    if occursin("</body>", html)
+        html = replace(html,
+                       "</body>" =>
+                           injection *
+                           "\n</body>")
+    else
+        html *= injection
+    end
+
+    write(file_path, html)
+
+    return file_path
+end
+"""
+    create_objective_parameter_plots(results, io_settings, sim_params; ...)
+
+Create a single interactive 2D objective/parameter explorer. The x-axis can be selected from
+all optimisation parameters, the y-axis from all plotted objectives, and the colour can be set
+from an independent objective quantity when that adds information.
+
+Single-objective runs highlight the best solution. Multi-objective runs highlight the global
+Pareto set.
+"""
+function create_objective_parameter_plots(results::Vector{Any},
+                                          io_settings::Dict{String,Any},
+                                          sim_params::Dict{String,Any};
+                                          objective_keys=nothing,
+                                          objective_senses=nothing,
+                                          color_key=nothing)
+    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    configured_objective_params = if haskey(sim_params["optimisation"],
+                                            "objective_params_keys")
+        unique(String.(sim_params["optimisation"]["objective_params_keys"]))
+    else
+        String[]
+    end
+
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
+    results_dict = spec.results_dict
+    isempty(spec.objective_keys) && return ""
+
+    senses = optimisation_objective_senses(spec.objective_keys,
+                                           sim_params;
+                                           objective_senses=objective_senses)
+    isempty(senses) && return ""
+
+    configured_senses = if objective_senses !== nothing
+        objective_senses
+    elseif haskey(sim_params["optimisation"], "objective_senses")
+        sim_params["optimisation"]["objective_senses"]
+    else
+        nothing
+    end
+
+    function explorer_objective_sense(key::String)::Symbol
+        if haskey(senses, key)
+            return senses[key]
+        end
+
+        raw_sense = if configured_senses isa Symbol
+            configured_senses
+        elseif configured_senses isa AbstractDict && haskey(configured_senses, key)
+            configured_senses[key]
+        elseif configured_senses isa AbstractDict && haskey(configured_senses, Symbol(key))
+            configured_senses[Symbol(key)]
+        else
+            :min
+        end
+
+        sense = raw_sense isa Symbol ?
+                raw_sense :
+                Symbol(lowercase(String(raw_sense)))
+
+        if !(sense in (:min, :max))
+            @warn "Invalid objective sense for explorer colour; defaulting to :min." key raw_sense
+            return :min
+        end
+
+        return sense
+    end
+
+    available_param_names = [key
+                             for key in param_names
+                             if haskey(results_dict, key) && any(is_finite_number, results_dict[key])]
+
+    if isempty(available_param_names)
+        @error("Cannot create objective/parameter explorer: no finite optimisation parameters were found.")
+        return ""
+    end
+
+    complete_objective_idx = [idx
+                              for idx in eachindex(results)
+                              if all(key -> is_finite_number(results_dict[key][idx]),
+                                     spec.objective_keys)]
+
+    pareto_global_indices = Set{Int}()
+
+    if spec.is_multiobjective && !isempty(complete_objective_idx)
+        objective_matrix = hcat([Float64[Float64(results_dict[key][idx])
+                                         for idx in complete_objective_idx]
+                                 for key in spec.objective_keys]...)
+
+        pareto_mask = pareto_front_mask(objective_matrix,
+                                        [senses[key]
+                                         for key in spec.objective_keys])
+
+        for local_index in findall(pareto_mask)
+            push!(pareto_global_indices,
+                  complete_objective_idx[local_index])
+        end
+    end
+
+    interactive_keys = unique(vcat(available_param_names,
+                                   spec.objective_keys,
+                                   configured_objective_params))
+
+    plot_data = Dict{String,Vector{Union{Nothing,Float64}}}(
+        key => Union{Nothing,Float64}[is_finite_number(value) ? Float64(value) : nothing
+                                      for value in results_dict[key]]
+        for key in interactive_keys
+        if haskey(results_dict, key)
+    )
+
+    function candidate_color_keys(y_key::String)::Vector{String}
+        candidates = if spec.is_multiobjective
+            [key for key in spec.objective_keys if key != y_key]
+        elseif length(configured_objective_params) > 1
+            [key for key in configured_objective_params
+             if key != y_key && key != "objective"]
+        else
+            String[]
+        end
+
+        return unique([key
+                       for key in candidates
+                       if haskey(plot_data, key) && any(!isnothing, plot_data[key])])
+    end
+
+    initial_x = first(available_param_names)
+    initial_y = first(spec.objective_keys)
+    initial_color_candidates = candidate_color_keys(initial_y)
+    initial_color = if color_key !== nothing && String(color_key) in initial_color_candidates
+        String(color_key)
+    elseif isempty(initial_color_candidates)
+        nothing
+    else
+        first(initial_color_candidates)
+    end
+
+    function valid_indices(x_key::String,
+                           y_key::String,
+                           selected_color::Union{Nothing,String})::Vector{Int}
+        return [idx
+                for idx in eachindex(results)
+                if plot_data[x_key][idx] !== nothing &&
+                       plot_data[y_key][idx] !== nothing &&
+                       (selected_color === nothing || plot_data[selected_color][idx] !== nothing)]
+    end
+
+    initial_valid_idx = valid_indices(initial_x,
+                                      initial_y,
+                                      initial_color)
+
+    if isempty(initial_valid_idx)
+        @error("Cannot create objective/parameter explorer: no complete numeric rows were found for the initial selection.")
+        return ""
+    end
+
+    x_values = Float64[plot_data[initial_x][idx] for idx in initial_valid_idx]
+    y_values = Float64[plot_data[initial_y][idx] for idx in initial_valid_idx]
+
+    function base_hover_text(x_key::String,
+                             y_key::String,
+                             valid_idx::Vector{Int})::Vector{String}
+        return ["run $(valid_idx[local_index])" *
+                "<br>$x_key = $(plot_data[x_key][valid_idx[local_index]])" *
+                "<br>$y_key = $(plot_data[y_key][valid_idx[local_index]])"
+                for local_index in eachindex(valid_idx)]
+    end
+
+    base_text = base_hover_text(initial_x,
+                                initial_y,
+                                initial_valid_idx)
+
+    initial_hover_text = if initial_color === nothing
+        base_text
+    else
+        [base_text[local_index] *
+         "<br>$initial_color = $(plot_data[initial_color][initial_valid_idx[local_index]])"
+         for local_index in eachindex(initial_valid_idx)]
+    end
+
+    marker_settings = if initial_color === nothing
+        attr(; color="rgb(31,119,180)",
+             size=7,
+             opacity=0.78,
+             showscale=false)
+    else
+        color_values = Float64[plot_data[initial_color][idx] for idx in initial_valid_idx]
+        cmin, cmax = optimisation_color_bounds(color_values)
+
+        initial_color_sense = explorer_objective_sense(initial_color)
+
+        attr(; color=color_values,
+             colorscale=objective_colorscale(initial_color_sense),
+             cmin=cmin,
+             cmax=cmax,
+             size=7,
+             opacity=0.78,
+             showscale=true,
+             colorbar=attr(; title=initial_color,
+                           thickness=16,
+                           x=1.02,
+                           xanchor="left",
+                           y=0.50,
+                           len=0.76))
+    end
+
+    runs_trace = scatter(; x=x_values,
+                         y=y_values,
+                         mode="markers",
+                         name="Runs",
+                         marker=marker_settings,
+                         text=initial_hover_text,
+                         hovertemplate="%{text}<extra></extra>")
+
+    highlight_local_idx = if spec.is_multiobjective
+        [local_index
+         for (local_index, global_index) in pairs(initial_valid_idx)
+         if global_index in pareto_global_indices]
+    else
+        [senses[initial_y] == :min ? argmin(y_values) : argmax(y_values)]
+    end
+
+    highlight_name = spec.is_multiobjective ?
+                     "Pareto solutions" :
+                     "Best solution"
+
+    highlight_trace = scatter(; x=x_values[highlight_local_idx],
+                              y=y_values[highlight_local_idx],
+                              mode="markers",
+                              name=highlight_name,
+                              marker=attr(; symbol=spec.is_multiobjective ? "diamond" : "x",
+                                          size=spec.is_multiobjective ? 10 : 14,
+                                          color="black",
+                                          line=attr(; color="white", width=1.2)),
+                              text=[base_text[idx] for idx in highlight_local_idx],
+                              hovertemplate="%{text}<extra></extra>")
+
+    layout = Layout(; title=attr(; text="Interactive Objective/Parameter Explorer",
+                                 x=0.5,
+                                 xanchor="center"),
+                    xaxis=attr(; title=initial_x,
+                               autorange=true),
+                    yaxis=attr(; title=initial_y,
+                               type=all(value -> value > 0.0, y_values) ? "log" : "linear",
+                               autorange=true),
+                    legend=attr(; x=1.18,
+                                xanchor="left",
+                                y=1.0,
+                                yanchor="top"),
+                    margin=attr(; t=70,
+                                b=70,
+                                l=85,
+                                r=300),
+                    autosize=true)
+
+    p = plot(GenericTrace[runs_trace, highlight_trace], layout)
+    file_path = optimisation_plot_path(sim_params,
+                                       io_settings,
+                                       "objective_parameter_explorer")
+    if lowercase(splitext(file_path)[2]) != ".html"
+        @error("The objective/parameter explorer requires an HTML output path.")
+        return ""
+    end
+
+    mkpath(dirname(file_path))
+    savefig(p, file_path)
+
+    explorer_sense_keys = unique(vcat(spec.objective_keys,
+                                      configured_objective_params))
+    sense_strings = Dict(key => String(explorer_objective_sense(key))
+                         for key in explorer_sense_keys)
+
+    inject_objective_parameter_controls!(file_path,
+                                         plot_data,
+                                         available_param_names,
+                                         spec.objective_keys,
+                                         configured_objective_params,
+                                         collect(eachindex(results)),
+                                         collect(pareto_global_indices),
+                                         sense_strings,
+                                         spec.is_multiobjective,
+                                         initial_x,
+                                         initial_y,
+                                         initial_color)
+
+    return file_path
+end
+
+"""
+    inject_objective_parameter_controls!(file_path, plot_data, parameter_keys,
+                                         objective_keys, configured_color_keys,
+                                         run_ids, pareto_run_ids, objective_senses,
+                                         is_multiobjective, initial_x, initial_y,
+                                         initial_color)
+
+Inject x-axis, y-axis and colour selectors into the objective/parameter explorer. The x-axis
+may be chosen from optimisation parameters, the y-axis from objective quantities, and the
+colour from an independent objective quantity when available.
+"""
+function inject_objective_parameter_controls!(file_path::String,
+                                              plot_data::Dict{String,Vector{Union{Nothing,Float64}}},
+                                              parameter_keys::Vector{String},
+                                              objective_keys::Vector{String},
+                                              configured_color_keys::Vector{String},
+                                              run_ids::Vector{Int},
+                                              pareto_run_ids::Vector{Int},
+                                              objective_senses::Dict{String,String},
+                                              is_multiobjective::Bool,
+                                              initial_x::String,
+                                              initial_y::String,
+                                              initial_color::Union{Nothing,String})
+    html = read(file_path, String)
+
+    json_for_html(value) = replace(JSON.json(value),
+                                   "</" => "<\\/")
+
+    plot_data_json = json_for_html(plot_data)
+    parameter_keys_json = json_for_html(parameter_keys)
+    objective_keys_json = json_for_html(objective_keys)
+    configured_color_keys_json = json_for_html(configured_color_keys)
+    run_ids_json = json_for_html(run_ids)
+    pareto_run_ids_json = json_for_html(pareto_run_ids)
+    objective_senses_json = json_for_html(objective_senses)
+    initial_x_json = json_for_html(initial_x)
+    initial_y_json = json_for_html(initial_y)
+    initial_color_json = json_for_html(initial_color)
+    is_multiobjective_json = json_for_html(is_multiobjective)
+
+    injection = """
+<script>
+(function () {
+    const plotData = $plot_data_json;
+    const parameterKeys = $parameter_keys_json;
+    const objectiveKeys = $objective_keys_json;
+    const configuredColorKeys = $configured_color_keys_json;
+    const runIds = $run_ids_json;
+    const paretoRunIds = new Set($pareto_run_ids_json);
+    const objectiveSenses = $objective_senses_json;
+    const isMultiobjective = $is_multiobjective_json;
+
+    const initialSelection = {
+        x: $initial_x_json,
+        y: $initial_y_json,
+        color: $initial_color_json
+    };
+
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll('.js-plotly-plot');
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function formatValue(value) {
+        if (!isFiniteNumber(value)) {
+            return String(value);
+        }
+
+        const absolute = Math.abs(value);
+
+        if (absolute !== 0 && (absolute >= 100000 || absolute < 0.001)) {
+            return value.toExponential(4);
+        }
+
+        return Number(value.toPrecision(6)).toString();
+    }
+
+    function colorSense(colorKey) {
+        return objectiveSenses[colorKey] === 'max' ? 'max' : 'min';
+    }
+
+    function colorBounds(values) {
+        const finite = values.filter(isFiniteNumber);
+
+        if (finite.length === 0) {
+            return [0.0, 1.0];
+        }
+
+        let minimum = Math.min(...finite);
+        let maximum = Math.max(...finite);
+
+        if (!(maximum > minimum)) {
+            const delta =
+                Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+            minimum -= delta;
+            maximum += delta;
+        }
+
+        return [minimum, maximum];
+    }
+
+    function availableColorKeys(yKey) {
+        const candidates = isMultiobjective
+            ? objectiveKeys.filter(key => key !== yKey)
+            : configuredColorKeys.filter(key => key !== yKey && key !== 'objective');
+
+        return candidates.filter(
+            key => Array.isArray(plotData[key]) && plotData[key].some(isFiniteNumber)
+        );
+    }
+
+    function validIndices(xKey, yKey, colorKey) {
+        const pointCount = runIds.length;
+        const indices = [];
+
+        for (let index = 0; index < pointCount; index += 1) {
+            const xValue = plotData[xKey][index];
+            const yValue = plotData[yKey][index];
+            const colorValue = colorKey === null ? null : plotData[colorKey][index];
+
+            if (!isFiniteNumber(xValue) || !isFiniteNumber(yValue)) {
+                continue;
+            }
+
+            if (colorKey !== null && !isFiniteNumber(colorValue)) {
+                continue;
+            }
+
+            indices.push(index);
+        }
+
+        return indices;
+    }
+
+    function buildSeries(xKey, yKey, colorKey) {
+        const indices = validIndices(xKey, yKey, colorKey);
+        const x = indices.map(index => plotData[xKey][index]);
+        const y = indices.map(index => plotData[yKey][index]);
+        const colorValues = colorKey === null
+            ? null
+            : indices.map(index => plotData[colorKey][index]);
+
+        const text = indices.map(index => {
+            let label = 'run ' + runIds[index] +
+                '<br>' + xKey + ' = ' + formatValue(plotData[xKey][index]) +
+                '<br>' + yKey + ' = ' + formatValue(plotData[yKey][index]);
+
+            if (colorKey !== null) {
+                label += '<br>' + colorKey + ' = ' + formatValue(plotData[colorKey][index]);
+            }
+
+            return label;
+        });
+
+        const highlightIndices = isMultiobjective
+            ? indices.filter(index => paretoRunIds.has(runIds[index]))
+            : (() => {
+                if (indices.length === 0) {
+                    return [];
+                }
+
+                const sense = objectiveSenses[yKey] || 'min';
+                let bestLocal = 0;
+
+                for (let local = 1; local < y.length; local += 1) {
+                    const better = sense === 'max'
+                        ? y[local] > y[bestLocal]
+                        : y[local] < y[bestLocal];
+
+                    if (better) {
+                        bestLocal = local;
+                    }
+                }
+
+                return [indices[bestLocal]];
+            })();
+
+        const highlightLocalPositions = highlightIndices.map(
+            globalIndex => indices.indexOf(globalIndex)
+        ).filter(position => position >= 0);
+
+        return {
+            x,
+            y,
+            text,
+            colorValues,
+            bounds: colorKey === null ? null : colorBounds(colorValues),
+            highlightX: highlightLocalPositions.map(position => x[position]),
+            highlightY: highlightLocalPositions.map(position => y[position]),
+            highlightText: highlightLocalPositions.map(position => text[position]),
+            highlightName: isMultiobjective ? 'Pareto solutions' : 'Best solution',
+            useLogAxis: y.length > 0 && y.every(value => value > 0),
+            hasPoints: indices.length > 0
+        };
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupControls, 200);
+            return;
+        }
+
+        if (document.getElementById('objective-parameter-controls')) {
+            return;
+        }
+
+        const runTraceIndex = gd.data.findIndex(trace => trace.name === 'Runs');
+        const highlightTraceIndex = gd.data.findIndex(trace => trace.name !== 'Runs');
+
+        if (runTraceIndex < 0 || highlightTraceIndex < 0) {
+            return;
+        }
+
+        const controls = document.createElement('div');
+        controls.id = 'objective-parameter-controls';
+        controls.style.fontFamily = 'Arial, sans-serif';
+        controls.style.fontSize = '13px';
+        controls.style.margin = '8px 0 4px 0';
+        controls.style.padding = '10px';
+        controls.style.border = '1px solid #ccc';
+        controls.style.borderRadius = '5px';
+        controls.style.display = 'flex';
+        controls.style.flexDirection = 'column';
+        controls.style.alignItems = 'stretch';
+        controls.style.gap = '8px';
+        controls.style.overflowX = 'auto';
+
+        function createControlRow() {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.flexWrap = 'nowrap';
+            row.style.gap = '10px';
+            row.style.minWidth = 'max-content';
+            controls.appendChild(row);
+            return row;
+        }
+
+        const selectionRow = createControlRow();
+
+        function createSelect(parent, labelText, values, initialValue) {
+            const container = document.createElement('label');
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '5px';
+
+            const label = document.createElement('span');
+            label.textContent = labelText;
+
+            const select = document.createElement('select');
+            select.style.maxWidth = '320px';
+
+            values.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                select.appendChild(option);
+            });
+
+            select.value = initialValue;
+
+            container.appendChild(label);
+            container.appendChild(select);
+            parent.appendChild(container);
+
+            return select;
+        }
+
+        const xSelect = createSelect(selectionRow,
+                                     'X axis:',
+                                     parameterKeys,
+                                     initialSelection.x);
+
+        const ySelect = createSelect(selectionRow,
+                                     'Y axis:',
+                                     objectiveKeys,
+                                     initialSelection.y);
+
+        const colorContainer = document.createElement('label');
+        colorContainer.style.display = 'flex';
+        colorContainer.style.alignItems = 'center';
+        colorContainer.style.gap = '5px';
+
+        const colorLabel = document.createElement('span');
+        colorLabel.textContent = 'Color:';
+        colorContainer.appendChild(colorLabel);
+
+        const colorSelect = document.createElement('select');
+        colorSelect.style.maxWidth = '320px';
+        colorContainer.appendChild(colorSelect);
+        selectionRow.appendChild(colorContainer);
+
+        const resetSelectionButton = document.createElement('button');
+        resetSelectionButton.textContent = 'Reset selection';
+        selectionRow.appendChild(resetSelectionButton);
+
+        const resetViewButton = document.createElement('button');
+        resetViewButton.textContent = 'Reset view';
+        selectionRow.appendChild(resetViewButton);
+
+        gd.parentNode.insertBefore(controls, gd);
+
+        // Fill the complete browser viewport. The control panel keeps its natural
+        // height and the Plotly graph receives all remaining vertical space.
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height = '100%';
+        document.body.style.height = '100%';
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+
+        plotParent.style.height = '100vh';
+        plotParent.style.width = '100%';
+        plotParent.style.display = 'flex';
+        plotParent.style.flexDirection = 'column';
+        plotParent.style.overflow = 'hidden';
+
+        controls.style.flex = '0 0 auto';
+        gd.style.flex = '1 1 auto';
+        gd.style.minHeight = '0';
+        gd.style.width = '100%';
+
+        function resizePlotToViewport() {
+            const parentTop = plotParent.getBoundingClientRect().top;
+            const controlsHeight = controls.getBoundingClientRect().height;
+            const availableHeight = Math.max(
+                360,
+                window.innerHeight - parentTop - controlsHeight - 8
+            );
+
+            gd.style.height = availableHeight + 'px';
+            gd.style.width = '100%';
+
+            return Plotly.relayout(gd, {
+                autosize: true,
+                height: availableHeight
+            }).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        let colorUpdateTimer = null;
+
+        function axisContainsValue(axisName, value) {
+            if (!isFiniteNumber(value)) {
+                return false;
+            }
+
+            const axis = gd._fullLayout[axisName];
+
+            if (
+                !axis ||
+                !Array.isArray(axis.range) ||
+                axis.range.length !== 2
+            ) {
+                return true;
+            }
+
+            let coordinate = value;
+
+            if (axis.type === 'log') {
+                if (!(value > 0)) {
+                    return false;
+                }
+
+                coordinate = Math.log10(value);
+            }
+
+            const lower = Math.min(axis.range[0], axis.range[1]);
+            const upper = Math.max(axis.range[0], axis.range[1]);
+
+            return coordinate >= lower && coordinate <= upper;
+        }
+
+        function updateVisibleColorBounds() {
+            const colorKey =
+                colorSelect.value === '' ? null : colorSelect.value;
+
+            if (colorKey === null) {
+                return Promise.resolve();
+            }
+
+            const series = buildSeries(
+                xSelect.value,
+                ySelect.value,
+                colorKey
+            );
+
+            const visibleColorValues = [];
+
+            for (let index = 0; index < series.x.length; index += 1) {
+                if (
+                    axisContainsValue('xaxis', series.x[index]) &&
+                    axisContainsValue('yaxis', series.y[index]) &&
+                    isFiniteNumber(series.colorValues[index])
+                ) {
+                    visibleColorValues.push(
+                        series.colorValues[index]
+                    );
+                }
+            }
+
+            const bounds = visibleColorValues.length > 0
+                ? colorBounds(visibleColorValues)
+                : series.bounds;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    'marker.cmin': bounds[0],
+                    'marker.cmax': bounds[1]
+                },
+                [runTraceIndex]
+            );
+        }
+
+        function scheduleVisibleColorUpdate() {
+            if (colorUpdateTimer !== null) {
+                window.clearTimeout(colorUpdateTimer);
+            }
+
+            colorUpdateTimer = window.setTimeout(
+                updateVisibleColorBounds,
+                0
+            );
+        }
+
+        function refreshColorOptions(preferredValue) {
+            const candidates = availableColorKeys(ySelect.value);
+            const currentValue = preferredValue !== undefined ? preferredValue : colorSelect.value;
+
+            colorSelect.innerHTML = '';
+
+            const noneOption = document.createElement('option');
+            noneOption.value = '';
+            noneOption.textContent = 'None';
+            colorSelect.appendChild(noneOption);
+
+            candidates.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = key;
+                colorSelect.appendChild(option);
+            });
+
+            if (currentValue && candidates.includes(currentValue)) {
+                colorSelect.value = currentValue;
+            } else {
+                colorSelect.value = '';
+            }
+        }
+
+        function applySelection(resetAxes) {
+            const xKey = xSelect.value;
+            const yKey = ySelect.value;
+            const colorKey = colorSelect.value === '' ? null : colorSelect.value;
+            const series = buildSeries(xKey, yKey, colorKey);
+
+            const runUpdate = {
+                x: [series.x],
+                y: [series.y],
+                text: [series.text],
+                'marker.size': 7,
+                'marker.opacity': 0.78,
+                'marker.showscale': colorKey !== null
+            };
+
+            if (colorKey === null) {
+                runUpdate['marker.color'] = 'rgb(31,119,180)';
+                runUpdate['marker.reversescale'] = false;
+            } else {
+                runUpdate['marker.color'] = [series.colorValues];
+                runUpdate['marker.colorscale'] = 'Viridis';
+                runUpdate['marker.reversescale'] =
+                    colorSense(colorKey) === 'min';
+                runUpdate['marker.cmin'] = series.bounds[0];
+                runUpdate['marker.cmax'] = series.bounds[1];
+                runUpdate['marker.colorbar.title.text'] = colorKey;
+            }
+
+            const highlightUpdate = {
+                x: [series.highlightX],
+                y: [series.highlightY],
+                text: [series.highlightText],
+                name: series.highlightName
+            };
+
+            Promise.all([
+                Plotly.restyle(gd, runUpdate, [runTraceIndex]),
+                Plotly.restyle(gd, highlightUpdate, [highlightTraceIndex])
+            ]).then(function () {
+                const layoutUpdate = {
+                    'xaxis.title.text': xKey,
+                    'yaxis.title.text': yKey,
+                    'yaxis.type': series.useLogAxis ? 'log' : 'linear'
+                };
+
+                if (resetAxes) {
+                    layoutUpdate['xaxis.range'] = null;
+                    layoutUpdate['yaxis.range'] = null;
+                    layoutUpdate['xaxis.autorange'] = true;
+                    layoutUpdate['yaxis.autorange'] = true;
+                }
+
+                return Plotly.relayout(gd, layoutUpdate);
+            }).then(updateVisibleColorBounds);
+        }
+
+        xSelect.addEventListener('change', function () {
+            applySelection(true);
+        });
+
+        ySelect.addEventListener('change', function () {
+            refreshColorOptions();
+            applySelection(true);
+        });
+
+        colorSelect.addEventListener('change', function () {
+            applySelection(false);
+        });
+
+        resetSelectionButton.addEventListener('click', function () {
+            xSelect.value = initialSelection.x;
+            ySelect.value = initialSelection.y;
+            refreshColorOptions(initialSelection.color || '');
+            applySelection(true);
+        });
+
+        resetViewButton.addEventListener('click', function () {
+            Plotly.relayout(gd, {
+                'xaxis.range': null,
+                'yaxis.range': null,
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }).then(updateVisibleColorBounds);
+        });
+
+        gd.on('plotly_relayout', function (eventData) {
+            const keys = Object.keys(eventData || {});
+
+            const axisChanged = keys.some(
+                key =>
+                    /^(xaxis|yaxis)\\.(range|range\\[\\d+\\]|autorange)\$/.test(key)
+            );
+
+            if (axisChanged) {
+                scheduleVisibleColorUpdate();
+            }
+        });
+
+        refreshColorOptions(initialSelection.color || '');
+
+        window.addEventListener('resize', resizePlotToViewport);
+        window.setTimeout(resizePlotToViewport, 0);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupControls);
+    } else {
+        setupControls();
+    }
+})();
+</script>
+"""
+
+    if occursin("</body>", html)
+        html = replace(html,
+                       "</body>" => injection * "\n</body>")
+    else
+        html *= injection
+    end
+
+    write(file_path, html)
+
+    return file_path
+end
+
+"""
+    create_parallel_coordinates_plot(results, io_settings, sim_params; ...)
+
+Create a filterable parallel-coordinates plot. Parameters and all finite scalar result axes are
+shown. Multi-objective vector entries are represented by the configured named scalar objective columns.
+Line colour defaults to the first objective and may be changed with `color_key`.
 """
 function create_parallel_coordinates_plot(results::Vector{Any},
                                           io_settings::Dict{String,Any},
                                           sim_params::Dict{String,Any};
-                                          objective_keys=nothing)
-    obj_key = "objective"
-    param_names = sim_params["optimisation"]["optim_params_keys"]
-    results_dict = optimisation_results_dict(results)
+                                          objective_keys=nothing,
+                                          objective_senses=nothing,
+                                          color_key=nothing)
+    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
+    results_dict = spec.results_dict
+    isempty(spec.objective_keys) && return ""
 
-    all_objective_keys = optimisation_objective_axis_keys(results,
-                                                          sim_params,
-                                                          obj_key;
-                                                          objective_keys=objective_keys)
-    individual_objective_keys = filter(!=(obj_key), all_objective_keys)
-    is_multiobjective = !isempty(individual_objective_keys)
-    required_keys = unique(vcat(param_names, all_objective_keys))
+    senses = optimisation_objective_senses(spec.objective_keys,
+                                           sim_params;
+                                           objective_senses=objective_senses)
+    isempty(senses) && return ""
+
+    result_axis_keys = optimisation_result_axis_keys(results,
+                                                     results_dict,
+                                                     sim_params,
+                                                     spec.objective_keys)
+
+    selected_color_key = color_key === nothing ?
+                         first(spec.objective_keys) :
+                         String(color_key)
+
+    if !(selected_color_key in result_axis_keys)
+        @warn "Requested parallel-coordinates color key is unavailable; using the first objective." selected_color_key
+        selected_color_key = first(spec.objective_keys)
+    end
+
+    required_keys = unique(vcat(param_names, result_axis_keys))
     missing_keys = filter(key -> !haskey(results_dict, key), required_keys)
 
     if !isempty(missing_keys)
-        @error("Cannot create parallel-coordinates plot. Missing result keys: " * join(missing_keys, ", "))
+        @error("Cannot create parallel-coordinates plot. Missing result keys: " *
+               join(missing_keys, ", "))
         return ""
     end
 
     valid_idx = [idx
                  for idx in eachindex(results)
                  if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
+
     if isempty(valid_idx)
         @error("Cannot create parallel-coordinates plot: no complete numeric result rows.")
         return ""
     end
 
-    objective_values = Dict(
-        key => Float64[Float64(results_dict[key][idx])
-                       for idx in valid_idx]
-        for key in all_objective_keys)
-    primary_values = objective_values[obj_key]
     dimensions = Any[]
 
-    # parameter axes
     for param_name in param_names
         values = Float64[Float64(results_dict[param_name][idx]) for idx in valid_idx]
         push!(dimensions, attr(; label=param_name, values=values))
     end
 
-    if is_multiobjective
-        # individual objective axes
-        for key in individual_objective_keys
-            push!(dimensions, attr(; label=key, values=objective_values[key]))
-        end
-
-        if !all(value -> value > 0.0, primary_values)
-            @error("Cannot display log10($obj_key): the combined objective contains non-positive values.")
-            return ""
-        end
-
-        color_values = log10.(primary_values)
-        color_title = "log10($obj_key)"
-        push!(dimensions, attr(; label=color_title, values=color_values))
-    else
-        color_values = primary_values
-        color_title = obj_key
-        push!(dimensions, attr(; label=obj_key, values=primary_values))
+    for key in result_axis_keys
+        values = Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+        push!(dimensions, attr(; label=key, values=values))
     end
 
+    color_values = Float64[Float64(results_dict[selected_color_key][idx])
+                           for idx in valid_idx]
+
+    color_sense = get(senses, selected_color_key, :min)
     cmin, cmax = optimisation_color_bounds(color_values)
     n_parameters = length(param_names)
     n_dimensions = length(dimensions)
     n_results = n_dimensions - n_parameters
 
-    # keep full outer labels visible and leave room for group labels
     plot_x_min = 0.035
     plot_x_max = 0.955
     plot_y_max = 0.915
     group_boundary = if n_dimensions > 1
         plot_x_min +
-        ((n_parameters - 0.5) / (n_dimensions - 1)) * (plot_x_max - plot_x_min)
+        ((n_parameters - 0.5) / (n_dimensions - 1)) *
+        (plot_x_max - plot_x_min)
     else
         plot_x_max
     end
 
     trace = parcoords(; ids=string.(valid_idx),
-                      domain=attr(; x=[plot_x_min, plot_x_max], y=[0.0, plot_y_max]),
+                      domain=attr(; x=[plot_x_min, plot_x_max],
+                                  y=[0.0, plot_y_max]),
                       labelfont=attr(; size=11),
                       line=attr(; color=color_values,
-                                colorscale=reverse(ColorSchemes.viridis),
+                                colorscale=objective_colorscale(color_sense),
                                 cmin=cmin,
                                 cmax=cmax,
                                 showscale=true,
-                                colorbar=attr(; title=color_title,
+                                colorbar=attr(; title=selected_color_key,
                                               len=0.82,
                                               y=0.45,
                                               x=0.985,
@@ -1686,6 +3352,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                                                  group_boundary,
                                                                  plot_x_max,
                                                                  plot_y_max)
+
     layout = Layout(;
                     title=attr(; text="Interactive Optimisation Design Space",
                                x=0.5,
@@ -1780,56 +3447,28 @@ function parallel_group_decorations(n_parameters::Int,
 end
 
 """
-    optimisation_objective_axis_keys(results, sim_params, primary_obj_key;
+    optimisation_objective_axis_keys(results, sim_params, primary_obj_key="objective";
                                      objective_keys=nothing)
 
-Return the result columns displayed as objective or KPI axes.
+Backward-compatible helper returning all scalar objective or KPI axes. The vector-valued
+`"objective"` column itself is excluded; the configured named scalar objective columns are included.
 """
 function optimisation_objective_axis_keys(results::Vector{Any},
                                           sim_params::Dict{String,Any},
-                                          primary_obj_key::String;
+                                          primary_obj_key::String="objective";
                                           objective_keys=nothing)::Vector{String}
-    if isempty(results)
-        @error("Cannot determine objective axes: results are empty.")
-        return []
-    end
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
 
-    param_names = sim_params["optimisation"]["optim_params_keys"]
+    isempty(spec.objective_keys) && return String[]
 
-    if objective_keys !== nothing
-        selected_keys = unique(String.(objective_keys))
-        primary_obj_key in selected_keys || pushfirst!(selected_keys, primary_obj_key)
-
-        missing_keys = [key for key in selected_keys
-                        if !any(result -> haskey(result, key), results)]
-        if !isempty(missing_keys)
-            @error("Cannot create objective axes. Missing result keys: " * join(missing_keys, ", "))
-            return []
-        end
-        return selected_keys
-    end
-
-    excluded_keys = Set(vcat(param_names, ["error", "run", "run_id", "sample_id"]))
-    all_result_keys = unique([String(key) for result in results for key in keys(result)])
-    detected_keys = String[]
-
-    for key in all_result_keys
-        key in excluded_keys && continue
-        values = [haskey(result, key) ? result[key] : missing for result in results]
-        any(is_finite_number, values) && push!(detected_keys, key)
-    end
-
-    filter!(key -> key != primary_obj_key, detected_keys)
-    pushfirst!(detected_keys, primary_obj_key)
-
-    return unique(detected_keys)
+    return optimisation_result_axis_keys(results,
+                                         spec.results_dict,
+                                         sim_params,
+                                         spec.objective_keys)
 end
 
-"""
-    inject_parallel_axis_zoom_controls!(file_path)
-
-Inject a floating axis-zoom panel into a saved parallel-coordinates HTML plot.
-"""
 function inject_parallel_axis_zoom_controls!(file_path::String)
     html = read(file_path, String)
 
@@ -1869,6 +3508,160 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     ? dimension.range.slice()
                     : null
         );
+
+        const originalCmin = gd.data[traceIndex].line.cmin;
+        const originalCmax = gd.data[traceIndex].line.cmax;
+        const originalColorValues = Array.from(
+            gd.data[traceIndex].line.color || []
+        );
+        let updatingColorBounds = false;
+        let colorUpdateTimer = null;
+
+        function isFiniteNumber(value) {
+            return typeof value === "number" &&
+                   Number.isFinite(value);
+        }
+
+        function adaptiveColorBounds(values) {
+            const finite = values.filter(isFiniteNumber);
+
+            if (finite.length === 0) {
+                return null;
+            }
+
+            let minimum = Math.min(...finite);
+            let maximum = Math.max(...finite);
+
+            if (!(maximum > minimum)) {
+                const delta =
+                    Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+                minimum -= delta;
+                maximum += delta;
+            }
+
+            return [minimum, maximum];
+        }
+
+        function valueInsideRange(value, range) {
+            if (
+                !isFiniteNumber(value) ||
+                !Array.isArray(range) ||
+                range.length !== 2
+            ) {
+                return false;
+            }
+
+            const lower = Math.min(range[0], range[1]);
+            const upper = Math.max(range[0], range[1]);
+
+            return value >= lower && value <= upper;
+        }
+
+        function valueInsideConstraint(value, constraint) {
+            if (!Array.isArray(constraint)) {
+                return true;
+            }
+
+            if (Array.isArray(constraint[0])) {
+                return constraint.some(
+                    range => valueInsideRange(value, range)
+                );
+            }
+
+            return valueInsideRange(value, constraint);
+        }
+
+        function activeVisibleColorValues() {
+            const currentDimensions =
+                gd.data[traceIndex].dimensions;
+
+            const hasActiveRange = currentDimensions.some(
+                dimension =>
+                    Array.isArray(dimension.range) ||
+                    Array.isArray(dimension.constraintrange)
+            );
+
+            if (!hasActiveRange) {
+                return null;
+            }
+
+            const visible = [];
+            const pointCount = originalColorValues.length;
+
+            for (let pointIndex = 0;
+                 pointIndex < pointCount;
+                 pointIndex += 1) {
+                let isVisible = true;
+
+                for (const dimension of currentDimensions) {
+                    const value = dimension.values[pointIndex];
+
+                    if (
+                        Array.isArray(dimension.range) &&
+                        !valueInsideRange(value, dimension.range)
+                    ) {
+                        isVisible = false;
+                        break;
+                    }
+
+                    if (
+                        Array.isArray(dimension.constraintrange) &&
+                        !valueInsideConstraint(
+                            value,
+                            dimension.constraintrange
+                        )
+                    ) {
+                        isVisible = false;
+                        break;
+                    }
+                }
+
+                if (
+                    isVisible &&
+                    isFiniteNumber(originalColorValues[pointIndex])
+                ) {
+                    visible.push(originalColorValues[pointIndex]);
+                }
+            }
+
+            return visible;
+        }
+
+        function updateVisibleColorBounds() {
+            const visibleValues = activeVisibleColorValues();
+            const bounds = visibleValues === null
+                ? [originalCmin, originalCmax]
+                : adaptiveColorBounds(visibleValues);
+
+            const selectedBounds = bounds === null
+                ? [originalCmin, originalCmax]
+                : bounds;
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.cmin": selectedBounds[0],
+                    "line.cmax": selectedBounds[1]
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            });
+        }
+
+        function scheduleVisibleColorUpdate() {
+            if (colorUpdateTimer !== null) {
+                window.clearTimeout(colorUpdateTimer);
+            }
+
+            colorUpdateTimer = window.setTimeout(
+                updateVisibleColorBounds,
+                0
+            );
+        }
 
         document.documentElement.style.height = "100%";
         document.body.style.height = "100%";
@@ -2081,7 +3874,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     dimensions: [newDimensions]
                 },
                 [traceIndex]
-            ).then(updateInputValues);
+            ).then(function () {
+                updateInputValues();
+                return updateVisibleColorBounds();
+            });
         });
 
         resetButton.addEventListener("click", function () {
@@ -2114,7 +3910,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     dimensions: [newDimensions]
                 },
                 [traceIndex]
-            ).then(updateInputValues);
+            ).then(function () {
+                updateInputValues();
+                return updateVisibleColorBounds();
+            });
         });
 
         resetAllButton.addEventListener("click", function () {
@@ -2143,7 +3942,33 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     dimensions: [newDimensions]
                 },
                 [traceIndex]
-            ).then(updateInputValues);
+            ).then(function () {
+                updateInputValues();
+                return updateVisibleColorBounds();
+            });
+        });
+
+        gd.on("plotly_restyle", function (eventData) {
+            if (updatingColorBounds) {
+                return;
+            }
+
+            const update =
+                Array.isArray(eventData) && eventData.length > 0
+                    ? eventData[0]
+                    : {};
+
+            const keys = Object.keys(update || {});
+
+            const dimensionsChanged = keys.some(
+                key =>
+                    key === "dimensions" ||
+                    key.startsWith("dimensions[")
+            );
+
+            if (dimensionsChanged) {
+                scheduleVisibleColorUpdate();
+            }
         });
 
         window.addEventListener("resize", function () {
@@ -2186,10 +4011,19 @@ end
 Create an interactive 3D optimisation explorer with selectable axes, colour variable and
 independent axis zoom controls.
 """
+
+"""
+    create_interactive_3d_optimisation_plot(results, io_settings, sim_params; ...)
+
+Create an interactive 3D optimisation explorer with selectable parameter and result axes,
+selectable colour, two fixed control rows and independent axis zoom controls. Single-objective
+runs highlight the best solution. Multi-objective runs highlight all Pareto-optimal solutions.
+"""
 function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                                  io_settings::Dict{String,Any},
                                                  sim_params::Dict{String,Any};
                                                  objective_keys=nothing,
+                                                 objective_senses=nothing,
                                                  x_key=nothing,
                                                  y_key=nothing,
                                                  z_key=nothing,
@@ -2200,85 +4034,72 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
         return ""
     end
 
-    obj_key = "objective"
-    param_names = sim_params["optimisation"]["optim_params_keys"]
-    results_dict = optimisation_results_dict(results)
+    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    spec = optimisation_objective_spec(results,
+                                       sim_params;
+                                       objective_keys=objective_keys)
+    results_dict = spec.results_dict
+    isempty(spec.objective_keys) && return ""
 
-    all_objective_keys = optimisation_objective_axis_keys(results,
-                                                          sim_params,
-                                                          obj_key;
-                                                          objective_keys=objective_keys)
-    individual_objective_keys = filter(!=(obj_key), all_objective_keys)
-    is_multiobjective = !isempty(individual_objective_keys)
-    source_keys = unique(vcat(param_names, all_objective_keys))
-    missing_keys = filter(key -> !haskey(results_dict, key), source_keys)
+    has_configured_senses = haskey(sim_params, "optimisation") &&
+                            haskey(sim_params["optimisation"], "objective_senses")
+
+    senses_input = objective_senses === nothing && !has_configured_senses ?
+                   objective_sense :
+                   objective_senses
+
+    senses = optimisation_objective_senses(spec.objective_keys,
+                                           sim_params;
+                                           objective_senses=senses_input)
+    isempty(senses) && return ""
+
+    result_axis_keys = optimisation_result_axis_keys(results,
+                                                     results_dict,
+                                                     sim_params,
+                                                     spec.objective_keys)
+    axis_keys = unique(vcat(param_names, result_axis_keys))
+
+    if isempty(axis_keys)
+        @error("The 3D plot requires at least one selectable numeric quantity.")
+        return ""
+    end
+
+    required_keys = axis_keys
+    missing_keys = filter(key -> !haskey(results_dict, key), required_keys)
 
     if !isempty(missing_keys)
         @error("Cannot create 3D plot. Missing result keys: $(join(missing_keys, ", ")).")
         return ""
     end
 
-    valid_idx = [idx for idx in eachindex(results)
-                 if all(key -> is_finite_number(results_dict[key][idx]), source_keys)]
+    valid_idx = [idx
+                 for idx in eachindex(results)
+                 if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
+
     if isempty(valid_idx)
         @error("Cannot create 3D plot: no complete numeric result rows.")
         return ""
     end
 
-    source_data = Dict(key => Float64[Float64(results_dict[key][idx])
-                                      for idx in valid_idx]
-                       for key in source_keys)
-    primary_values = source_data[obj_key]
-    axis_data = Dict{String,Vector{Float64}}()
-    axis_keys = String[]
-
-    # parameter axes
-    for key in param_names
-        axis_data[key] = source_data[key]
-        push!(axis_keys, key)
-    end
-
-    if is_multiobjective
-        # individual objectives and combined objective
-        for key in individual_objective_keys
-            axis_data[key] = source_data[key]
-            push!(axis_keys, key)
-        end
-
-        if !all(value -> value > 0.0, primary_values)
-            @error("Cannot create log10($obj_key): the objective contains non-positive values.")
-            return ""
-        end
-
-        default_objective_key = "log10($obj_key)"
-        axis_data[default_objective_key] = log10.(primary_values)
-        push!(axis_keys, default_objective_key)
-    else
-        default_objective_key = obj_key
-        axis_data[obj_key] = primary_values
-        push!(axis_keys, obj_key)
-    end
-
-    unique!(axis_keys)
-    if isempty(axis_keys)
-        @error("The 3D plot requires at least one selectable numeric quantity.")
-        return ""
-    end
+    axis_data = Dict(
+        key => Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+        for key in axis_keys
+    )
 
     function select_axis_key(explicit_key,
                              preferred_keys::Vector{String},
                              used_keys::Vector{String})::String
         if explicit_key !== nothing
             selected = String(explicit_key)
+
             if !(selected in axis_keys)
                 @error("Axis key \"$selected\" is not available.")
                 return ""
             end
+
             return selected
         end
 
-        # Prefer different default axes when enough quantities are available,
-        # but permit repeated quantities on two or all three axes.
         candidates = unique(vcat(preferred_keys, axis_keys))
 
         for candidate in candidates
@@ -2297,30 +4118,54 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
         return ""
     end
 
+    default_objective_key = first(spec.objective_keys)
     x_selected = select_axis_key(x_key, param_names, String[])
     y_preferred = length(param_names) >= 2 ? param_names[2:end] : axis_keys
     y_selected = select_axis_key(y_key, y_preferred, [x_selected])
     z_selected = select_axis_key(z_key,
                                  [default_objective_key],
                                  [x_selected, y_selected])
-    color_selected = color_key === nothing ? default_objective_key : String(color_key)
-    if !(color_selected in axis_keys)
-        !error("Colour key \"$color_selected\" is not available.")
+
+    if any(isempty, [x_selected, y_selected, z_selected])
         return ""
     end
 
-    best_local_idx = objective_sense == :min ? argmin(primary_values) : argmax(primary_values)
-    color_values = axis_data[color_selected]
-    cmin = minimum(color_values)
-    cmax = maximum(color_values)
-    if cmax <= cmin
-        cmax = cmin + max(abs(cmin), 1.0) * 1.0e-9
+    color_selected = color_key === nothing ?
+                     default_objective_key :
+                     String(color_key)
+
+    if !(color_selected in axis_keys)
+        @error("Colour key \"$color_selected\" is not available.")
+        return ""
     end
 
-    # Always show all optimisation parameters in the hover tooltip.
-    # Selected axis/colour quantities are appended only when not already present.
+    objective_matrix = hcat([Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+                             for key in spec.objective_keys]...)
+
+    highlight_indices = if spec.is_multiobjective
+        findall(pareto_front_mask(objective_matrix,
+                                  [senses[key]
+                                   for key in spec.objective_keys]))
+    else
+        sense = senses[first(spec.objective_keys)]
+        [sense == :min ?
+         argmin(objective_matrix[:, 1]) :
+         argmax(objective_matrix[:, 1])]
+    end
+
+    highlight_name = spec.is_multiobjective ?
+                     "Pareto solutions" :
+                     "Best objective"
+
+    color_values = axis_data[color_selected]
+    cmin, cmax = optimisation_color_bounds(color_values)
+    color_sense = get(senses, color_selected, :min)
+
     hover_keys = unique(vcat(param_names,
-                             [x_selected, y_selected, z_selected, color_selected]))
+                             [x_selected,
+                              y_selected,
+                              z_selected,
+                              color_selected]))
 
     hover_text = ["run $(valid_idx[idx])" *
                   join(("<br>$key = $(axis_data[key][idx])" for key in hover_keys))
@@ -2335,7 +4180,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                   marker=attr(; size=5,
                                               opacity=0.75,
                                               color=color_values,
-                                              colorscale=reverse(ColorSchemes.viridis),
+                                              colorscale=objective_colorscale(color_sense),
                                               cmin=cmin,
                                               cmax=cmax,
                                               showscale=true,
@@ -2350,18 +4195,18 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                   text=hover_text,
                                   hovertemplate="%{text}<extra></extra>")
 
-    best_trace = PlotlyJS.scatter(; type="scatter3d",
-                                  x=[axis_data[x_selected][best_local_idx]],
-                                  y=[axis_data[y_selected][best_local_idx]],
-                                  z=[axis_data[z_selected][best_local_idx]],
-                                  mode="markers",
-                                  name="Best objective",
-                                  marker=attr(; size=9,
-                                              symbol="diamond",
-                                              color="black",
-                                              line=attr(; color="white", width=1.5)),
-                                  text=[hover_text[best_local_idx]],
-                                  hovertemplate="%{text}<extra></extra>")
+    highlight_trace = PlotlyJS.scatter(; type="scatter3d",
+                                       x=axis_data[x_selected][highlight_indices],
+                                       y=axis_data[y_selected][highlight_indices],
+                                       z=axis_data[z_selected][highlight_indices],
+                                       mode="markers",
+                                       name=highlight_name,
+                                       marker=attr(; size=9,
+                                                   symbol="diamond",
+                                                   color="black",
+                                                   line=attr(; color="white", width=1.5)),
+                                       text=hover_text[highlight_indices],
+                                       hovertemplate="%{text}<extra></extra>")
 
     layout = Layout(; title=attr(; text="Interactive 3D Optimisation Explorer",
                                  x=0.5,
@@ -2370,7 +4215,9 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                yaxis=attr(; title=y_selected, autorange=true),
                                zaxis=attr(; title=z_selected, autorange=true),
                                aspectmode="cube",
-                               camera=attr(; eye=attr(; x=1.35, y=1.35, z=1.10))),
+                               camera=attr(; eye=attr(; x=1.35,
+                                                      y=1.35,
+                                                      z=1.10))),
                     legend=attr(; x=1.16,
                                 xanchor="left",
                                 y=1.0,
@@ -2378,21 +4225,26 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                     margin=attr(; t=60, b=20, l=20, r=250),
                     height=720)
 
-    p = plot([runs_trace, best_trace], layout)
-    file_path = optimisation_plot_path(sim_params, io_settings, "interactive_3d")
-    if lowercase(splitext(file_path)[2]) !== ".html"
+    p = plot([runs_trace, highlight_trace], layout)
+    file_path = optimisation_plot_path(sim_params,
+                                       io_settings,
+                                       "interactive_3d")
+
+    if lowercase(splitext(file_path)[2]) != ".html"
         @error("The interactive 3D plot requires an HTML output path.")
         return ""
     end
 
     mkpath(dirname(file_path))
     savefig(p, file_path)
+
     inject_3d_axis_selection_controls!(file_path,
                                        axis_data,
                                        axis_keys,
                                        param_names,
                                        valid_idx,
-                                       best_local_idx,
+                                       highlight_indices,
+                                       highlight_name,
                                        x_selected,
                                        y_selected,
                                        z_selected,
@@ -2403,8 +4255,9 @@ end
 
 """
     inject_3d_axis_selection_controls!(file_path, axis_data, axis_keys,
-                                       parameter_keys, run_ids, best_local_idx,
-                                       initial_x, initial_y, initial_z, initial_color)
+                                       parameter_keys, run_ids, highlight_indices,
+                                       highlight_name, initial_x, initial_y,
+                                       initial_z, initial_color)
 
 Inject axis selection, colour selection, camera reset and axis-zoom controls into a saved
 3D optimisation HTML plot.
@@ -2414,7 +4267,8 @@ function inject_3d_axis_selection_controls!(file_path::String,
                                             axis_keys::Vector{String},
                                             parameter_keys::Vector{String},
                                             run_ids::Vector{Int},
-                                            best_local_idx::Int,
+                                            highlight_indices::Vector{Int},
+                                            highlight_name::String,
                                             initial_x::String,
                                             initial_y::String,
                                             initial_z::String,
@@ -2433,8 +4287,8 @@ function inject_3d_axis_selection_controls!(file_path::String,
     y_json = json_for_html(initial_y)
     z_json = json_for_html(initial_z)
     color_json = json_for_html(initial_color)
-
-    best_index = best_local_idx - 1
+    highlight_indices_json = json_for_html(highlight_indices .- 1)
+    highlight_name_json = json_for_html(highlight_name)
 
     injection = """
 <script>
@@ -2443,7 +4297,8 @@ function inject_3d_axis_selection_controls!(file_path::String,
     const axisKeys = $keys_json;
     const parameterKeys = $parameter_keys_json;
     const runIds = $runs_json;
-    const bestIndex = $best_index;
+    const highlightIndices = $highlight_indices_json;
+    const highlightTraceName = $highlight_name_json;
 
     const initialSelection = {
         x: $x_json,
@@ -2475,13 +4330,13 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 trace.name === "Optimisation runs"
         );
 
-        const bestTraceIndex = gd.data.findIndex(
+        const highlightTraceIndex = gd.data.findIndex(
             trace =>
                 trace.type === "scatter3d" &&
-                trace.name === "Best objective"
+                trace.name === highlightTraceName
         );
 
-        if (runTraceIndex < 0 || bestTraceIndex < 0) {
+        if (runTraceIndex < 0 || highlightTraceIndex < 0) {
             return;
         }
 
@@ -2879,11 +4734,27 @@ function inject_3d_axis_selection_controls!(file_path::String,
                 "marker.colorbar.title.text": colorKey
             };
 
-            const bestUpdate = {
-                x: [[plotData[xKey][bestIndex]]],
-                y: [[plotData[yKey][bestIndex]]],
-                z: [[plotData[zKey][bestIndex]]],
-                text: [[text[bestIndex]]]
+            const highlightUpdate = {
+                x: [
+                    highlightIndices.map(
+                        index => plotData[xKey][index]
+                    )
+                ],
+                y: [
+                    highlightIndices.map(
+                        index => plotData[yKey][index]
+                    )
+                ],
+                z: [
+                    highlightIndices.map(
+                        index => plotData[zKey][index]
+                    )
+                ],
+                text: [
+                    highlightIndices.map(
+                        index => text[index]
+                    )
+                ]
             };
 
             Promise.all([
@@ -2895,8 +4766,8 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
                 Plotly.restyle(
                     gd,
-                    bestUpdate,
-                    [bestTraceIndex]
+                    highlightUpdate,
+                    [highlightTraceIndex]
                 )
             ]).then(function () {
                 const layoutUpdate = {
@@ -3086,23 +4957,56 @@ function inject_3d_axis_selection_controls!(file_path::String,
 end
 
 """
-    create_optimisation_diagnostic_plots(results, io_settings, sim_params)
+    create_optimisation_diagnostic_plots(results, io_settings, sim_params; ...)
 
-Create all optimisation diagnostic plots and return their output paths.
+Create all optimisation diagnostic plots and return their output paths. Objective columns are
+resolved from the scalar `"objective"` column for single-objective runs and from
+`sim_params["optimisation"]["objective_params_keys"]` for multi-objective runs. Optional
+objective names, senses and colour selection are forwarded consistently to all figures.
 """
 function create_optimisation_diagnostic_plots(results::Vector{Any},
                                               io_settings::Dict{String,Any},
-                                              sim_params::Dict{String,Any})
-    if io_settings["matrix_plot"] != "nothing" &&
-       sim_params["optimisation"]["N_obj"] == 1
-        matrix = create_matrix_plot(results, io_settings, sim_params)
+                                              sim_params::Dict{String,Any};
+                                              objective_keys=nothing,
+                                              objective_senses=nothing,
+                                              color_key=nothing)
+    matrix = if io_settings["matrix_plot"] != "nothing"
+        create_matrix_plot(results,
+                           io_settings,
+                           sim_params;
+                           objective_keys=objective_keys,
+                           objective_senses=objective_senses,
+                           color_key=color_key)
     else
-        matrix = ""
+        ""
     end
-    convergence = create_objective_convergence_plot(results, io_settings, sim_params)
-    parameter_plots = create_objective_parameter_plots(results, io_settings, sim_params)
-    parallel_coordinates = create_parallel_coordinates_plot(results, io_settings, sim_params)
-    interactive_3d = create_interactive_3d_optimisation_plot(results, io_settings, sim_params)
+
+    convergence = create_objective_convergence_plot(results,
+                                                    io_settings,
+                                                    sim_params;
+                                                    objective_keys=objective_keys,
+                                                    objective_senses=objective_senses)
+
+    parameter_plots = create_objective_parameter_plots(results,
+                                                       io_settings,
+                                                       sim_params;
+                                                       objective_keys=objective_keys,
+                                                       objective_senses=objective_senses,
+                                                       color_key=color_key)
+
+    parallel_coordinates = create_parallel_coordinates_plot(results,
+                                                            io_settings,
+                                                            sim_params;
+                                                            objective_keys=objective_keys,
+                                                            objective_senses=objective_senses,
+                                                            color_key=color_key)
+
+    interactive_3d = create_interactive_3d_optimisation_plot(results,
+                                                             io_settings,
+                                                             sim_params;
+                                                             objective_keys=objective_keys,
+                                                             objective_senses=objective_senses,
+                                                             color_key=color_key)
 
     return (; matrix,
             convergence,
