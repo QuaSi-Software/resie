@@ -912,7 +912,8 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
                     "follows the definition of components. See the documentation for " *
                     "more details.",
         display_name="Objective parameters",
-        required=false,
+        required=true,
+        conditionals=[("run_optimisation", "is", true)],
         type=Dict{String,Any},
         json_type="object",
         unit="-"
