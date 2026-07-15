@@ -2135,6 +2135,14 @@ function inject_convergence_objective_controls!(file_path::String,
         select.style.maxWidth =
             "420px";
 
+        const objectiveGroup =
+            document.createElement(
+                "optgroup"
+            );
+
+        objectiveGroup.label =
+            "Objectives";
+
         objectiveKeys.forEach(
             objectiveKey => {
                 const option =
@@ -2147,10 +2155,14 @@ function inject_convergence_objective_controls!(file_path::String,
                 option.textContent =
                     objectiveKey;
 
-                select.appendChild(
+                objectiveGroup.appendChild(
                     option
                 );
             }
+        );
+
+        select.appendChild(
+            objectiveGroup
         );
 
         select.value =
@@ -2367,9 +2379,9 @@ end
 """
     create_objective_parameter_plots(results, io_settings, sim_params; ...)
 
-Create a single interactive 2D objective/parameter explorer. The x-axis can be selected from
-all optimisation parameters, the y-axis from all plotted objectives, and the colour can be set
-from an independent objective quantity when that adds information.
+Create a single interactive 2D objective/parameter explorer. Both axes and the marker colour
+can be selected independently from all finite scalar optimisation parameters, objectives and
+result/KPI columns.
 
 Single-objective runs highlight the best solution. Multi-objective runs highlight the global
 Pareto set.
@@ -2448,7 +2460,7 @@ function create_objective_parameter_plots(results::Vector{Any},
                               if all(key -> is_finite_number(results_dict[key][idx]),
                                      spec.objective_keys)]
 
-    pareto_global_indices = Set{Int}()
+    highlight_global_indices = Set{Int}()
 
     if spec.is_multiobjective && !isempty(complete_objective_idx)
         objective_matrix = hcat([Float64[Float64(results_dict[key][idx])
@@ -2460,14 +2472,35 @@ function create_objective_parameter_plots(results::Vector{Any},
                                          for key in spec.objective_keys])
 
         for local_index in findall(pareto_mask)
-            push!(pareto_global_indices,
+            push!(highlight_global_indices,
                   complete_objective_idx[local_index])
+        end
+    elseif !spec.is_multiobjective
+        primary_objective = first(spec.objective_keys)
+        valid_objective_idx = [idx
+                               for idx in eachindex(results)
+                               if is_finite_number(results_dict[primary_objective][idx])]
+
+        if !isempty(valid_objective_idx)
+            objective_values = Float64[Float64(results_dict[primary_objective][idx])
+                                       for idx in valid_objective_idx]
+
+            best_local_index = senses[primary_objective] == :min ?
+                               argmin(objective_values) :
+                               argmax(objective_values)
+
+            push!(highlight_global_indices,
+                  valid_objective_idx[best_local_index])
         end
     end
 
+    available_result_keys = optimisation_result_axis_keys(results,
+                                                          results_dict,
+                                                          sim_params,
+                                                          spec.objective_keys)
+
     interactive_keys = unique(vcat(available_param_names,
-                                   spec.objective_keys,
-                                   configured_objective_params))
+                                   available_result_keys))
 
     plot_data = Dict{String,Vector{Union{Nothing,Float64}}}(
         key => Union{Nothing,Float64}[is_finite_number(value) ? Float64(value) : nothing
@@ -2476,30 +2509,35 @@ function create_objective_parameter_plots(results::Vector{Any},
         if haskey(results_dict, key)
     )
 
-    function candidate_color_keys(y_key::String)::Vector{String}
-        candidates = if spec.is_multiobjective
-            [key for key in spec.objective_keys if key != y_key]
-        elseif length(configured_objective_params) > 1
-            [key for key in configured_objective_params
-             if key != y_key && key != "objective"]
-        else
-            String[]
-        end
-
-        return unique([key
-                       for key in candidates
-                       if haskey(plot_data, key) && any(!isnothing, plot_data[key])])
+    function candidate_color_keys()::Vector{String}
+        return [key
+                for key in interactive_keys
+                if haskey(plot_data, key) && any(!isnothing, plot_data[key])]
     end
 
     initial_x = first(available_param_names)
     initial_y = first(spec.objective_keys)
-    initial_color_candidates = candidate_color_keys(initial_y)
-    initial_color = if color_key !== nothing && String(color_key) in initial_color_candidates
+    initial_color_candidates = candidate_color_keys()
+
+    preferred_initial_color_candidates = if spec.is_multiobjective
+        [key for key in spec.objective_keys if key != initial_y]
+    elseif length(configured_objective_params) > 1
+        [key for key in configured_objective_params
+         if key != initial_y && key != "objective"]
+    else
+        String[]
+    end
+
+    filter!(key -> key in initial_color_candidates,
+            preferred_initial_color_candidates)
+
+    initial_color = if color_key !== nothing &&
+                       String(color_key) in initial_color_candidates
         String(color_key)
-    elseif isempty(initial_color_candidates)
+    elseif isempty(preferred_initial_color_candidates)
         nothing
     else
-        first(initial_color_candidates)
+        first(preferred_initial_color_candidates)
     end
 
     function valid_indices(x_key::String,
@@ -2579,13 +2617,9 @@ function create_objective_parameter_plots(results::Vector{Any},
                          text=initial_hover_text,
                          hovertemplate="%{text}<extra></extra>")
 
-    highlight_local_idx = if spec.is_multiobjective
-        [local_index
-         for (local_index, global_index) in pairs(initial_valid_idx)
-         if global_index in pareto_global_indices]
-    else
-        [senses[initial_y] == :min ? argmin(y_values) : argmax(y_values)]
-    end
+    highlight_local_idx = [local_index
+                           for (local_index, global_index) in pairs(initial_valid_idx)
+                           if global_index in highlight_global_indices]
 
     highlight_name = spec.is_multiobjective ?
                      "Pareto solutions" :
@@ -2639,11 +2673,10 @@ function create_objective_parameter_plots(results::Vector{Any},
 
     inject_objective_parameter_controls!(file_path,
                                          plot_data,
+                                         interactive_keys,
                                          available_param_names,
-                                         spec.objective_keys,
-                                         configured_objective_params,
                                          collect(eachindex(results)),
-                                         collect(pareto_global_indices),
+                                         collect(highlight_global_indices),
                                          sense_strings,
                                          spec.is_multiobjective,
                                          initial_x,
@@ -2654,23 +2687,21 @@ function create_objective_parameter_plots(results::Vector{Any},
 end
 
 """
-    inject_objective_parameter_controls!(file_path, plot_data, parameter_keys,
-                                         objective_keys, configured_color_keys,
-                                         run_ids, pareto_run_ids, objective_senses,
-                                         is_multiobjective, initial_x, initial_y,
-                                         initial_color)
+    inject_objective_parameter_controls!(file_path, plot_data, variable_keys,
+                                         parameter_keys, run_ids, highlight_run_ids,
+                                         objective_senses, is_multiobjective, initial_x,
+                                         initial_y, initial_color)
 
-Inject x-axis, y-axis and colour selectors into the objective/parameter explorer. The x-axis
-may be chosen from optimisation parameters, the y-axis from objective quantities, and the
-colour from an independent objective quantity when available.
+Inject grouped x-axis, y-axis and colour selectors into the objective/parameter explorer.
+Every finite scalar optimisation parameter, objective and result/KPI column remains available.
+Variables are shown under the two dropdown groups "Optimisation parameters" and "Objectives".
 """
 function inject_objective_parameter_controls!(file_path::String,
                                               plot_data::Dict{String,Vector{Union{Nothing,Float64}}},
+                                              variable_keys::Vector{String},
                                               parameter_keys::Vector{String},
-                                              objective_keys::Vector{String},
-                                              configured_color_keys::Vector{String},
                                               run_ids::Vector{Int},
-                                              pareto_run_ids::Vector{Int},
+                                              highlight_run_ids::Vector{Int},
                                               objective_senses::Dict{String,String},
                                               is_multiobjective::Bool,
                                               initial_x::String,
@@ -2682,11 +2713,10 @@ function inject_objective_parameter_controls!(file_path::String,
                                    "</" => "<\\/")
 
     plot_data_json = json_for_html(plot_data)
+    variable_keys_json = json_for_html(variable_keys)
     parameter_keys_json = json_for_html(parameter_keys)
-    objective_keys_json = json_for_html(objective_keys)
-    configured_color_keys_json = json_for_html(configured_color_keys)
     run_ids_json = json_for_html(run_ids)
-    pareto_run_ids_json = json_for_html(pareto_run_ids)
+    highlight_run_ids_json = json_for_html(highlight_run_ids)
     objective_senses_json = json_for_html(objective_senses)
     initial_x_json = json_for_html(initial_x)
     initial_y_json = json_for_html(initial_y)
@@ -2697,11 +2727,11 @@ function inject_objective_parameter_controls!(file_path::String,
 <script>
 (function () {
     const plotData = $plot_data_json;
+    const variableKeys = $variable_keys_json;
     const parameterKeys = $parameter_keys_json;
-    const objectiveKeys = $objective_keys_json;
-    const configuredColorKeys = $configured_color_keys_json;
+    const parameterKeySet = new Set(parameterKeys);
     const runIds = $run_ids_json;
-    const paretoRunIds = new Set($pareto_run_ids_json);
+    const highlightRunIds = new Set($highlight_run_ids_json);
     const objectiveSenses = $objective_senses_json;
     const isMultiobjective = $is_multiobjective_json;
 
@@ -2759,12 +2789,8 @@ function inject_objective_parameter_controls!(file_path::String,
         return [minimum, maximum];
     }
 
-    function availableColorKeys(yKey) {
-        const candidates = isMultiobjective
-            ? objectiveKeys.filter(key => key !== yKey)
-            : configuredColorKeys.filter(key => key !== yKey && key !== 'objective');
-
-        return candidates.filter(
+    function availableColorKeys() {
+        return variableKeys.filter(
             key => Array.isArray(plotData[key]) && plotData[key].some(isFiniteNumber)
         );
     }
@@ -2812,28 +2838,9 @@ function inject_objective_parameter_controls!(file_path::String,
             return label;
         });
 
-        const highlightIndices = isMultiobjective
-            ? indices.filter(index => paretoRunIds.has(runIds[index]))
-            : (() => {
-                if (indices.length === 0) {
-                    return [];
-                }
-
-                const sense = objectiveSenses[yKey] || 'min';
-                let bestLocal = 0;
-
-                for (let local = 1; local < y.length; local += 1) {
-                    const better = sense === 'max'
-                        ? y[local] > y[bestLocal]
-                        : y[local] < y[bestLocal];
-
-                    if (better) {
-                        bestLocal = local;
-                    }
-                }
-
-                return [indices[bestLocal]];
-            })();
+        const highlightIndices = indices.filter(
+            index => highlightRunIds.has(runIds[index])
+        );
 
         const highlightLocalPositions = highlightIndices.map(
             globalIndex => indices.indexOf(globalIndex)
@@ -2913,6 +2920,37 @@ function inject_objective_parameter_controls!(file_path::String,
 
         const selectionRow = createControlRow();
 
+        function appendGroupedVariableOptions(select, values) {
+            const groups = [
+                {
+                    label: 'Variable parameters',
+                    values: values.filter(value => parameterKeySet.has(value))
+                },
+                {
+                    label: 'Objectives',
+                    values: values.filter(value => !parameterKeySet.has(value))
+                }
+            ];
+
+            groups.forEach(groupDefinition => {
+                if (groupDefinition.values.length === 0) {
+                    return;
+                }
+
+                const group = document.createElement('optgroup');
+                group.label = groupDefinition.label;
+
+                groupDefinition.values.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    group.appendChild(option);
+                });
+
+                select.appendChild(group);
+            });
+        }
+
         function createSelect(parent, labelText, values, initialValue) {
             const container = document.createElement('label');
             container.style.display = 'inline-flex';
@@ -2929,12 +2967,7 @@ function inject_objective_parameter_controls!(file_path::String,
             select.style.maxWidth = '100%';
             select.style.minWidth = '110px';
 
-            values.forEach(value => {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = value;
-                select.appendChild(option);
-            });
+            appendGroupedVariableOptions(select, values);
 
             select.value = initialValue;
 
@@ -2947,12 +2980,12 @@ function inject_objective_parameter_controls!(file_path::String,
 
         const xSelect = createSelect(selectionRow,
                                      'X axis:',
-                                     parameterKeys,
+                                     variableKeys,
                                      initialSelection.x);
 
         const ySelect = createSelect(selectionRow,
                                      'Y axis:',
-                                     objectiveKeys,
+                                     variableKeys,
                                      initialSelection.y);
 
         const colorContainer = document.createElement('label');
@@ -3122,7 +3155,7 @@ function inject_objective_parameter_controls!(file_path::String,
         }
 
         function refreshColorOptions(preferredValue) {
-            const candidates = availableColorKeys(ySelect.value);
+            const candidates = availableColorKeys();
             const currentValue = preferredValue !== undefined ? preferredValue : colorSelect.value;
 
             colorSelect.innerHTML = '';
@@ -3132,12 +3165,7 @@ function inject_objective_parameter_controls!(file_path::String,
             noneOption.textContent = 'None';
             colorSelect.appendChild(noneOption);
 
-            candidates.forEach(key => {
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = key;
-                colorSelect.appendChild(option);
-            });
+            appendGroupedVariableOptions(colorSelect, candidates);
 
             if (currentValue && candidates.includes(currentValue)) {
                 colorSelect.value = currentValue;
@@ -3377,7 +3405,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                               xpad=2,
                                               thickness=13)),
                       unselected=attr(; line=attr(; color="rgb(145,145,145)",
-                                                  opacity=0.20)),
+                                                  opacity=0.10)),
                       dimensions=dimensions)
 
     group_shapes, group_annotations = parallel_group_decorations(n_parameters,
@@ -3403,7 +3431,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                        io_settings,
                                        "parallel_coordinates")
     savefig(p, file_path)
-    inject_parallel_axis_zoom_controls!(file_path)
+    inject_parallel_axis_zoom_controls!(file_path, param_names)
 
     return file_path
 end
@@ -3504,12 +3532,17 @@ function optimisation_objective_axis_keys(results::Vector{Any},
                                          spec.objective_keys)
 end
 
-function inject_parallel_axis_zoom_controls!(file_path::String)
+function inject_parallel_axis_zoom_controls!(file_path::String,
+                                             parameter_keys::Vector{String})
     html = read(file_path, String)
+    parameter_keys_json = replace(JSON.json(parameter_keys),
+                                  "</" => "<\\/")
 
-    injection = raw"""
+    injection = """
 <script>
 (function () {
+    const parameterKeys = $parameter_keys_json;
+    const parameterKeySet = new Set(parameterKeys);
     function findPlotlyDiv() {
         const divs = document.querySelectorAll(".js-plotly-plot");
         return divs.length > 0 ? divs[0] : null;
@@ -3705,7 +3738,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                 gd.data[traceIndex].unselected.line.opacity
             )
                 ? gd.data[traceIndex].unselected.line.opacity
-                : 0.20;
+                : 0.10;
 
         document.documentElement.style.height = "100%";
         document.documentElement.style.overflow = "hidden";
@@ -3765,13 +3798,44 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         axisSelect.style.maxWidth = "100%";
         axisSelect.style.minWidth = "120px";
 
-        dims.forEach((dimension, index) => {
-            const option = document.createElement("option");
-            option.value = index;
-            option.textContent =
-                dimension.label || ("Axis " + (index + 1));
+        const axisGroups = [
+            {
+                label: "Variable parameters",
+                entries: []
+            },
+            {
+                label: "Objectives",
+                entries: []
+            }
+        ];
 
-            axisSelect.appendChild(option);
+        dims.forEach((dimension, index) => {
+            const label =
+                dimension.label || ("Axis " + (index + 1));
+            const groupIndex = parameterKeySet.has(label) ? 0 : 1;
+
+            axisGroups[groupIndex].entries.push({
+                index: index,
+                label: label
+            });
+        });
+
+        axisGroups.forEach(groupDefinition => {
+            if (groupDefinition.entries.length === 0) {
+                return;
+            }
+
+            const group = document.createElement("optgroup");
+            group.label = groupDefinition.label;
+
+            groupDefinition.entries.forEach(entry => {
+                const option = document.createElement("option");
+                option.value = entry.index;
+                option.textContent = entry.label;
+                group.appendChild(option);
+            });
+
+            axisSelect.appendChild(group);
         });
 
         addControl("Axis", axisSelect);
@@ -3986,7 +4050,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
              * axis line. Reserve that overhang explicitly; otherwise the
              * category headings and dimension names occupy the same row.
              */
-            const axisLabelGapPx = 8;
+            const axisLabelGapPx = 16;
             const dimensionLabelOverhangPx = 28;
             const axisRegionOffsetPx =
                 groupHeadingTopOffsetPx +
@@ -4972,6 +5036,38 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
         const selectionRow = createControlRow("760px");
         const scalingRow = createControlRow("560px");
+        const parameterKeySet = new Set(parameterKeys);
+
+        function appendGroupedVariableOptions(select, values) {
+            const groups = [
+                {
+                    label: "Variable parameters",
+                    values: values.filter(value => parameterKeySet.has(value))
+                },
+                {
+                    label: "Objectives",
+                    values: values.filter(value => !parameterKeySet.has(value))
+                }
+            ];
+
+            groups.forEach(groupDefinition => {
+                if (groupDefinition.values.length === 0) {
+                    return;
+                }
+
+                const group = document.createElement("optgroup");
+                group.label = groupDefinition.label;
+
+                groupDefinition.values.forEach(value => {
+                    const option = document.createElement("option");
+                    option.value = value;
+                    option.textContent = value;
+                    group.appendChild(option);
+                });
+
+                select.appendChild(group);
+            });
+        }
 
         function createSelect(parent, labelText, values, initialValue) {
             const container = document.createElement("label");
@@ -4989,12 +5085,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
             select.style.maxWidth = "100%";
             select.style.minWidth = "105px";
 
-            values.forEach(value => {
-                const option = document.createElement("option");
-                option.value = value;
-                option.textContent = value;
-                select.appendChild(option);
-            });
+            appendGroupedVariableOptions(select, values);
 
             select.value = initialValue;
 
