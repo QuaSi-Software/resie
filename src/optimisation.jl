@@ -230,6 +230,7 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 - `model_function::Function`: Function to run if more datapoints are needed
 - `bounds::Array{Float64}`: Bounds in which to analyse parameters
 - `all_results::Vector{Any}`: Results of all runs
+- `optim_params_keys::Vector{String}`: Names of all variable parameters
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Float64`: Total-order Sobol sensitivity index
@@ -237,8 +238,10 @@ doesn't produce a well enough fit more data is generated in batches until RMSE i
 - `Float64`: Relative root mean square error for the surrogate model
 - `Float64`: R^2 for the surrogate model
 """
-function calc_global_sensitivity!(model_function::Function, bounds::Array{Float64},
+function calc_global_sensitivity!(model_function::Union{Nothing,Function},
+                                  bounds::Array{Float64},
                                   all_results::Vector{Any},
+                                  optim_params_keys::Array{String},
                                   sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
     d = size(bounds, 1)
     deg = 3
@@ -290,25 +293,32 @@ function calc_global_sensitivity!(model_function::Function, bounds::Array{Float6
         X_phys = Array{Float64}(undef, 0, d)
     end
 
-    while rel_rmse > 0.1 && r2 > 0.9 && length(y) < sim_params["optimisation"]["max_runs"] * 2
-        if n_existing < mop.dim
-            n_new = max(mop.dim - n_existing, Threads.nthreads())
-        else
-            n_new = max(mop.dim, Threads.nthreads())
+    if model_function !== nothing
+        print = true
+        while (rel_rmse > 0.1 || r2 < 0.9) && length(y) < sim_params["optimisation"]["max_runs"] * 2
+            if print
+                @globalInfo "Performing additional runs for sensitivity analysis."
+                print = false
+            end
+            if n_existing < mop.dim
+                n_new = max(mop.dim - n_existing, Threads.nthreads())
+            else
+                n_new = max(mop.dim, Threads.nthreads())
+            end
+
+            X_std_new = rand(n_new, d) .* 2 .- 1
+            X_phys_new = hcat([to_phys.(X_std_new[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+            y_new = zeros(n_new)
+            @threads for i in 1:n_new
+                y_new[i] = model_function(X_phys_new[i, :])
+            end
+
+            X_phys = vcat(X_phys, X_phys_new)
+            y = vcat(y, y_new)
+
+            X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+            coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
         end
-
-        X_std_new = rand(n_new, d) .* 2 .- 1
-        X_phys_new = hcat([to_phys.(X_std_new[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
-        y_new = zeros(n_new)
-        @threads for i in 1:n_new
-            y_new[i] = model_function(X_phys_new[i, :])
-        end
-
-        X_phys = vcat(X_phys, X_phys_new)
-        y = vcat(y, y_new)
-
-        X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
-        coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
     end
 
     # Calculate Sobol indices from coefficients 
@@ -327,6 +337,14 @@ function calc_global_sensitivity!(model_function::Function, bounds::Array{Float6
     end
     S_first ./= total_var
     S_total ./= total_var
+
+    width = length.(optim_params_keys)
+    @globalInfo "Global sensitivity: \n" *
+                "\t $(join(optim_params_keys, "\t")) \n" *
+                "S_total\t $(join(rpad.(round.(S_total, digits=3), width), "\t")) \n" *
+                "S_first\t $(join(rpad.(round.(S_first, digits=3), width), "\t")) \n" *
+                "Surrogate RMSE: $(round(rel_rmse, digits=3)), R2: $(round(r2, digits=3)) \n" *
+                "Important: Sobol indices depend on the selected parameter bounds!"
 
     return S_total, S_first, rel_rmse, r2
 end
@@ -476,6 +494,11 @@ function perform_optimisation(io_settings::Dict{String,Any},
                     end
                 end
             end
+
+            if optimiser["run_sensitivity"]
+                calc_global_sensitivity!(nothing, optimiser["bounds"][:, 1:2], all_results,
+                                         optimiser["optim_params_keys"], sim_params)
+            end
         catch e
             if e isa InterruptException
                 # Handles Ctrl+C delivered to the task coordinating @threads.
@@ -591,20 +614,13 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 NOMAD.solve(prob, optimiser["args"][end])
             end
 
-            if optimiser["run_sensitivity"]
-                St, S1, rel_rmse, r2 = calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, sim_params)
-                width = length.(optimiser["optim_params_keys"])
-                @globalInfo "Global sensitivity: \n" *
-                            "\t $(join(optimiser["optim_params_keys"], "\t")) \n" *
-                            "S_total\t $(join(rpad.(round.(St, digits=3), width), "\t")) \n" *
-                            "S_first\t $(join(rpad.(round.(S1, digits=3), width), "\t")) \n" *
-                            "Surrogate RMSE: $(round(rel_rmse, digits=3)), " *
-                            "R2: $(round(r2, digits=3))"
-            end
-
             runtime = round(Int, seconds(now() - start_time))
             @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
 
+            if optimiser["run_sensitivity"]
+                calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, optimiser["optim_params_keys"],
+                                         sim_params)
+            end
         catch e
             if e isa InterruptException
                 cancel_optimisation[] = true
