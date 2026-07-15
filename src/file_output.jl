@@ -3760,6 +3760,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         applyButton.textContent = "Apply axis";
         buttonRow.appendChild(applyButton);
 
+        const zoomSelectionButton = document.createElement("button");
+        zoomSelectionButton.textContent = "Zoom to selection";
+        buttonRow.appendChild(zoomSelectionButton);
+
         const resetButton = document.createElement("button");
         resetButton.textContent = "Reset axis";
         buttonRow.appendChild(resetButton);
@@ -3793,7 +3797,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
 
         const hint = document.createElement("span");
         hint.textContent =
-            "Press Enter to apply values. Drag on an axis to filter.";
+            "Drag on one or more axes to filter, then zoom all axes to the selected lines.";
         hint.style.color = "#666";
         hint.style.fontSize = "11px";
         hint.style.whiteSpace = "nowrap";
@@ -3831,6 +3835,158 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                         typeof value === "number" &&
                         Number.isFinite(value)
                 );
+        }
+
+        function constraintRanges(constraint) {
+            if (!Array.isArray(constraint)) {
+                return [];
+            }
+
+            if (
+                constraint.length === 2 &&
+                constraint.every(isFiniteNumber)
+            ) {
+                return [constraint];
+            }
+
+            return constraint.filter(
+                range =>
+                    Array.isArray(range) &&
+                    range.length === 2 &&
+                    range.every(isFiniteNumber)
+            );
+        }
+
+        function selectedRowIndices() {
+            const currentDimensions =
+                gd.data[traceIndex].dimensions;
+
+            const hasActiveSelection =
+                currentDimensions.some(
+                    dimension =>
+                        constraintRanges(
+                            dimension.constraintrange
+                        ).length > 0
+                );
+
+            if (!hasActiveSelection) {
+                return null;
+            }
+
+            const pointCount =
+                currentDimensions[0].values.length;
+
+            const selectedIndices = [];
+
+            for (
+                let pointIndex = 0;
+                pointIndex < pointCount;
+                pointIndex += 1
+            ) {
+                const isSelected =
+                    currentDimensions.every(dimension => {
+                        const ranges =
+                            constraintRanges(
+                                dimension.constraintrange
+                            );
+
+                        if (ranges.length === 0) {
+                            return true;
+                        }
+
+                        const value =
+                            dimension.values[pointIndex];
+
+                        return (
+                            isFiniteNumber(value) &&
+                            ranges.some(
+                                range =>
+                                    valueInsideRange(
+                                        value,
+                                        range
+                                    )
+                            )
+                        );
+                    });
+
+                if (isSelected) {
+                    selectedIndices.push(pointIndex);
+                }
+            }
+
+            return selectedIndices;
+        }
+
+        function selectedAxisRange(
+            dimensionIndex,
+            selectedIndices
+        ) {
+            const dimension =
+                gd.data[traceIndex]
+                    .dimensions[dimensionIndex];
+
+            const selectedValues =
+                selectedIndices
+                    .map(
+                        pointIndex =>
+                            dimension.values[pointIndex]
+                    )
+                    .filter(isFiniteNumber);
+
+            if (selectedValues.length === 0) {
+                return null;
+            }
+
+            const selectedMinimum =
+                Math.min(...selectedValues);
+
+            const selectedMaximum =
+                Math.max(...selectedValues);
+
+            const allValues =
+                finiteValues(dimensionIndex);
+
+            const fullMinimum =
+                allValues.length > 0
+                    ? Math.min(...allValues)
+                    : selectedMinimum;
+
+            const fullMaximum =
+                allValues.length > 0
+                    ? Math.max(...allValues)
+                    : selectedMaximum;
+
+            const selectedSpan =
+                selectedMaximum - selectedMinimum;
+
+            const fullSpan =
+                fullMaximum - fullMinimum;
+
+            const scale =
+                Math.max(
+                    Math.abs(selectedMinimum),
+                    Math.abs(selectedMaximum),
+                    Math.abs(fullMinimum),
+                    Math.abs(fullMaximum),
+                    1.0
+                );
+
+            const effectivelyConstant =
+                selectedSpan <= scale * 1.0e-12;
+
+            const padding =
+                effectivelyConstant
+                    ? (
+                        fullSpan > scale * 1.0e-12
+                            ? fullSpan * 0.03
+                            : scale * 0.03
+                    )
+                    : selectedSpan * 0.05;
+
+            return [
+                selectedMinimum - padding,
+                selectedMaximum + padding
+            ];
         }
 
         function formatInputValue(value) {
@@ -3971,6 +4127,59 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         applyButton.addEventListener(
             "click",
             applyAxisRange
+        );
+
+        zoomSelectionButton.addEventListener(
+            "click",
+            function () {
+                const selectedIndices =
+                    selectedRowIndices();
+
+                if (selectedIndices === null) {
+                    alert(
+                        "No active selection. Drag on one or more axes first."
+                    );
+                    return;
+                }
+
+                if (selectedIndices.length === 0) {
+                    alert(
+                        "The current filters do not select any lines."
+                    );
+                    return;
+                }
+
+                const newDimensions =
+                    gd.data[traceIndex].dimensions.map(
+                        (dimension, dimensionIndex) => {
+                            const copied =
+                                Object.assign({}, dimension);
+
+                            const selectedRange =
+                                selectedAxisRange(
+                                    dimensionIndex,
+                                    selectedIndices
+                                );
+
+                            if (selectedRange !== null) {
+                                copied.range = selectedRange;
+                            }
+
+                            return copied;
+                        }
+                    );
+
+                Plotly.restyle(
+                    gd,
+                    {
+                        dimensions: [newDimensions]
+                    },
+                    [traceIndex]
+                ).then(function () {
+                    updateInputValues();
+                    return updateVisibleColorBounds();
+                });
+            }
         );
 
         resetButton.addEventListener("click", function () {
