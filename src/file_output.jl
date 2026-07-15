@@ -3351,7 +3351,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
 
     plot_x_min = 0.035
     plot_x_max = 0.955
-    plot_y_max = 0.86
+    plot_y_max = 0.92
     group_boundary = if n_dimensions > 1
         plot_x_min +
         ((n_parameters - 0.5) / (n_dimensions - 1)) *
@@ -3370,8 +3370,8 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                 cmax=cmax,
                                 showscale=true,
                                 colorbar=attr(; title=selected_color_key,
-                                              len=0.82,
-                                              y=0.45,
+                                              len=plot_y_max,
+                                              y=plot_y_max / 2,
                                               x=0.985,
                                               xanchor="left",
                                               xpad=2,
@@ -3394,7 +3394,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                y=0.995,
                                yanchor="top",
                                font=attr(; size=18)),
-                    margin=attr(; t=48, b=24, l=28, r=58),
+                    margin=attr(; t=26, b=24, l=28, r=58),
                     shapes=group_shapes,
                     annotations=group_annotations)
 
@@ -3445,7 +3445,7 @@ function parallel_group_decorations(n_parameters::Int,
                    x0=group.x0,
                    x1=group.x1,
                    y0=0.0,
-                   y1=plot_y_max,
+                   y1=1.0,
                    fillcolor=group.fill,
                    line=attr(; width=0),
                    layer="below"))
@@ -3453,12 +3453,12 @@ function parallel_group_decorations(n_parameters::Int,
         push!(annotations,
               attr(; text="<b>$(group.label)</b>",
                    x=(group.x0 + group.x1) / 2,
-                   y=0.925,
+                   y=0.99,
                    xref="paper",
                    yref="paper",
                    showarrow=false,
                    xanchor="center",
-                   yanchor="middle",
+                   yanchor="top",
                    align="center",
                    font=attr(; size=11, color=group.text_color)))
     end
@@ -3471,7 +3471,7 @@ function parallel_group_decorations(n_parameters::Int,
                    x0=group_boundary,
                    x1=group_boundary,
                    y0=0.0,
-                   y1=plot_y_max,
+                   y1=1.0,
                    line=attr(; color="rgba(80,80,80,0.65)",
                              width=2,
                              dash="dot"),
@@ -3798,6 +3798,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         applyButton.textContent = "Apply axis";
         buttonRow.appendChild(applyButton);
 
+        const zoomSelectionButton = document.createElement("button");
+        zoomSelectionButton.textContent = "Zoom to selection";
+        buttonRow.appendChild(zoomSelectionButton);
+
         const resetButton = document.createElement("button");
         resetButton.textContent = "Reset axis";
         buttonRow.appendChild(resetButton);
@@ -3864,24 +3868,16 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
             );
 
             /*
-             * Keep the vertical structure in pixels rather than fixed paper
-             * fractions. This prevents excessive whitespace on tall windows
-             * while preserving enough separation on short windows:
-             *
-             * title
-             *   34 px
-             * group headings
-             *   44 px
-             * axis-label / parallel-coordinate region
+             * The plot title sits in Plotly's top margin. Place the category
+             * headings directly at the top of the paper area, then derive the
+             * parallel-coordinate domain from the actual heading height. This
+             * keeps the layout compact on large windows while preserving a
+             * fixed readable gap above the axis labels on narrow windows.
              */
-            const groupHeadingOffsetPx = 34;
-            const axisRegionOffsetPx = 78;
+            const groupHeadingTopOffsetPx = 2;
             const groupY =
-                1 - groupHeadingOffsetPx / plotHeight;
-            const domainTop = Math.max(
-                0.62,
-                1 - axisRegionOffsetPx / plotHeight
-            );
+                1 - groupHeadingTopOffsetPx / plotHeight;
+            let maximumHeadingLines = 1;
 
             const usedAnnotationIndices = new Set();
             const updates = {};
@@ -3953,10 +3949,18 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
 
                 const fontSize =
                     width < 55 ? 9 : width < 100 ? 10 : 11;
+                const labelText = group.labelForWidth(width);
+                const headingLines =
+                    (labelText.match(/<br>/g) || []).length + 1;
+
+                maximumHeadingLines = Math.max(
+                    maximumHeadingLines,
+                    headingLines
+                );
 
                 updates[
                     "annotations[" + annotationIndex + "].text"
-                ] = "<b>" + group.labelForWidth(width) + "</b>";
+                ] = "<b>" + labelText + "</b>";
 
                 updates[
                     "annotations[" + annotationIndex + "].font.size"
@@ -3969,7 +3973,30 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                 updates[
                     "annotations[" + annotationIndex + "].y"
                 ] = groupY;
+
+                updates[
+                    "annotations[" + annotationIndex + "].yanchor"
+                ] = "top";
             });
+
+            const headingHeightPx =
+                maximumHeadingLines > 1 ? 25 : 14;
+            /*
+             * Plotly draws the parcoords dimension names above the visible
+             * axis line. Reserve that overhang explicitly; otherwise the
+             * category headings and dimension names occupy the same row.
+             */
+            const axisLabelGapPx = 8;
+            const dimensionLabelOverhangPx = 28;
+            const axisRegionOffsetPx =
+                groupHeadingTopOffsetPx +
+                headingHeightPx +
+                axisLabelGapPx +
+                dimensionLabelOverhangPx;
+            const domainTop = Math.max(
+                0.62,
+                1 - axisRegionOffsetPx / plotHeight
+            );
 
             const layoutUpdate =
                 Object.keys(updates).length > 0
@@ -3986,13 +4013,18 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                     ? currentDomain[1]
                     : null;
 
-            const domainUpdate =
+            const domainNeedsUpdate =
                 currentDomainTop === null ||
-                Math.abs(currentDomainTop - domainTop) > 1.0e-4
+                Math.abs(currentDomainTop - domainTop) > 1.0e-4;
+
+            const domainUpdate =
+                domainNeedsUpdate
                     ? Plotly.restyle(
                           gd,
                           {
-                              "domain.y": [[0.0, domainTop]]
+                              "domain.y": [[0.0, domainTop]],
+                              "line.colorbar.len": domainTop,
+                              "line.colorbar.y": domainTop / 2
                           },
                           [traceIndex]
                       )
@@ -4042,6 +4074,173 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                         typeof value === "number" &&
                         Number.isFinite(value)
                 );
+        }
+
+        function constraintRanges(constraint) {
+            if (!Array.isArray(constraint)) {
+                return [];
+            }
+
+            if (
+                constraint.length === 2 &&
+                constraint.every(isFiniteNumber)
+            ) {
+                return [constraint];
+            }
+
+            return constraint.filter(
+                range =>
+                    Array.isArray(range) &&
+                    range.length === 2 &&
+                    range.every(isFiniteNumber)
+            );
+        }
+
+        function selectedRowIndices() {
+            const currentDimensions =
+                gd.data[traceIndex].dimensions;
+
+            const hasActiveSelection =
+                currentDimensions.some(
+                    dimension =>
+                        constraintRanges(
+                            dimension.constraintrange
+                        ).length > 0
+                );
+
+            if (!hasActiveSelection) {
+                return null;
+            }
+
+            const pointCount =
+                currentDimensions[0].values.length;
+
+            const selectedIndices = [];
+
+            for (
+                let pointIndex = 0;
+                pointIndex < pointCount;
+                pointIndex += 1
+            ) {
+                const isSelected =
+                    currentDimensions.every(dimension => {
+                        const ranges =
+                            constraintRanges(
+                                dimension.constraintrange
+                            );
+
+                        if (ranges.length === 0) {
+                            return true;
+                        }
+
+                        const value =
+                            dimension.values[pointIndex];
+
+                        return (
+                            isFiniteNumber(value) &&
+                            ranges.some(
+                                range =>
+                                    valueInsideRange(
+                                        value,
+                                        range
+                                    )
+                            )
+                        );
+                    });
+
+                if (isSelected) {
+                    selectedIndices.push(pointIndex);
+                }
+            }
+
+            return selectedIndices;
+        }
+
+        function selectedAxisRanges(
+            dimensionIndex,
+            selectedIndices
+        ) {
+            const dimension =
+                gd.data[traceIndex]
+                    .dimensions[dimensionIndex];
+
+            const selectedValues =
+                selectedIndices
+                    .map(
+                        pointIndex =>
+                            dimension.values[pointIndex]
+                    )
+                    .filter(isFiniteNumber);
+
+            if (selectedValues.length === 0) {
+                return null;
+            }
+
+            const selectedMinimum =
+                Math.min(...selectedValues);
+
+            const selectedMaximum =
+                Math.max(...selectedValues);
+
+            const allValues =
+                finiteValues(dimensionIndex);
+
+            const fullMinimum =
+                allValues.length > 0
+                    ? Math.min(...allValues)
+                    : selectedMinimum;
+
+            const fullMaximum =
+                allValues.length > 0
+                    ? Math.max(...allValues)
+                    : selectedMaximum;
+
+            const selectedSpan =
+                selectedMaximum - selectedMinimum;
+
+            const fullSpan =
+                fullMaximum - fullMinimum;
+
+            const scale =
+                Math.max(
+                    Math.abs(selectedMinimum),
+                    Math.abs(selectedMaximum),
+                    Math.abs(fullMinimum),
+                    Math.abs(fullMaximum),
+                    1.0
+                );
+
+            const effectivelyConstant =
+                selectedSpan <= scale * 1.0e-12;
+
+            const zoomPadding =
+                effectivelyConstant
+                    ? (
+                        fullSpan > scale * 1.0e-12
+                            ? fullSpan * 0.03
+                            : scale * 0.03
+                    )
+                    : selectedSpan * 0.05;
+
+            // The visible selection should be exactly as wide as the
+            // selected data. A tiny interval is required when all selected
+            // values on this axis are identical, because Plotly cannot show
+            // a zero-width constraint range reliably.
+            const selectionPadding =
+                effectivelyConstant
+                    ? Math.max(scale * 1.0e-9, zoomPadding * 1.0e-6)
+                    : 0.0;
+
+            return {
+                zoomRange: [
+                    selectedMinimum - zoomPadding,
+                    selectedMaximum + zoomPadding
+                ],
+                selectionRange: [
+                    selectedMinimum - selectionPadding,
+                    selectedMaximum + selectionPadding
+                ]
+            };
         }
 
         function formatInputValue(value) {
@@ -4182,6 +4381,72 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         applyButton.addEventListener(
             "click",
             applyAxisRange
+        );
+
+        zoomSelectionButton.addEventListener(
+            "click",
+            function () {
+                const selectedIndices =
+                    selectedRowIndices();
+
+                if (selectedIndices === null) {
+                    alert(
+                        "No active selection. Drag on one or more axes first."
+                    );
+                    return;
+                }
+
+                if (selectedIndices.length === 0) {
+                    alert(
+                        "The current filters do not select any lines."
+                    );
+                    return;
+                }
+
+                const newDimensions =
+                    gd.data[traceIndex].dimensions.map(
+                        (dimension, dimensionIndex) => {
+                            const copied =
+                                Object.assign({}, dimension);
+
+                            const selectedRanges =
+                                selectedAxisRanges(
+                                    dimensionIndex,
+                                    selectedIndices
+                                );
+
+                            if (selectedRanges !== null) {
+                                copied.range =
+                                    selectedRanges.zoomRange;
+
+                                // Tighten only axes that already carried an
+                                // active selection. Unfiltered axes remain
+                                // unfiltered after zooming.
+                                if (
+                                    constraintRanges(
+                                        dimension.constraintrange
+                                    ).length > 0
+                                ) {
+                                    copied.constraintrange =
+                                        selectedRanges.selectionRange;
+                                }
+                            }
+
+                            return copied;
+                        }
+                    );
+
+                Plotly.restyle(
+                    gd,
+                    {
+                        dimensions: [newDimensions]
+                    },
+                    [traceIndex]
+                ).then(function () {
+                    updateInputValues();
+                    return updateVisibleColorBounds();
+                });
+            }
         );
 
         resetButton.addEventListener("click", function () {
