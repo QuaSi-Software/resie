@@ -411,6 +411,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
     all_results = Vector{Any}()
 
     @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
+    main_start_time = now()
 
     if length(optimiser["iterator"]) > 1
         if optimiser["type"] == "monte_carlo_annealing"
@@ -481,10 +482,8 @@ function perform_optimisation(io_settings::Dict{String,Any},
                         eta_text = "$eta_minutes min $(lpad(eta_remaining_seconds, 2, '0')) s"
                     end
 
-                    @globalInfo "[$completed/$max_runs] → completed in " *
-                                "$runtime_minutes min " *
-                                "$(lpad(runtime_remaining_seconds, 2, '0')) s. " *
-                                "ETA: $eta_text"
+                    @globalInfo "[$completed/$max_runs] → completed in $runtime_minutes min " *
+                                "$(lpad(runtime_remaining_seconds, 2, '0')) s. ETA: $eta_text"
                 catch e
                     if e isa InterruptException
                         cancel_optimisation[] = true
@@ -493,11 +492,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
                         rethrow()
                     end
                 end
-            end
-
-            if optimiser["run_sensitivity"]
-                calc_global_sensitivity!(nothing, optimiser["bounds"][:, 1:2], all_results,
-                                         optimiser["optim_params_keys"], sim_params)
             end
         catch e
             if e isa InterruptException
@@ -509,7 +503,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
             end
         end
     else
-        start_time = now()
         # generic optimisation function
         f = function (sample_values)
             if cancel_optimisation[]
@@ -613,14 +606,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f_nomad; optimiser["kwargs"]...)
                 NOMAD.solve(prob, optimiser["args"][end])
             end
-
-            runtime = round(Int, seconds(now() - start_time))
-            @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
-
-            if optimiser["run_sensitivity"]
-                calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results, optimiser["optim_params_keys"],
-                                         sim_params)
-            end
         catch e
             if e isa InterruptException
                 cancel_optimisation[] = true
@@ -630,8 +615,70 @@ function perform_optimisation(io_settings::Dict{String,Any},
         end
     end
 
+    # handle info messages
+    workflow_name = if optimiser["type"] == "parametervariation"
+        "Parameter variation"
+    elseif optimiser["type"] == "monte_carlo_annealing"
+        "Monte Carlo annealing"
+    else
+        "Optimisation"
+    end
+
+    main_runtime_seconds = round(Int, seconds(now() - main_start_time))
+    main_runtime_minutes, main_runtime_remaining_seconds = divrem(main_runtime_seconds, 60)
+    main_run_count = length(all_results)
+
     if cancel_optimisation[]
+        @globalInfo "$workflow_name interrupted after $main_runtime_minutes min " *
+                    "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
         return false, all_results
+    end
+
+    @globalInfo "$workflow_name completed in $main_runtime_minutes min " *
+                "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
+
+    # Start sensitivity analysis based on the former and additional simulation runs.
+    if optimiser["run_sensitivity"]
+        sensitivity_start_time = now()
+        results_before_sensitivity = length(all_results)
+
+        try
+            if length(optimiser["iterator"]) > 1
+                calc_global_sensitivity!(nothing, optimiser["bounds"][:, 1:2], all_results,
+                                         optimiser["optim_params_keys"], sim_params)
+
+            else
+                calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results,
+                                         optimiser["optim_params_keys"], sim_params)
+            end
+        catch e
+            if e isa InterruptException
+                cancel_optimisation[] = true
+
+                sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
+                sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds,
+                                                                                            60)
+                sensitivity_runs = length(all_results) - results_before_sensitivity
+
+                @globalInfo "Global sensitivity analysis interrupted after $sensitivity_runtime_minutes min " *
+                            "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. $sensitivity_runs additional runs completed."
+
+                return false, all_results
+            else
+                rethrow()
+            end
+        end
+
+        sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
+        sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds, 60)
+        sensitivity_runs = length(all_results) - results_before_sensitivity
+        @globalInfo "Global sensitivity analysis completed in $sensitivity_runtime_minutes min " *
+                    "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. $sensitivity_runs additional runs completed."
+
+        overall_runtime_seconds = round(Int, seconds(now() - main_start_time))
+        overall_runtime_minutes, overall_runtime_remaining_seconds = divrem(overall_runtime_seconds, 60)
+        @globalInfo "Complete $workflow_name workflow finished in $overall_runtime_minutes min " *
+                    "$(lpad(overall_runtime_remaining_seconds, 2, '0')) s. $(length(all_results)) total runs completed."
     end
 
     # write results to optimisation result file if not written continuously
