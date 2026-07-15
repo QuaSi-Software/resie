@@ -2875,25 +2875,38 @@ function inject_objective_parameter_controls!(file_path::String,
 
         const controls = document.createElement('div');
         controls.id = 'objective-parameter-controls';
+        controls.style.flex = '0 0 auto';
+        controls.style.width = '100%';
+        controls.style.boxSizing = 'border-box';
+        controls.style.zIndex = '10000';
         controls.style.fontFamily = 'Arial, sans-serif';
         controls.style.fontSize = '13px';
-        controls.style.margin = '8px 0 4px 0';
-        controls.style.padding = '10px';
-        controls.style.border = '1px solid #ccc';
-        controls.style.borderRadius = '5px';
+        controls.style.margin = '0';
+        controls.style.padding = '6px 10px 10px';
+        controls.style.background = 'rgba(255,255,255,0.98)';
+        controls.style.borderBottom = '1px solid #bbb';
+        controls.style.boxShadow = '0 1px 5px rgba(0,0,0,0.12)';
         controls.style.display = 'flex';
-        controls.style.flexDirection = 'column';
-        controls.style.alignItems = 'stretch';
-        controls.style.gap = '8px';
-        controls.style.overflowX = 'auto';
+        controls.style.flexWrap = 'wrap';
+        controls.style.alignItems = 'center';
+        controls.style.gap = '6px 12px';
+
+        const controlsHeading = document.createElement('span');
+        controlsHeading.textContent =
+            'Figure settings:';
+        controlsHeading.style.fontWeight = '600';
+        controlsHeading.style.marginRight = '4px';
+        controls.appendChild(controlsHeading);
 
         function createControlRow() {
             const row = document.createElement('div');
-            row.style.display = 'flex';
+            row.style.display = 'inline-flex';
             row.style.alignItems = 'center';
-            row.style.flexWrap = 'nowrap';
-            row.style.gap = '10px';
-            row.style.minWidth = 'max-content';
+            row.style.flexWrap = 'wrap';
+            row.style.flex = '1 1 640px';
+            row.style.minWidth = '0';
+            row.style.maxWidth = '100%';
+            row.style.gap = '6px 10px';
             controls.appendChild(row);
             return row;
         }
@@ -2902,15 +2915,19 @@ function inject_objective_parameter_controls!(file_path::String,
 
         function createSelect(parent, labelText, values, initialValue) {
             const container = document.createElement('label');
-            container.style.display = 'flex';
+            container.style.display = 'inline-flex';
             container.style.alignItems = 'center';
             container.style.gap = '5px';
+            container.style.minWidth = '0';
+            container.style.whiteSpace = 'nowrap';
 
             const label = document.createElement('span');
             label.textContent = labelText;
 
             const select = document.createElement('select');
-            select.style.maxWidth = '320px';
+            select.style.width = 'clamp(130px, 20vw, 320px)';
+            select.style.maxWidth = '100%';
+            select.style.minWidth = '110px';
 
             values.forEach(value => {
                 const option = document.createElement('option');
@@ -2939,16 +2956,20 @@ function inject_objective_parameter_controls!(file_path::String,
                                      initialSelection.y);
 
         const colorContainer = document.createElement('label');
-        colorContainer.style.display = 'flex';
+        colorContainer.style.display = 'inline-flex';
         colorContainer.style.alignItems = 'center';
         colorContainer.style.gap = '5px';
+        colorContainer.style.minWidth = '0';
+        colorContainer.style.whiteSpace = 'nowrap';
 
         const colorLabel = document.createElement('span');
         colorLabel.textContent = 'Color:';
         colorContainer.appendChild(colorLabel);
 
         const colorSelect = document.createElement('select');
-        colorSelect.style.maxWidth = '320px';
+        colorSelect.style.width = 'clamp(130px, 20vw, 320px)';
+        colorSelect.style.maxWidth = '100%';
+        colorSelect.style.minWidth = '110px';
         colorContainer.appendChild(colorSelect);
         selectionRow.appendChild(colorContainer);
 
@@ -2962,12 +2983,15 @@ function inject_objective_parameter_controls!(file_path::String,
 
         gd.parentNode.insertBefore(controls, gd);
 
-        // Fill the complete browser viewport. The control panel keeps its natural
-        // height and the Plotly graph receives all remaining vertical space.
+        // Use the same full-width responsive toolbar layout as the
+        // parallel-coordinates figure. The plot receives the remaining
+        // viewport height, including after the toolbar wraps.
         const plotParent = gd.parentNode;
 
         document.documentElement.style.height = '100%';
+        document.documentElement.style.overflow = 'hidden';
         document.body.style.height = '100%';
+        document.body.style.width = '100%';
         document.body.style.margin = '0';
         document.body.style.overflow = 'hidden';
 
@@ -2976,18 +3000,19 @@ function inject_objective_parameter_controls!(file_path::String,
         plotParent.style.display = 'flex';
         plotParent.style.flexDirection = 'column';
         plotParent.style.overflow = 'hidden';
+        plotParent.style.minWidth = '0';
 
-        controls.style.flex = '0 0 auto';
         gd.style.flex = '1 1 auto';
         gd.style.minHeight = '0';
+        gd.style.minWidth = '0';
         gd.style.width = '100%';
 
         function resizePlotToViewport() {
             const parentTop = plotParent.getBoundingClientRect().top;
             const controlsHeight = controls.getBoundingClientRect().height;
             const availableHeight = Math.max(
-                360,
-                window.innerHeight - parentTop - controlsHeight - 8
+                1,
+                window.innerHeight - parentTop - controlsHeight
             );
 
             gd.style.height = availableHeight + 'px';
@@ -2999,6 +3024,15 @@ function inject_objective_parameter_controls!(file_path::String,
             }).then(function () {
                 Plotly.Plots.resize(gd);
             });
+        }
+
+        const controlsResizeObserver =
+            typeof ResizeObserver === 'function'
+                ? new ResizeObserver(resizePlotToViewport)
+                : null;
+
+        if (controlsResizeObserver !== null) {
+            controlsResizeObserver.observe(controls);
         }
 
         let colorUpdateTimer = null;
@@ -3317,7 +3351,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
 
     plot_x_min = 0.035
     plot_x_max = 0.955
-    plot_y_max = 0.915
+    plot_y_max = 0.86
     group_boundary = if n_dimensions > 1
         plot_x_min +
         ((n_parameters - 0.5) / (n_dimensions - 1)) *
@@ -3357,10 +3391,10 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                     title=attr(; text="Interactive Optimisation Design Space",
                                x=0.5,
                                xanchor="center",
-                               y=0.997,
+                               y=0.995,
                                yanchor="top",
                                font=attr(; size=18)),
-                    margin=attr(; t=42, b=24, l=28, r=58),
+                    margin=attr(; t=48, b=24, l=28, r=58),
                     shapes=group_shapes,
                     annotations=group_annotations)
 
@@ -3419,12 +3453,13 @@ function parallel_group_decorations(n_parameters::Int,
         push!(annotations,
               attr(; text="<b>$(group.label)</b>",
                    x=(group.x0 + group.x1) / 2,
-                   y=0.992,
+                   y=0.925,
                    xref="paper",
                    yref="paper",
                    showarrow=false,
                    xanchor="center",
-                   yanchor="top",
+                   yanchor="middle",
+                   align="center",
                    font=attr(; size=11, color=group.text_color)))
     end
 
@@ -3694,7 +3729,9 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         panel.style.boxShadow = "0 1px 5px rgba(0,0,0,0.12)";
 
         const content = document.createElement("div");
-        content.style.padding = "6px 10px";
+        content.style.padding = "6px 10px 12px";
+        content.style.width = "100%";
+        content.style.boxSizing = "border-box";
         content.style.display = "flex";
         content.style.flexWrap = "wrap";
         content.style.gap = "6px 12px";
@@ -3703,7 +3740,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         panel.appendChild(content);
 
         const heading = document.createElement("span");
-        heading.textContent = "Parallel-coordinate settings";
+        heading.textContent = "Figure settings:";
         heading.style.fontWeight = "600";
         heading.style.marginRight = "4px";
         content.appendChild(heading);
@@ -3724,8 +3761,9 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         }
 
         const axisSelect = document.createElement("select");
-        axisSelect.style.width = "220px";
-        axisSelect.style.maxWidth = "220px";
+        axisSelect.style.width = "clamp(140px, 22vw, 220px)";
+        axisSelect.style.maxWidth = "100%";
+        axisSelect.style.minWidth = "120px";
 
         dims.forEach((dimension, index) => {
             const option = document.createElement("option");
@@ -3741,13 +3779,13 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         const minInput = document.createElement("input");
         minInput.type = "number";
         minInput.step = "any";
-        minInput.style.width = "110px";
+        minInput.style.width = "clamp(88px, 12vw, 110px)";
         addControl("Minimum", minInput);
 
         const maxInput = document.createElement("input");
         maxInput.type = "number";
         maxInput.step = "any";
-        maxInput.style.width = "110px";
+        maxInput.style.width = "clamp(88px, 12vw, 110px)";
         addControl("Maximum", maxInput);
 
         const buttonRow = document.createElement("div");
@@ -3759,10 +3797,6 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         const applyButton = document.createElement("button");
         applyButton.textContent = "Apply axis";
         buttonRow.appendChild(applyButton);
-
-        const zoomSelectionButton = document.createElement("button");
-        zoomSelectionButton.textContent = "Zoom to selection";
-        buttonRow.appendChild(zoomSelectionButton);
 
         const resetButton = document.createElement("button");
         resetButton.textContent = "Reset axis";
@@ -3797,10 +3831,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
 
         const hint = document.createElement("span");
         hint.textContent =
-            "Drag on one or more axes to filter, then zoom all axes to the selected lines.";
+            "Press Enter to apply values. Drag on an axis to filter.";
         hint.style.color = "#666";
         hint.style.fontSize = "11px";
-        hint.style.whiteSpace = "nowrap";
+        hint.style.whiteSpace = "normal";
         content.appendChild(hint);
 
         document.body.insertBefore(panel, document.body.firstChild);
@@ -3809,15 +3843,188 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         gd.style.width = "100vw";
         gd.style.minHeight = "0";
 
+        function updateResponsiveParallelLayout() {
+            if (
+                !gd._fullLayout ||
+                !gd._fullLayout._size ||
+                !Array.isArray(gd.layout.annotations) ||
+                !Array.isArray(gd.layout.shapes)
+            ) {
+                return;
+            }
+
+            const annotations = gd.layout.annotations;
+            const plotWidth = Math.max(
+                gd._fullLayout._size.w,
+                1
+            );
+            const plotHeight = Math.max(
+                gd._fullLayout._size.h,
+                1
+            );
+
+            /*
+             * Keep the vertical structure in pixels rather than fixed paper
+             * fractions. This prevents excessive whitespace on tall windows
+             * while preserving enough separation on short windows:
+             *
+             * title
+             *   34 px
+             * group headings
+             *   44 px
+             * axis-label / parallel-coordinate region
+             */
+            const groupHeadingOffsetPx = 34;
+            const axisRegionOffsetPx = 78;
+            const groupY =
+                1 - groupHeadingOffsetPx / plotHeight;
+            const domainTop = Math.max(
+                0.62,
+                1 - axisRegionOffsetPx / plotHeight
+            );
+
+            const usedAnnotationIndices = new Set();
+            const updates = {};
+
+            const groups = [
+                {
+                    fillToken: "70,130,180",
+                    labelForWidth: function (width) {
+                        if (width >= 150) {
+                            return "Variable parameters";
+                        }
+
+                        if (width >= 85) {
+                            return "Variable<br>parameters";
+                        }
+
+                        if (width >= 55) {
+                            return "Parameters";
+                        }
+
+                        return "Vars";
+                    }
+                },
+                {
+                    fillToken: "220,140,50",
+                    labelForWidth: function (width) {
+                        return width >= 55 ? "Results" : "Result";
+                    }
+                }
+            ];
+
+            groups.forEach(group => {
+                const shape = gd.layout.shapes.find(
+                    candidate =>
+                        candidate.type === "rect" &&
+                        typeof candidate.fillcolor === "string" &&
+                        candidate.fillcolor.includes(group.fillToken)
+                );
+
+                if (shape === undefined) {
+                    return;
+                }
+
+                const center = (shape.x0 + shape.x1) / 2;
+                const width =
+                    Math.abs(shape.x1 - shape.x0) * plotWidth;
+
+                let annotationIndex = -1;
+                let smallestDistance = Infinity;
+
+                annotations.forEach((annotation, index) => {
+                    if (usedAnnotationIndices.has(index)) {
+                        return;
+                    }
+
+                    const distance = Math.abs(annotation.x - center);
+
+                    if (distance < smallestDistance) {
+                        smallestDistance = distance;
+                        annotationIndex = index;
+                    }
+                });
+
+                if (annotationIndex < 0) {
+                    return;
+                }
+
+                usedAnnotationIndices.add(annotationIndex);
+
+                const fontSize =
+                    width < 55 ? 9 : width < 100 ? 10 : 11;
+
+                updates[
+                    "annotations[" + annotationIndex + "].text"
+                ] = "<b>" + group.labelForWidth(width) + "</b>";
+
+                updates[
+                    "annotations[" + annotationIndex + "].font.size"
+                ] = fontSize;
+
+                updates[
+                    "annotations[" + annotationIndex + "].x"
+                ] = center;
+
+                updates[
+                    "annotations[" + annotationIndex + "].y"
+                ] = groupY;
+            });
+
+            const layoutUpdate =
+                Object.keys(updates).length > 0
+                    ? Plotly.relayout(gd, updates)
+                    : Promise.resolve();
+
+            const currentDomain =
+                gd.data[traceIndex].domain &&
+                gd.data[traceIndex].domain.y;
+
+            const currentDomainTop =
+                Array.isArray(currentDomain) &&
+                currentDomain.length === 2
+                    ? currentDomain[1]
+                    : null;
+
+            const domainUpdate =
+                currentDomainTop === null ||
+                Math.abs(currentDomainTop - domainTop) > 1.0e-4
+                    ? Plotly.restyle(
+                          gd,
+                          {
+                              "domain.y": [[0.0, domainTop]]
+                          },
+                          [traceIndex]
+                      )
+                    : Promise.resolve();
+
+            return Promise.all([
+                layoutUpdate,
+                domainUpdate
+            ]);
+        }
+
         function resizePlotToViewport() {
             const panelHeight =
                 panel.getBoundingClientRect().height;
 
             gd.style.height =
-                Math.max(100, window.innerHeight - panelHeight) +
+                Math.max(1, window.innerHeight - panelHeight) +
                 "px";
 
             Plotly.Plots.resize(gd);
+            window.requestAnimationFrame(
+                updateResponsiveParallelLayout
+            );
+        }
+
+        const panelResizeObserver =
+            typeof ResizeObserver === "function"
+                ? new ResizeObserver(resizePlotToViewport)
+                : null;
+
+        if (panelResizeObserver !== null) {
+            panelResizeObserver.observe(panel);
         }
 
         window.setTimeout(resizePlotToViewport, 0);
@@ -3835,158 +4042,6 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
                         typeof value === "number" &&
                         Number.isFinite(value)
                 );
-        }
-
-        function constraintRanges(constraint) {
-            if (!Array.isArray(constraint)) {
-                return [];
-            }
-
-            if (
-                constraint.length === 2 &&
-                constraint.every(isFiniteNumber)
-            ) {
-                return [constraint];
-            }
-
-            return constraint.filter(
-                range =>
-                    Array.isArray(range) &&
-                    range.length === 2 &&
-                    range.every(isFiniteNumber)
-            );
-        }
-
-        function selectedRowIndices() {
-            const currentDimensions =
-                gd.data[traceIndex].dimensions;
-
-            const hasActiveSelection =
-                currentDimensions.some(
-                    dimension =>
-                        constraintRanges(
-                            dimension.constraintrange
-                        ).length > 0
-                );
-
-            if (!hasActiveSelection) {
-                return null;
-            }
-
-            const pointCount =
-                currentDimensions[0].values.length;
-
-            const selectedIndices = [];
-
-            for (
-                let pointIndex = 0;
-                pointIndex < pointCount;
-                pointIndex += 1
-            ) {
-                const isSelected =
-                    currentDimensions.every(dimension => {
-                        const ranges =
-                            constraintRanges(
-                                dimension.constraintrange
-                            );
-
-                        if (ranges.length === 0) {
-                            return true;
-                        }
-
-                        const value =
-                            dimension.values[pointIndex];
-
-                        return (
-                            isFiniteNumber(value) &&
-                            ranges.some(
-                                range =>
-                                    valueInsideRange(
-                                        value,
-                                        range
-                                    )
-                            )
-                        );
-                    });
-
-                if (isSelected) {
-                    selectedIndices.push(pointIndex);
-                }
-            }
-
-            return selectedIndices;
-        }
-
-        function selectedAxisRange(
-            dimensionIndex,
-            selectedIndices
-        ) {
-            const dimension =
-                gd.data[traceIndex]
-                    .dimensions[dimensionIndex];
-
-            const selectedValues =
-                selectedIndices
-                    .map(
-                        pointIndex =>
-                            dimension.values[pointIndex]
-                    )
-                    .filter(isFiniteNumber);
-
-            if (selectedValues.length === 0) {
-                return null;
-            }
-
-            const selectedMinimum =
-                Math.min(...selectedValues);
-
-            const selectedMaximum =
-                Math.max(...selectedValues);
-
-            const allValues =
-                finiteValues(dimensionIndex);
-
-            const fullMinimum =
-                allValues.length > 0
-                    ? Math.min(...allValues)
-                    : selectedMinimum;
-
-            const fullMaximum =
-                allValues.length > 0
-                    ? Math.max(...allValues)
-                    : selectedMaximum;
-
-            const selectedSpan =
-                selectedMaximum - selectedMinimum;
-
-            const fullSpan =
-                fullMaximum - fullMinimum;
-
-            const scale =
-                Math.max(
-                    Math.abs(selectedMinimum),
-                    Math.abs(selectedMaximum),
-                    Math.abs(fullMinimum),
-                    Math.abs(fullMaximum),
-                    1.0
-                );
-
-            const effectivelyConstant =
-                selectedSpan <= scale * 1.0e-12;
-
-            const padding =
-                effectivelyConstant
-                    ? (
-                        fullSpan > scale * 1.0e-12
-                            ? fullSpan * 0.03
-                            : scale * 0.03
-                    )
-                    : selectedSpan * 0.05;
-
-            return [
-                selectedMinimum - padding,
-                selectedMaximum + padding
-            ];
         }
 
         function formatInputValue(value) {
@@ -4127,59 +4182,6 @@ function inject_parallel_axis_zoom_controls!(file_path::String)
         applyButton.addEventListener(
             "click",
             applyAxisRange
-        );
-
-        zoomSelectionButton.addEventListener(
-            "click",
-            function () {
-                const selectedIndices =
-                    selectedRowIndices();
-
-                if (selectedIndices === null) {
-                    alert(
-                        "No active selection. Drag on one or more axes first."
-                    );
-                    return;
-                }
-
-                if (selectedIndices.length === 0) {
-                    alert(
-                        "The current filters do not select any lines."
-                    );
-                    return;
-                }
-
-                const newDimensions =
-                    gd.data[traceIndex].dimensions.map(
-                        (dimension, dimensionIndex) => {
-                            const copied =
-                                Object.assign({}, dimension);
-
-                            const selectedRange =
-                                selectedAxisRange(
-                                    dimensionIndex,
-                                    selectedIndices
-                                );
-
-                            if (selectedRange !== null) {
-                                copied.range = selectedRange;
-                            }
-
-                            return copied;
-                        }
-                    );
-
-                Plotly.restyle(
-                    gd,
-                    {
-                        dimensions: [newDimensions]
-                    },
-                    [traceIndex]
-                ).then(function () {
-                    updateInputValues();
-                    return updateVisibleColorBounds();
-                });
-            }
         );
 
         resetButton.addEventListener("click", function () {
@@ -4668,43 +4670,59 @@ function inject_3d_axis_selection_controls!(file_path::String,
 
         const controls = document.createElement("div");
         controls.id = "optimisation-3d-controls";
+        controls.style.flex = "0 0 auto";
+        controls.style.width = "100%";
+        controls.style.boxSizing = "border-box";
+        controls.style.zIndex = "10000";
         controls.style.fontFamily = "Arial, sans-serif";
         controls.style.fontSize = "13px";
-        controls.style.margin = "8px 0 4px 0";
-        controls.style.padding = "10px";
-        controls.style.border = "1px solid #ccc";
-        controls.style.borderRadius = "5px";
+        controls.style.margin = "0";
+        controls.style.padding = "6px 10px 10px";
+        controls.style.background = "rgba(255,255,255,0.98)";
+        controls.style.borderBottom = "1px solid #bbb";
+        controls.style.boxShadow = "0 1px 5px rgba(0,0,0,0.12)";
         controls.style.display = "flex";
-        controls.style.flexDirection = "column";
-        controls.style.alignItems = "stretch";
-        controls.style.gap = "8px";
-        controls.style.overflowX = "auto";
+        controls.style.flexWrap = "wrap";
+        controls.style.alignItems = "center";
+        controls.style.gap = "6px 12px";
 
-        function createControlRow() {
+        const controlsHeading = document.createElement("span");
+        controlsHeading.textContent = "Figure settings:";
+        controlsHeading.style.fontWeight = "600";
+        controlsHeading.style.marginRight = "4px";
+        controls.appendChild(controlsHeading);
+
+        function createControlRow(flexBasis) {
             const row = document.createElement("div");
-            row.style.display = "flex";
+            row.style.display = "inline-flex";
             row.style.alignItems = "center";
-            row.style.flexWrap = "nowrap";
-            row.style.gap = "10px";
-            row.style.minWidth = "max-content";
+            row.style.flexWrap = "wrap";
+            row.style.flex = "1 1 " + flexBasis;
+            row.style.minWidth = "0";
+            row.style.maxWidth = "100%";
+            row.style.gap = "6px 10px";
             controls.appendChild(row);
             return row;
         }
 
-        const selectionRow = createControlRow();
-        const scalingRow = createControlRow();
+        const selectionRow = createControlRow("760px");
+        const scalingRow = createControlRow("560px");
 
         function createSelect(parent, labelText, values, initialValue) {
             const container = document.createElement("label");
-            container.style.display = "flex";
+            container.style.display = "inline-flex";
             container.style.alignItems = "center";
             container.style.gap = "5px";
+            container.style.minWidth = "0";
+            container.style.whiteSpace = "nowrap";
 
             const label = document.createElement("span");
             label.textContent = labelText;
 
             const select = document.createElement("select");
-            select.style.maxWidth = "280px";
+            select.style.width = "clamp(125px, 17vw, 280px)";
+            select.style.maxWidth = "100%";
+            select.style.minWidth = "105px";
 
             values.forEach(value => {
                 const option = document.createElement("option");
@@ -4780,13 +4798,13 @@ function inject_3d_axis_selection_controls!(file_path::String,
         const zoomMinInput = document.createElement("input");
         zoomMinInput.type = "number";
         zoomMinInput.step = "any";
-        zoomMinInput.style.width = "120px";
+        zoomMinInput.style.width = "clamp(88px, 11vw, 110px)";
         scalingRow.appendChild(zoomMinInput);
 
         const zoomMaxInput = document.createElement("input");
         zoomMaxInput.type = "number";
         zoomMaxInput.step = "any";
-        zoomMaxInput.style.width = "120px";
+        zoomMaxInput.style.width = "clamp(88px, 11vw, 110px)";
         scalingRow.appendChild(zoomMaxInput);
 
         const applyZoomButton = document.createElement("button");
@@ -4802,6 +4820,57 @@ function inject_3d_axis_selection_controls!(file_path::String,
         scalingRow.appendChild(resetAllZoomButton);
 
         gd.parentNode.insertBefore(controls, gd);
+
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height = "100%";
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.height = "100%";
+        document.body.style.width = "100%";
+        document.body.style.margin = "0";
+        document.body.style.overflow = "hidden";
+
+        plotParent.style.height = "100vh";
+        plotParent.style.width = "100%";
+        plotParent.style.display = "flex";
+        plotParent.style.flexDirection = "column";
+        plotParent.style.overflow = "hidden";
+        plotParent.style.minWidth = "0";
+
+        gd.style.flex = "1 1 auto";
+        gd.style.minHeight = "0";
+        gd.style.minWidth = "0";
+        gd.style.width = "100%";
+
+        function resizePlotToViewport() {
+            const parentTop =
+                plotParent.getBoundingClientRect().top;
+            const controlsHeight =
+                controls.getBoundingClientRect().height;
+            const availableHeight = Math.max(
+                1,
+                window.innerHeight - parentTop - controlsHeight
+            );
+
+            gd.style.height = availableHeight + "px";
+            gd.style.width = "100%";
+
+            return Plotly.relayout(gd, {
+                autosize: true,
+                height: availableHeight
+            }).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        const controlsResizeObserver =
+            typeof ResizeObserver === "function"
+                ? new ResizeObserver(resizePlotToViewport)
+                : null;
+
+        if (controlsResizeObserver !== null) {
+            controlsResizeObserver.observe(controls);
+        }
 
         function formatValue(value) {
             if (!Number.isFinite(value)) {
@@ -5252,9 +5321,15 @@ function inject_3d_axis_selection_controls!(file_path::String,
             }
         );
 
+        window.addEventListener(
+            "resize",
+            resizePlotToViewport
+        );
+
         updateZoomAxisLabels();
         updateAxisZoomInputs();
         updateColorRangeFromVisibleAxes();
+        resizePlotToViewport();
     }
 
     if (document.readyState === "loading") {
