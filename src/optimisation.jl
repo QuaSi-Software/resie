@@ -638,6 +638,11 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
 
     # Start sensitivity analysis based on the former and additional simulation runs.
+    if optimiser["run_sensitivity"] && get(optimiser, "objective_function_name", "") == "multi-objective"
+        @warn "Sensitivity analysis will not be performed because a multi-objective optimiser was selected."
+        optimiser["run_sensitivity"] = false
+    end
+
     if optimiser["run_sensitivity"]
         sensitivity_start_time = now()
         results_before_sensitivity = length(all_results)
@@ -688,8 +693,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
             header = join(collect(keys(all_results[1])), ';') * "\n"
             write(file_handle, header)
 
-            # write rows 
-            #TODO can probably speed up by collecting data and writing once
+            # write results
             for results in all_results
                 row = join(collect(values(results)), ';') * "\n"
                 row = replace(row, '.' => ',')

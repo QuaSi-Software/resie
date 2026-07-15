@@ -902,6 +902,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
                     "reusing results from optimisation if available or running seperately.",
         display_name="Run sensitivity analysis",
         required=false,
+        conditionals=[("objective_function", "is_one_of", ("sum", "linear"))],
         type=Bool,
         json_type="boolean",
         unit="-"
@@ -1771,12 +1772,12 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         sort!(optimiser["objective_params_keys"]; by=lowercase)
 
         optimiser["objective_function"],
-        f_obj_name,
+        optimiser["objective_function_name"],
         optimiser["objective_factors"] = parse_objective_function(optimiser_config["objective_function"],
                                                                   optimiser["objective_params_keys"],
                                                                   optimiser_config["objective_factors"])
 
-        if f_obj_name == "multi-objective"
+        if optimiser["objective_function_name"] == "multi-objective"
             optimiser["N_obj"] = length(optimiser["objective_params_keys"])
             optimiser["objective_senses"],
             optimiser["objective_signs"] = parse_objective_senses(optimiser["objective_params_keys"],
@@ -1814,7 +1815,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         optimiser["nbh_scale"] = default(optimiser_config, "nbh_scale", 0.5)
 
     elseif optimiser_config["type"] == "Optim"
-        if f_obj_name == "multi-objective"
+        if optimiser["objective_function_name"] == "multi-objective"
             @error "Objective function multi-objective not supported for algorithms from " *
                    "package 'Optim'"
             throw(InputError())
@@ -1870,7 +1871,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         optimiser["args"] = [bounds[:, 3]]
         optimiser["kwargs"] = Dict{Symbol,Any}()
 
-        if f_obj_name == "multi-objective"
+        if optimiser["objective_function_name"] == "multi-objective"
             if optimiser_config["algorithm"] != "borg_moea"
                 @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
                        "support multi-objective optimisation. Choose a different " *
@@ -1899,7 +1900,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
     elseif optimiser_config["type"] == "Metaheuristics"
         m_obj_algs = ["MOEAD_DE", "NSGA2", "NSGA3", "SMS_EMOA", "SPEA2", "CCMO"]
-        if f_obj_name == "multi-objective" && !(optimiser_config["algorithm"] in m_obj_algs)
+        if optimiser["objective_function_name"] == "multi-objective" && !(optimiser_config["algorithm"] in m_obj_algs)
             @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
                    "support multi-objective optimisation. Choose a different " *
                    "objective_function or algorithm."
