@@ -1295,17 +1295,31 @@ end
 """
     create_matrix_plot(results, io_settings, sim_params; ...)
 
-Create a scatter-plot matrix of all optimisation parameters. For a single objective, the best
-point is highlighted. For multiple objectives, all Pareto-optimal points are highlighted. Marker
-colour uses the selected objective, defaulting to the first objective in vector order.
+Create a lower-triangular optimisation-parameter matrix.
+
+The diagonal contains histograms of evaluated parameter values. Pairwise scatter plots are
+shown below the diagonal; the redundant upper triangle remains empty. Scatter colours use the
+selected objective or configured matrix-plot quantity. For a single objective, the best point
+is highlighted. For multiple objectives, all Pareto-optimal points are highlighted.
+
+All panels that display the same parameter are linked with Plotly's `matches` axes. Zooming or
+panning one panel therefore updates the corresponding horizontal or vertical axes in the other
+visible panels.
 """
 function create_matrix_plot(results::Vector{Any},
                             io_settings::Dict{String,Any},
                             sim_params::Dict{String,Any};
                             objective_keys=nothing,
                             objective_senses=nothing,
-                            color_key=nothing)
+                            color_key=nothing,
+                            histogram_bins::Union{Nothing,Int}=nothing)
     param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+
+    if isempty(param_names)
+        @error("Cannot create matrix plot: no optimisation parameters were found.")
+        return ""
+    end
+
     spec = optimisation_objective_spec(results,
                                        sim_params;
                                        objective_keys=objective_keys)
@@ -1314,7 +1328,8 @@ function create_matrix_plot(results::Vector{Any},
 
     missing_params = filter(param -> !haskey(results_dict, param), param_names)
     if !isempty(missing_params)
-        @error("Cannot create matrix plot. Missing parameters: $(join(missing_params, ", ")).")
+        @error("Cannot create matrix plot. Missing parameters: " *
+               join(missing_params, ", "))
         return ""
     end
 
@@ -1348,7 +1363,8 @@ function create_matrix_plot(results::Vector{Any},
 
     valid_idx = [idx
                  for idx in eachindex(results)
-                 if all(key -> is_finite_number(results_dict[key][idx]), required_keys)]
+                 if all(key -> is_finite_number(results_dict[key][idx]),
+                        required_keys)]
 
     if isempty(valid_idx)
         @error("Cannot create matrix plot: no complete numeric result rows.")
@@ -1379,25 +1395,16 @@ function create_matrix_plot(results::Vector{Any},
         mask
     end
 
-    line_width = [highlight_mask[idx] ? 2 : 0
-                  for idx in eachindex(valid_idx)]
+    color_sense = get(senses, configured_color_key, :min)
 
-    color_sense = get(senses,
-                      configured_color_key,
-                      :min)
-
-    # Static matrix-specific colour range:
-    # show approximately the best 25% with the full colour gradient.
+    # Preserve the matrix plot's established colour grading: approximately the
+    # best quarter of the selected quantity receives the complete colour scale.
     sorted_color_values = sort(color_values)
     number_of_values = length(sorted_color_values)
-    number_of_best_values = max(1,
-                                cld(number_of_values, 4))
+    number_of_best_values = max(1, cld(number_of_values, 4))
 
     if color_sense == :max
-        first_best_index = number_of_values -
-                           number_of_best_values +
-                           1
-
+        first_best_index = number_of_values - number_of_best_values + 1
         cmin = sorted_color_values[first_best_index]
         cmax = last(sorted_color_values)
     else
@@ -1405,49 +1412,440 @@ function create_matrix_plot(results::Vector{Any},
         cmax = sorted_color_values[number_of_best_values]
     end
 
-    # Fall back to the complete range when the selected quartile has
-    # no width, for example with identical or very few values.
-    if !isfinite(cmin) ||
-       !isfinite(cmax) ||
-       cmax <= cmin
+    if !isfinite(cmin) || !isfinite(cmax) || cmax <= cmin
         cmin = first(sorted_color_values)
         cmax = last(sorted_color_values)
     end
 
-    # Plotly requires two distinct colour limits.
     if cmax <= cmin
-        delta = max(abs(cmin), 1.0) *
-                1.0e-9
-
+        delta = max(abs(cmin), 1.0) * 1.0e-9
         cmin -= delta
         cmax += delta
     end
+
     hover_keys = unique(vcat(param_names, spec.objective_keys))
     hover_text = ["run $(valid_idx[local_index])" *
                   join(("<br>$key = $(results_dict[key][valid_idx[local_index]])"
                         for key in hover_keys))
                   for local_index in eachindex(valid_idx)]
 
-    trace = splom(;
-                  dimensions=[attr(; label=param,
-                                   values=parameter_values[param])
-                              for param in param_names],
-                  marker=attr(; color=color_values,
-                              colorscale=objective_colorscale(color_sense),
-                              cmin=cmin,
-                              cmax=cmax,
-                              showscale=true,
-                              line=attr(; color="red", width=line_width),
-                              colorbar=attr(; title=configured_color_key)),
-                  text=hover_text,
-                  hovertemplate="%{text}<extra></extra>")
+    number_of_bins = if histogram_bins === nothing
+        clamp(ceil(Int, sqrt(length(valid_idx))), 6, 20)
+    else
+        histogram_bins > 0 ||
+            throw(ArgumentError("histogram_bins must be greater than zero."))
+        histogram_bins
+    end
 
-    title = spec.is_multiobjective ?
-            "Optimisation parameter matrix — red outline: Pareto solutions" :
-            "Optimisation parameter matrix — red outline: best solution"
+    function padded_parameter_range(values::Vector{Float64})::Tuple{Float64,Float64}
+        minimum_value, maximum_value = extrema(values)
+        scale = max(abs(minimum_value), abs(maximum_value), 1.0)
 
-    p = plot(trace, Layout(; title=title))
-    file_path = optimisation_plot_path(sim_params, io_settings, "matrix_plot")
+        padding = if maximum_value <= minimum_value
+            scale * 0.05
+        else
+            (maximum_value - minimum_value) * 0.03
+        end
+
+        return minimum_value - padding, maximum_value + padding
+    end
+
+    function histogram_counts(values::Vector{Float64},
+                              lower::Float64,
+                              upper::Float64,
+                              n_bins::Int)::Tuple{Vector{Float64},
+                                                  Vector{Float64},
+                                                  Vector{Int},
+                                                  Vector{Float64},
+                                                  Vector{Float64}}
+        bin_width = (upper - lower) / n_bins
+        bin_width > 0.0 ||
+            throw(ArgumentError("Histogram range must have positive width."))
+
+        lower_edges = [lower + (index - 1) * bin_width for index in 1:n_bins]
+        upper_edges = [lower + index * bin_width for index in 1:n_bins]
+        centers = (lower_edges .+ upper_edges) ./ 2.0
+        widths = fill(bin_width, n_bins)
+        counts = zeros(Int, n_bins)
+
+        for value in values
+            bin_index = if value >= upper
+                n_bins
+            else
+                floor(Int, (value - lower) / bin_width) + 1
+            end
+
+            counts[clamp(bin_index, 1, n_bins)] += 1
+        end
+
+        return centers, widths, counts, lower_edges, upper_edges
+    end
+
+    function axis_reference(prefix::String, axis_index::Int)::String
+        return axis_index == 1 ? prefix : prefix * string(axis_index)
+    end
+
+    function axis_layout_key(prefix::String, axis_index::Int)::Symbol
+        return axis_index == 1 ?
+               Symbol(prefix * "axis") :
+               Symbol(prefix * "axis" * string(axis_index))
+    end
+
+    parameter_ranges = Dict(
+        parameter => padded_parameter_range(parameter_values[parameter])
+        for parameter in param_names
+    )
+
+    n_parameters = length(param_names)
+
+    # Assign one Plotly x/y-axis pair to every visible cell in the lower triangle.
+    cell_axis_index = Dict{Tuple{Int,Int},Int}()
+    next_axis_index = 0
+
+    for row in 1:n_parameters
+        for column in 1:row
+            next_axis_index += 1
+            cell_axis_index[(row, column)] = next_axis_index
+        end
+    end
+
+    # Every column shares one x parameter. The diagonal histogram is the master x axis.
+    x_master_reference = Dict(
+        column => axis_reference("x", cell_axis_index[(column, column)])
+        for column in 1:n_parameters
+    )
+
+    # Every scatter row shares one y parameter. Its left-most scatter cell is the master.
+    y_master_reference = Dict(
+        row => axis_reference("y", cell_axis_index[(row, 1)])
+        for row in 2:n_parameters
+    )
+
+    horizontal_spacing = n_parameters > 1 ?
+                         min(0.025, 0.10 / (n_parameters - 1)) :
+                         0.0
+
+    vertical_spacing = n_parameters > 1 ?
+                       min(0.030, 0.12 / (n_parameters - 1)) :
+                       0.0
+
+    # Reserve space on the right for a clearly labelled colour bar.
+    plot_x_max = 0.88
+
+    cell_width = (plot_x_max -
+                  (n_parameters - 1) * horizontal_spacing) /
+                 n_parameters
+
+    cell_height = (1.0 -
+                   (n_parameters - 1) * vertical_spacing) /
+                  n_parameters
+
+    traces = GenericTrace[]
+    annotations = Any[]
+    panel_shapes = Any[]
+    layout_values = Dict{Symbol,Any}()
+    highlight_legend_added = false
+    scatter_trace_added = false
+
+    for row in 1:n_parameters
+        for column in 1:row
+            axis_index = cell_axis_index[(row, column)]
+            x_reference = axis_reference("x", axis_index)
+            y_reference = axis_reference("y", axis_index)
+            x_layout_key = axis_layout_key("x", axis_index)
+            y_layout_key = axis_layout_key("y", axis_index)
+
+            x_domain_start = (column - 1) * (cell_width + horizontal_spacing)
+            x_domain_end = x_domain_start + cell_width
+
+            y_domain_end = 1.0 -
+                           (row - 1) * (cell_height + vertical_spacing)
+            y_domain_start = y_domain_end - cell_height
+
+            x_parameter = param_names[column]
+            y_parameter = param_names[row]
+            x_range = parameter_ranges[x_parameter]
+            y_range = parameter_ranges[y_parameter]
+
+            panel_fill = row == column ?
+                         "rgba(245,247,250,0.95)" :
+                         "rgba(230,236,246,0.72)"
+
+            push!(panel_shapes,
+                  attr(; type="rect",
+                       xref="paper",
+                       yref="paper",
+                       x0=x_domain_start,
+                       x1=x_domain_end,
+                       y0=y_domain_start,
+                       y1=y_domain_end,
+                       fillcolor=panel_fill,
+                       line=attr(; color="rgba(90,110,140,0.18)",
+                                 width=1),
+                       layer="below"))
+
+            xaxis_values = Dict{Symbol,Any}(
+                :domain => [x_domain_start, x_domain_end],
+                :anchor => y_reference,
+                :range => [x_range[1], x_range[2]],
+                :showgrid => true,
+                :gridcolor => "rgba(110,130,160,0.20)",
+                :zeroline => false,
+                :showline => false,
+                :ticks => "outside",
+                :tickfont => attr(; size=9),
+                :showticklabels => row == n_parameters || row == column,
+                :automargin => true,
+                :fixedrange => false,
+            )
+
+            if x_reference != x_master_reference[column]
+                xaxis_values[:matches] = x_master_reference[column]
+            end
+
+            if row == n_parameters
+                xaxis_values[:title] = attr(; text=x_parameter,
+                                            font=attr(; size=11))
+            end
+
+            layout_values[x_layout_key] = attr(; xaxis_values...)
+
+            yaxis_values = Dict{Symbol,Any}(
+                :domain => [y_domain_start, y_domain_end],
+                :anchor => x_reference,
+                :zeroline => false,
+                :showline => false,
+                :ticks => "outside",
+                :tickfont => attr(; size=9),
+                :automargin => true,
+                :fixedrange => false,
+            )
+
+            if row == column
+                # The diagonal y axis is a histogram count axis and must not be
+                # linked to the parameter-valued y axes in the scatter row.
+                yaxis_values[:showgrid] = false
+                yaxis_values[:showticklabels] = column == 1
+
+                if column == 1
+                    yaxis_values[:title] = attr(; text="Count",
+                                                font=attr(; size=11))
+                end
+            else
+                yaxis_values[:range] = [y_range[1], y_range[2]]
+                yaxis_values[:showgrid] = true
+                yaxis_values[:gridcolor] = "rgba(110,130,160,0.20)"
+                yaxis_values[:showticklabels] = column == 1
+
+                if y_reference != y_master_reference[row]
+                    yaxis_values[:matches] = y_master_reference[row]
+                end
+
+                if column == 1
+                    yaxis_values[:title] = attr(; text=y_parameter,
+                                                font=attr(; size=11))
+                end
+            end
+
+            layout_values[y_layout_key] = attr(; yaxis_values...)
+
+            if row == column
+                centers, bar_widths, counts, lower_edges, upper_edges = histogram_counts(parameter_values[x_parameter],
+                                                                                         x_range[1],
+                                                                                         x_range[2],
+                                                                                         number_of_bins)
+
+                bin_customdata = hcat(lower_edges, upper_edges)
+
+                push!(traces,
+                      bar(; x=centers,
+                          y=counts,
+                          width=bar_widths,
+                          marker=attr(; color="rgba(70,130,180,0.72)",
+                                      line=attr(; color="rgba(55,90,120,0.85)",
+                                                width=0.7)),
+                          customdata=bin_customdata,
+                          xaxis=x_reference,
+                          yaxis=y_reference,
+                          showlegend=false,
+                          hovertemplate=("$x_parameter<br>" *
+                                         "Range: %{customdata[0]:.6g} – " *
+                                         "%{customdata[1]:.6g}<br>" *
+                                         "Runs: %{y}<extra></extra>")))
+
+                # Draw red histogram outlines only for bins that actually contain
+                # highlighted runs. Omitting zero-height bins prevents the red
+                # baseline that Plotly otherwise draws at y = 0.
+                if any(highlight_mask)
+                    highlighted_values = parameter_values[x_parameter][highlight_mask]
+                    _, _, highlighted_counts, _, _ = histogram_counts(highlighted_values,
+                                                                      x_range[1],
+                                                                      x_range[2],
+                                                                      number_of_bins)
+
+                    nonzero_bins = findall(count -> count > 0, highlighted_counts)
+
+                    if !isempty(nonzero_bins)
+                        push!(traces,
+                              bar(; x=centers[nonzero_bins],
+                                  y=highlighted_counts[nonzero_bins],
+                                  width=bar_widths[nonzero_bins],
+                                  marker=attr(; color="rgba(255,255,255,0)",
+                                              line=attr(; color="red",
+                                                        width=2)),
+                                  customdata=bin_customdata[nonzero_bins, :],
+                                  xaxis=x_reference,
+                                  yaxis=y_reference,
+                                  name=spec.is_multiobjective ?
+                                       "Pareto solutions" :
+                                       "Best solution",
+                                  showlegend=(!highlight_legend_added),
+                                  hovertemplate=("$x_parameter — highlighted<br>" *
+                                                 "Range: %{customdata[0]:.6g} – " *
+                                                 "%{customdata[1]:.6g}<br>" *
+                                                 "Highlighted runs: %{y}<extra></extra>")))
+
+                        highlight_legend_added = true
+                    end
+                end
+
+                push!(annotations,
+                      attr(; text="<b>$x_parameter</b>",
+                           x=(x_domain_start + x_domain_end) / 2,
+                           y=y_domain_end - 0.012,
+                           xref="paper",
+                           yref="paper",
+                           showarrow=false,
+                           xanchor="center",
+                           yanchor="top",
+                           bgcolor="rgba(255,255,255,0.80)",
+                           borderpad=2,
+                           font=attr(; size=11,
+                                     color="rgb(45,65,90)")))
+
+                continue
+            end
+
+            push!(traces,
+                  scatter(; x=parameter_values[x_parameter],
+                          y=parameter_values[y_parameter],
+                          mode="markers",
+                          marker=attr(; size=5,
+                                      opacity=0.72,
+                                      color=color_values,
+                                      coloraxis="coloraxis",
+                                      line=attr(; width=0)),
+                          text=hover_text,
+                          hovertemplate="%{text}<extra></extra>",
+                          xaxis=x_reference,
+                          yaxis=y_reference,
+                          showlegend=false))
+
+            scatter_trace_added = true
+
+            if any(highlight_mask)
+                push!(traces,
+                      scatter(; x=parameter_values[x_parameter][highlight_mask],
+                              y=parameter_values[y_parameter][highlight_mask],
+                              mode="markers",
+                              marker=attr(; size=9,
+                                          opacity=1.0,
+                                          color=color_values[highlight_mask],
+                                          coloraxis="coloraxis",
+                                          line=attr(; color="red",
+                                                    width=2)),
+                              text=hover_text[highlight_mask],
+                              hovertemplate="%{text}<extra></extra>",
+                              xaxis=x_reference,
+                              yaxis=y_reference,
+                              name=spec.is_multiobjective ?
+                                   "Pareto solutions" :
+                                   "Best solution",
+                              showlegend=(!highlight_legend_added)))
+
+                highlight_legend_added = true
+            end
+        end
+    end
+
+    # With one optimisation parameter there is no scatter cell. Add a fully
+    # transparent marker so Plotly still renders the shared colour bar.
+    if !scatter_trace_added
+        first_parameter = first(param_names)
+
+        push!(traces,
+              scatter(; x=[first(parameter_values[first_parameter])],
+                      y=[0.0],
+                      mode="markers",
+                      marker=attr(; size=0,
+                                  opacity=0.0,
+                                  color=[first(color_values)],
+                                  coloraxis="coloraxis"),
+                      hoverinfo="skip",
+                      xaxis="x",
+                      yaxis="y",
+                      showlegend=false))
+    end
+
+    number_of_highlighted = count(identity, highlight_mask)
+    highlight_description = if spec.is_multiobjective
+        number_of_highlighted == 1 ?
+        "1 Pareto solution" :
+        "$number_of_highlighted Pareto solutions"
+    else
+        "best solution"
+    end
+
+    layout_values[:title] = attr(;
+                                 text=("Optimisation parameter matrix — " *
+                                       "$(length(valid_idx)) valid runs; " *
+                                       "red outline: $highlight_description"),
+                                 x=0.01,
+                                 xanchor="left",
+                                 font=attr(; size=17))
+
+    layout_values[:annotations] = annotations
+    layout_values[:shapes] = panel_shapes
+
+    # Shared colour scale and explicit title/legend for all scatter panels.
+    layout_values[:coloraxis] = attr(; colorscale=objective_colorscale(color_sense),
+                                     cmin=cmin,
+                                     cmax=cmax,
+                                     showscale=true,
+                                     colorbar=attr(; title=attr(; text=configured_color_key,
+                                                                side="right"),
+                                                   x=0.915,
+                                                   xanchor="left",
+                                                   y=0.5,
+                                                   len=0.88,
+                                                   thickness=18,
+                                                   ticks="",
+                                                   ticklen=0,
+                                                   outlinecolor="rgba(70,70,70,0.65)",
+                                                   outlinewidth=1))
+
+    layout_values[:autosize] = true
+    layout_values[:margin] = attr(; t=75,
+                                  b=70,
+                                  l=90,
+                                  r=150)
+    layout_values[:paper_bgcolor] = "white"
+    layout_values[:plot_bgcolor] = "rgba(0,0,0,0)"
+    layout_values[:hovermode] = "closest"
+    layout_values[:dragmode] = "zoom"
+    layout_values[:showlegend] = any(highlight_mask)
+    layout_values[:legend] = attr(; x=0.90,
+                                  xanchor="left",
+                                  y=1.0,
+                                  yanchor="top",
+                                  bgcolor="rgba(255,255,255,0.85)")
+    layout_values[:barmode] = "overlay"
+    layout_values[:bargap] = 0.06
+
+    p = plot(traces, Layout(; layout_values...))
+    file_path = optimisation_plot_path(sim_params,
+                                       io_settings,
+                                       "matrix_plot")
     savefig(p, file_path)
 
     return file_path
@@ -1510,13 +1908,6 @@ function optimisation_plot_path(sim_params::Dict{String,Any},
     ext = ".html"
     return joinpath(dir, "$(root)_$(suffix)$(ext)")
 end
-
-"""
-    safe_plot_name(name)
-
-Convert a result key to a filename-safe string.
-"""
-safe_plot_name(name::AbstractString)::String = replace(name, r"[^A-Za-z0-9_]+" => "_")
 
 """
     optimisation_color_bounds(values)
@@ -1718,25 +2109,63 @@ end
 
 Resolve one `:min` or `:max` sense for each objective. The keyword may be a single symbol, a
 vector in objective order or a dictionary keyed by objective name. If omitted, the function
-uses `sim_params["optimisation"]["objective_senses"]` when available and otherwise defaults to
-`:min`.
+first uses `sim_params["optimisation"]["objective_senses"]` when available. Otherwise it infers
+the direction from the sign of `objective_factors` (positive means minimise, negative means
+maximise) and defaults to `:min` when no factor is available.
 """
 function optimisation_objective_senses(objective_keys::Vector{String},
                                        sim_params::Dict{String,Any};
                                        objective_senses=nothing)::Dict{String,Symbol}
+    optimiser = get(sim_params, "optimisation", Dict{String,Any}())
     configured = objective_senses
 
-    if configured === nothing &&
-       haskey(sim_params, "optimisation") &&
-       haskey(sim_params["optimisation"], "objective_senses")
-        configured = sim_params["optimisation"]["objective_senses"]
+    # An explicit sense configuration has priority.
+    if configured === nothing && haskey(optimiser, "objective_senses")
+        configured = optimiser["objective_senses"]
     end
 
     resolved = Dict{String,Symbol}()
 
     if configured === nothing
+        # When no explicit senses are supplied, infer the direction from
+        # objective_factors if they are available. The optimisers minimise the
+        # factor-weighted objective values:
+        #
+        #   positive factor -> minimise the original objective
+        #   negative factor -> maximise the original objective
+        #
+        # The scalar aggregate "objective" remains a minimisation quantity.
+        factors = get(optimiser, "objective_factors", nothing)
+
         for key in objective_keys
-            resolved[key] = :min
+            if key == "objective"
+                resolved[key] = :min
+                continue
+            end
+
+            factor = if factors isa AbstractDict && haskey(factors, key)
+                factors[key]
+            elseif factors isa AbstractDict && haskey(factors, Symbol(key))
+                factors[Symbol(key)]
+            else
+                nothing
+            end
+
+            if factor isa Real && isfinite(Float64(factor))
+                numeric_factor = Float64(factor)
+
+                if numeric_factor > 0.0
+                    resolved[key] = :min
+                elseif numeric_factor < 0.0
+                    resolved[key] = :max
+                else
+                    @warn("Objective factor for \"$key\" is zero. " *
+                          "The objective has no optimisation direction; using :min for plotting.")
+                    resolved[key] = :min
+                end
+            else
+                resolved[key] = :min
+            end
         end
     elseif configured isa Symbol
         for key in objective_keys
@@ -3329,11 +3758,13 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                                      sim_params,
                                                      spec.objective_keys)
 
+    color_source_keys = unique(vcat(param_names, result_axis_keys))
+
     selected_color_key = color_key === nothing ?
                          first(spec.objective_keys) :
                          String(color_key)
 
-    if !(selected_color_key in result_axis_keys)
+    if !(selected_color_key in color_source_keys)
         @warn "Requested parallel-coordinates color key is unavailable; using the first objective." selected_color_key
         selected_color_key = first(spec.objective_keys)
     end
@@ -3431,7 +3862,11 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                        io_settings,
                                        "parallel_coordinates")
     savefig(p, file_path)
-    inject_parallel_axis_zoom_controls!(file_path, param_names)
+    inject_parallel_axis_zoom_controls!(file_path,
+                                        param_names,
+                                        spec.objective_keys,
+                                        selected_color_key,
+                                        senses)
 
     return file_path
 end
@@ -3533,16 +3968,30 @@ function optimisation_objective_axis_keys(results::Vector{Any},
 end
 
 function inject_parallel_axis_zoom_controls!(file_path::String,
-                                             parameter_keys::Vector{String})
+                                             parameter_keys::Vector{String},
+                                             objective_keys::Vector{String},
+                                             initial_color_key::String,
+                                             objective_senses::Dict{String,Symbol})
     html = read(file_path, String)
     parameter_keys_json = replace(JSON.json(parameter_keys),
                                   "</" => "<\\/")
+    objective_keys_json = replace(JSON.json(objective_keys),
+                                  "</" => "<\\/")
+    initial_color_key_json = replace(JSON.json(initial_color_key),
+                                     "</" => "<\\/")
+    objective_senses_json = replace(JSON.json(Dict(key => String(value)
+                                                   for (key, value) in objective_senses)),
+                                    "</" => "<\\/")
 
     injection = """
 <script>
 (function () {
     const parameterKeys = $parameter_keys_json;
     const parameterKeySet = new Set(parameterKeys);
+    const objectiveKeys = $objective_keys_json;
+    const objectiveKeySet = new Set(objectiveKeys);
+    const objectiveSenses = $objective_senses_json;
+    const initialColorKey = $initial_color_key_json;
     function findPlotlyDiv() {
         const divs = document.querySelectorAll(".js-plotly-plot");
         return divs.length > 0 ? divs[0] : null;
@@ -3582,6 +4031,15 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
         const originalColorValues = Array.from(
             gd.data[traceIndex].line.color || []
         );
+        const originalColorscale =
+            gd.data[traceIndex].line.colorscale;
+        const originalReversescale =
+            gd.data[traceIndex].line.reversescale === true;
+
+        let currentColorKey = initialColorKey;
+        let currentColorValues = originalColorValues.slice();
+        let currentBaseCmin = originalCmin;
+        let currentBaseCmax = originalCmax;
         let updatingColorBounds = false;
         let colorUpdateTimer = null;
 
@@ -3655,7 +4113,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
             }
 
             const visible = [];
-            const pointCount = originalColorValues.length;
+            const pointCount = currentColorValues.length;
 
             for (let pointIndex = 0;
                  pointIndex < pointCount;
@@ -3687,9 +4145,9 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
 
                 if (
                     isVisible &&
-                    isFiniteNumber(originalColorValues[pointIndex])
+                    isFiniteNumber(currentColorValues[pointIndex])
                 ) {
-                    visible.push(originalColorValues[pointIndex]);
+                    visible.push(currentColorValues[pointIndex]);
                 }
             }
 
@@ -3699,11 +4157,11 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
         function updateVisibleColorBounds() {
             const visibleValues = activeVisibleColorValues();
             const bounds = visibleValues === null
-                ? [originalCmin, originalCmax]
+                ? [currentBaseCmin, currentBaseCmax]
                 : adaptiveColorBounds(visibleValues);
 
             const selectedBounds = bounds === null
-                ? [originalCmin, originalCmax]
+                ? [currentBaseCmin, currentBaseCmax]
                 : bounds;
 
             updatingColorBounds = true;
@@ -3874,6 +4332,64 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
         resetAllButton.textContent = "Reset all";
         buttonRow.appendChild(resetAllButton);
 
+        const colorSelect = document.createElement("select");
+        colorSelect.style.width = "clamp(150px, 22vw, 230px)";
+        colorSelect.style.maxWidth = "100%";
+        colorSelect.style.minWidth = "130px";
+
+        const colorGroups = [
+            {
+                label: "Variable parameters",
+                entries: []
+            },
+            {
+                label: "Objectives",
+                entries: []
+            }
+        ];
+
+        dims.forEach((dimension, index) => {
+            const label =
+                dimension.label || ("Axis " + (index + 1));
+            const groupIndex = parameterKeySet.has(label) ? 0 : 1;
+
+            colorGroups[groupIndex].entries.push({
+                index: index,
+                label: label
+            });
+        });
+
+        colorGroups.forEach(groupDefinition => {
+            if (groupDefinition.entries.length === 0) {
+                return;
+            }
+
+            const group = document.createElement("optgroup");
+            group.label = groupDefinition.label;
+
+            groupDefinition.entries.forEach(entry => {
+                const option = document.createElement("option");
+                option.value = entry.index;
+                option.textContent = entry.label;
+                group.appendChild(option);
+            });
+
+            colorSelect.appendChild(group);
+        });
+
+        const initialColorDimensionIndex =
+            dims.findIndex(
+                dimension =>
+                    (dimension.label || "") === initialColorKey
+            );
+
+        if (initialColorDimensionIndex >= 0) {
+            colorSelect.value =
+                String(initialColorDimensionIndex);
+        }
+
+        addControl("Colour source", colorSelect);
+
         const opacityInput = document.createElement("input");
         opacityInput.type = "number";
         opacityInput.min = "0";
@@ -3888,7 +4404,6 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
         opacityGroup.style.alignItems = "center";
         opacityGroup.style.gap = "5px";
         opacityGroup.style.whiteSpace = "nowrap";
-        opacityGroup.style.marginLeft = "auto";
 
         const opacityLabel = document.createElement("span");
         opacityLabel.textContent = "Unselected opacity (%)";
@@ -4349,6 +4864,78 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
             updateInputValues
         );
 
+        function colorSenseForKey(key) {
+            if (
+                objectiveKeySet.has(key) &&
+                Object.prototype.hasOwnProperty.call(
+                    objectiveSenses,
+                    key
+                )
+            ) {
+                return objectiveSenses[key];
+            }
+
+            // Parameters and other result quantities have no optimisation
+            // direction. Keep low values yellow and high values purple.
+            return "min";
+        }
+
+        function applyColorSource() {
+            const dimensionIndex = Number(colorSelect.value);
+            const dimension =
+                gd.data[traceIndex].dimensions[dimensionIndex];
+
+            if (!dimension) {
+                return Promise.resolve();
+            }
+
+            const key =
+                dimension.label || ("Axis " + (dimensionIndex + 1));
+
+            const values =
+                Array.from(dimension.values || []);
+
+            const bounds =
+                adaptiveColorBounds(values);
+
+            if (bounds === null) {
+                alert(
+                    "The selected colour source has no finite values."
+                );
+                return Promise.resolve();
+            }
+
+            currentColorKey = key;
+            currentColorValues = values;
+            currentBaseCmin = bounds[0];
+            currentBaseCmax = bounds[1];
+
+            const sense =
+                colorSenseForKey(key);
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.color": [values],
+                    "line.colorscale": "Viridis",
+                    "line.reversescale": sense === "min",
+                    "line.cmin": bounds[0],
+                    "line.cmax": bounds[1],
+                    "line.colorbar.title.text": key
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            }).then(updateVisibleColorBounds);
+        }
+
+        colorSelect.addEventListener(
+            "change",
+            applyColorSource
+        );
+
         function applyOpacity() {
             const opacityPercent = Number(opacityInput.value);
 
@@ -4572,15 +5159,36 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
             opacityInput.value =
                 String(Math.round(originalUnselectedOpacity * 100));
 
+            currentColorKey = initialColorKey;
+            currentColorValues = originalColorValues.slice();
+            currentBaseCmin = originalCmin;
+            currentBaseCmax = originalCmax;
+
+            if (initialColorDimensionIndex >= 0) {
+                colorSelect.value =
+                    String(initialColorDimensionIndex);
+            }
+
+            updatingColorBounds = true;
+
             Plotly.restyle(
                 gd,
                 {
                     dimensions: [newDimensions],
                     "unselected.line.opacity":
-                        originalUnselectedOpacity
+                        originalUnselectedOpacity,
+                    "line.color": [originalColorValues],
+                    "line.colorscale": originalColorscale,
+                    "line.reversescale": originalReversescale,
+                    "line.cmin": originalCmin,
+                    "line.cmax": originalCmax,
+                    "line.colorbar.title.text":
+                        initialColorKey
                 },
                 [traceIndex]
-            ).then(function () {
+            ).finally(function () {
+                updatingColorBounds = false;
+            }).then(function () {
                 updateInputValues();
                 return updateVisibleColorBounds();
             });
