@@ -575,8 +575,21 @@ function perform_optimisation(io_settings::Dict{String,Any},
                     f_wrap = f
                 end
 
-                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
-                @globalInfo res
+                progress_logger = function (status)
+                    best_text = if optimiser["N_obj"] == 1
+                        string(round(minimum(status); sigdigits=8))
+                    else
+                        "$(length(status.population)) population members"
+                    end
+
+                    @globalInfo("Metaheuristics progress: iteration=$(status.iteration), " *
+                                "evaluations=$(status.f_calls), best=$best_text",)
+                    return nothing
+                end
+
+                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...; logger=progress_logger)
+
+                @globalInfo "Metaheuristics optimisation result:\n$res"
 
             elseif optimiser["type"] == "NLopt"
                 f_nlopt = function (sample_values, gradient)
