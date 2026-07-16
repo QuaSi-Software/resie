@@ -387,22 +387,18 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
     # calculate inputs that should be cashed
     if preparation_cache !== nothing
-        @globalInfo "Prewarming preparation cache."
+        @globalInfo "Preparing reusable data for repeated simulation runs..."
         warmup_run_ID = uuid4()
         prepare_inputs(project_config, warmup_run_ID; preparation_cache=preparation_cache)
     end
 
-    # ensure disabled file outputs for multi-thread simulations, as this can lead to troubles
+    # warn if file outputs for multi-thread simulations should be created, as this can lead to troubles
     uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
                                       (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1)
-
-    # TODO Why is this deactivated?
-    # if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
-    #     throw(InputError("Parallel optimisation sample evaluation requires " *
-    #                      "`optimisation.disable_all_simulation_outputs = true`. " *
-    #                      "Plots.jl/GR output is not thread-safe when multiple samples write plots concurrently. " *
-    #                      "Either set `disable_all_simulation_outputs` to true or use a non-threaded optimiser."))
-    # end
+    if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
+        @warn "Writing simulation outputs during multi-threaded optimisation may cause file-access conflicts or crashes. " *
+              "To be safe, set `disable_all_simulation_outputs` to `true`, or run the optimisation with a single thread."
+    end
 
     # handle interruption via STR+C for parallel runs and optimisation
     cancel_optimisation = Threads.Atomic{Bool}(false)
@@ -497,7 +493,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
             if e isa InterruptException
                 # Handles Ctrl+C delivered to the task coordinating @threads.
                 cancel_optimisation[] = true
-                @globalInfo "Parameter variation interrupted by user."
             else
                 rethrow()
             end
@@ -508,40 +503,59 @@ function perform_optimisation(io_settings::Dict{String,Any},
             if cancel_optimisation[]
                 throw(InterruptException())
             end
-            try
-                optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                            project_config, sample_values,
-                            run_lock, output_lock, results_lock;
-                            cancel_flag=cancel_optimisation,
-                            preparation_cache=preparation_cache)
-            catch e
-                if e isa InterruptException
-                    cancel_optimisation[] = true
-                    println("InterruptException level f")
-                    rethrow()
+            return optim_func!(all_results, io_settings, sim_params, optim_results_path,
+                               project_config, sample_values,
+                               run_lock, output_lock, results_lock;
+                               cancel_flag=cancel_optimisation,
+                               preparation_cache=preparation_cache)
+        end
+
+        # handle Logging for all algorithms
+        progress_lock = ReentrantLock()
+        progress_evaluations = Ref(0)
+        progress_best = Ref(Inf)
+        progress_every = get(optimiser, "progress_every", 1)
+
+        f_progress = function (sample_values)
+            result = f(sample_values)
+
+            lock(progress_lock) do
+                progress_evaluations[] += 1
+
+                best_text = if optimiser["N_obj"] == 1
+                    value = result isa Real ? Float64(result) : Float64(first(result))
+                    progress_best[] = min(progress_best[], value)
+                    string(round(progress_best[]; sigdigits=8))
                 else
-                    rethrow()
+                    "multi-objective"
+                end
+
+                if progress_evaluations[] == 1 ||
+                   progress_evaluations[] % progress_every == 0
+                    @globalInfo("Optimisation progress: evaluations=$(progress_evaluations[]), best=$best_text",)
                 end
             end
+
+            return result
         end
 
         try
             if optimiser["type"] == "Optim"
-                Optim.optimize(f, optimiser["args"]...)
+                Optim.optimize(f_progress, optimiser["args"]...)
             elseif optimiser["type"] == "BlackBoxOptim"
                 if optimiser["N_obj"] == 1
-                    f_wrap = f
+                    f_wrap = f_progress
                 else
-                    f_wrap(x) = Tuple(f(x))
+                    f_wrap(x) = Tuple(f_progress(x))
                 end
                 BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
             elseif optimiser["type"] == "Metaheuristics"
                 #TODO implement batch evaluation for other packages that need it        
                 if Threads.nthreads() > 1
                     if optimiser["N_obj"] == 1
-                        f_arr(x) = [f(x)]
+                        f_arr(x) = [f_progress(x)]
                     else
-                        f_arr = f
+                        f_arr = f_progress
                     end
                     f_wrap = function (sample_values)
                         N_samples = size(sample_values, 1)
@@ -557,7 +571,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
                                 catch e
                                     if e isa InterruptException
                                         cancel_optimisation[] = true
-                                        println("InterruptException level Metaheuristics")
                                     else
                                         rethrow()
                                     end
@@ -572,49 +585,27 @@ function perform_optimisation(io_settings::Dict{String,Any},
                         return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
                     end
                 else
-                    f_wrap = f
+                    f_wrap = f_progress
                 end
 
-                progress_logger = function (status)
-                    best_text = if optimiser["N_obj"] == 1
-                        string(round(minimum(status); sigdigits=8))
-                    else
-                        "$(length(status.population)) population members"
-                    end
-
-                    @globalInfo("Metaheuristics progress: iteration=$(status.iteration), " *
-                                "evaluations=$(status.f_calls), best=$best_text",)
-                    return nothing
-                end
-
-                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...; logger=progress_logger)
-
+                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
                 @globalInfo "Metaheuristics optimisation result:\n$res"
 
             elseif optimiser["type"] == "NLopt"
                 f_nlopt = function (sample_values, gradient)
-                    return f(sample_values)
+                    return f_progress(sample_values)
                 end
                 NLopt.min_objective!(optimiser["args"][1], f_nlopt)
                 res = NLopt.optimize(optimiser["args"]...)
-                @globalInfo "Optimisation results: $res"
+                @globalInfo "NLopt optimisation results: $res"
             elseif optimiser["type"] == "NOMAD"
                 f_nomad = function (sample_values)
-                    try
-                        res = f(sample_values)
-                        success = res == Inf ? false : true
-                        if length(res) == 1
-                            res = [res]
-                        end
-                        return success, true, res
-                    catch e
-                        if e isa InterruptException
-                            cancel_optimisation[] = true
-                            rethrow()
-                        else
-                            rethrow()
-                        end
+                    res = f_progress(sample_values)
+                    success = res == Inf ? false : true
+                    if length(res) == 1
+                        res = [res]
                     end
+                    return success, true, res
                 end
                 prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f_nomad; optimiser["kwargs"]...)
                 NOMAD.solve(prob, optimiser["args"][end])
@@ -642,8 +633,9 @@ function perform_optimisation(io_settings::Dict{String,Any},
     main_run_count = length(all_results)
 
     if cancel_optimisation[]
-        @globalInfo "$workflow_name interrupted after $main_runtime_minutes min " *
-                    "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
+        @globalInfo "$workflow_name interrupted by user after $main_runtime_minutes min " *
+                    "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed. " *
+                    "Recovering intermediate results..."
         return false, all_results
     end
 

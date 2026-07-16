@@ -524,10 +524,19 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         # establish overarching locks for parallelization
         run_lock = ReentrantLock()
         output_lock = ReentrantLock()
-        _ = run_sample(io_settings, sim_params, nothing, project_config,
-                       nothing, run_ID, run_lock, output_lock;
-                       suppress_all_output=false,
-                       preparation_cache=preparation_cache)
+        try
+            _ = run_sample(io_settings, sim_params, nothing, project_config,
+                           nothing, run_ID, run_lock, output_lock;
+                           suppress_all_output=false,
+                           preparation_cache=preparation_cache)
+        catch e
+            if e isa InterruptException
+                @globalInfo "Optimisation interrupted by user."
+                success = false
+            else
+                rethrow()
+            end
+        end
     end
 
     return success
@@ -601,7 +610,6 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
             if cancel_flag !== nothing
                 cancel_flag[] = true
             end
-            @globalInfo "Optimisation interrupted by user."
             rethrow()
         end
 

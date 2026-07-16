@@ -1170,7 +1170,7 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
         if preparation_cache === nothing
             # WeatherData() writes the latitude and longitude to sim_params if either of them is
             # nothing at this point
-            @globalInfo "Loading weather data."
+            @globalInfo "Loading weather data..."
             sim_params["weather_data"] = WeatherData(weather_path_abs,
                                                      sim_params,
                                                      guess_file_format(weather_path_abs),
@@ -1194,7 +1194,7 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
             end
 
             if entry === nothing
-                @globalInfo "Loading weather data."
+                @globalInfo "Loading weather data..."
                 weather_data = WeatherData(weather_path_abs,
                                            sim_params,
                                            guess_file_format(weather_path_abs),
