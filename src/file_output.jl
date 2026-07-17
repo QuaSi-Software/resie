@@ -1299,7 +1299,7 @@ Create a lower-triangular optimisation-parameter matrix.
 
 The diagonal contains histograms of evaluated parameter values. Pairwise scatter plots are
 shown below the diagonal; the redundant upper triangle remains empty. Scatter colours use the
-selected objective or configured matrix-plot quantity. For a single objective, the best point
+selected optimisation parameter, objective, objective component or scalar result quantity. For a single objective, the best point
 is highlighted. For multiple objectives, all Pareto-optimal points are highlighted.
 
 All panels that display the same parameter are linked with Plotly's `matches` axes. Zooming or
@@ -1357,9 +1357,20 @@ function create_matrix_plot(results::Vector{Any},
                                            objective_senses=objective_senses)
     isempty(senses) && return ""
 
-    required_keys = unique(vcat(param_names,
-                                spec.objective_keys,
-                                [configured_color_key]))
+    # Use the complete scalar optimisation result set for the colour selector.
+    # This includes the configured objective, named objective components and
+    # other finite scalar objective/KPI result columns. Variable optimisation
+    # parameters remain in their own dropdown group.
+    result_color_keys = optimisation_result_axis_keys(results,
+                                                      results_dict,
+                                                      sim_params,
+                                                      spec.objective_keys)
+    objective_color_keys = unique(vcat(result_color_keys,
+                                       [configured_color_key]))
+    selectable_color_keys = unique(vcat(param_names,
+                                        objective_color_keys))
+
+    required_keys = selectable_color_keys
 
     valid_idx = [idx
                  for idx in eachindex(results)
@@ -1379,8 +1390,12 @@ function create_matrix_plot(results::Vector{Any},
     objective_matrix = hcat([Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
                              for key in spec.objective_keys]...)
 
-    color_values = Float64[Float64(results_dict[configured_color_key][idx])
-                           for idx in valid_idx]
+    color_values_by_key = Dict(
+        key => Float64[Float64(results_dict[key][idx]) for idx in valid_idx]
+        for key in selectable_color_keys
+    )
+
+    color_values = color_values_by_key[configured_color_key]
 
     highlight_mask = if spec.is_multiobjective
         pareto_front_mask(objective_matrix,
@@ -1739,6 +1754,7 @@ function create_matrix_plot(results::Vector{Any},
                           hovertemplate="%{text}<extra></extra>",
                           xaxis=x_reference,
                           yaxis=y_reference,
+                          meta="matrix-colour-runs",
                           showlegend=false))
 
             scatter_trace_added = true
@@ -1758,6 +1774,7 @@ function create_matrix_plot(results::Vector{Any},
                               hovertemplate="%{text}<extra></extra>",
                               xaxis=x_reference,
                               yaxis=y_reference,
+                              meta="matrix-colour-highlight",
                               name=spec.is_multiobjective ?
                                    "Pareto solutions" :
                                    "Best solution",
@@ -1784,6 +1801,7 @@ function create_matrix_plot(results::Vector{Any},
                       hoverinfo="skip",
                       xaxis="x",
                       yaxis="y",
+                      meta="matrix-colour-dummy",
                       showlegend=false))
     end
 
@@ -1808,7 +1826,8 @@ function create_matrix_plot(results::Vector{Any},
     layout_values[:shapes] = panel_shapes
 
     # Shared colour scale and explicit title/legend for all scatter panels.
-    layout_values[:coloraxis] = attr(; colorscale=objective_colorscale(color_sense),
+    layout_values[:coloraxis] = attr(; colorscale="Viridis",
+                                     reversescale=color_sense != :max,
                                      cmin=cmin,
                                      cmax=cmax,
                                      showscale=true,
@@ -1824,6 +1843,9 @@ function create_matrix_plot(results::Vector{Any},
                                                    outlinecolor="rgba(70,70,70,0.65)",
                                                    outlinewidth=1))
 
+    # Let JavaScript size the figure to the current browser viewport.
+    # No fixed width or height is stored in the Plotly layout, so browser
+    # zoom and small screens can use all available screen space.
     layout_values[:autosize] = true
     layout_values[:margin] = attr(; t=75,
                                   b=70,
@@ -1847,6 +1869,362 @@ function create_matrix_plot(results::Vector{Any},
                                        io_settings,
                                        "matrix_plot")
     savefig(p, file_path)
+
+    # Add the same toolbar style used by the other interactive optimisation
+    # plots. The graph occupies the viewport space remaining below the toolbar.
+    if endswith(lowercase(file_path), ".html")
+        html = read(file_path, String)
+
+        json_for_html(value) = replace(JSON.json(value),
+                                       "</" => "<\\/")
+
+        color_data_json = json_for_html(color_values_by_key)
+        parameter_keys_json = json_for_html(param_names)
+        objective_keys_json = json_for_html(objective_color_keys)
+        initial_color_json = json_for_html(configured_color_key)
+        highlight_mask_json = json_for_html(collect(highlight_mask))
+        color_senses_json = json_for_html(Dict(
+                                              key => string(get(senses, key, :min))
+                                              for key in selectable_color_keys
+                                          ))
+
+        controls_injection = """
+<style id="resie-matrix-controls-style">
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+body {
+    min-width: 0;
+    min-height: 0;
+}
+
+.plotly-graph-div {
+    width: 100% !important;
+    min-width: 0;
+    min-height: 0;
+}
+</style>
+<script id="resie-matrix-controls-script">
+(function () {
+    const colorData = $color_data_json;
+    const parameterKeys = $parameter_keys_json;
+    const objectiveKeys = $objective_keys_json;
+    const highlightMask = $highlight_mask_json;
+    const colorSenses = $color_senses_json;
+    const initialColor = $initial_color_json;
+
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll('.js-plotly-plot');
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function colorBounds(values, sense) {
+        const sorted = values.filter(isFiniteNumber).slice().sort(function (a, b) {
+            return a - b;
+        });
+
+        if (sorted.length === 0) {
+            return [0.0, 1.0];
+        }
+
+        const numberOfBestValues = Math.max(1, Math.ceil(sorted.length / 4));
+        let minimum;
+        let maximum;
+
+        if (sense === 'max') {
+            minimum = sorted[sorted.length - numberOfBestValues];
+            maximum = sorted[sorted.length - 1];
+        } else {
+            minimum = sorted[0];
+            maximum = sorted[numberOfBestValues - 1];
+        }
+
+        if (!Number.isFinite(minimum) ||
+            !Number.isFinite(maximum) ||
+            !(maximum > minimum)) {
+            minimum = sorted[0];
+            maximum = sorted[sorted.length - 1];
+        }
+
+        if (!(maximum > minimum)) {
+            const delta = Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+            minimum -= delta;
+            maximum += delta;
+        }
+
+        return [minimum, maximum];
+    }
+
+    function setupMatrixControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupMatrixControls, 200);
+            return;
+        }
+
+        if (document.getElementById('optimisation-matrix-controls')) {
+            return;
+        }
+
+        const controls = document.createElement('div');
+        controls.id = 'optimisation-matrix-controls';
+        controls.style.fontFamily = 'Arial, sans-serif';
+        controls.style.fontSize = '13px';
+        controls.style.margin = '8px 0 4px 0';
+        controls.style.padding = '10px';
+        controls.style.border = '1px solid #ccc';
+        controls.style.borderRadius = '5px';
+        controls.style.display = 'flex';
+        controls.style.flexDirection = 'column';
+        controls.style.alignItems = 'stretch';
+        controls.style.gap = '8px';
+        controls.style.overflowX = 'auto';
+
+        function createControlRow() {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.flexWrap = 'nowrap';
+            row.style.gap = '10px';
+            row.style.minWidth = 'max-content';
+            controls.appendChild(row);
+            return row;
+        }
+
+        function appendOptionGroup(select, label, values) {
+            if (!Array.isArray(values) || values.length === 0) {
+                return;
+            }
+
+            const group = document.createElement('optgroup');
+            group.label = label;
+
+            values.forEach(function (value) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                group.appendChild(option);
+            });
+
+            select.appendChild(group);
+        }
+
+        const selectionRow = createControlRow();
+
+        const colorContainer = document.createElement('label');
+        colorContainer.style.display = 'flex';
+        colorContainer.style.alignItems = 'center';
+        colorContainer.style.gap = '5px';
+
+        const colorLabel = document.createElement('span');
+        colorLabel.textContent = 'Color:';
+
+        const colorSelect = document.createElement('select');
+        colorSelect.style.maxWidth = '320px';
+
+        appendOptionGroup(
+            colorSelect,
+            'Optimisation parameters',
+            parameterKeys
+        );
+        appendOptionGroup(
+            colorSelect,
+            'Objectives',
+            objectiveKeys
+        );
+
+        colorSelect.value = initialColor;
+
+        colorContainer.appendChild(colorLabel);
+        colorContainer.appendChild(colorSelect);
+        selectionRow.appendChild(colorContainer);
+
+        const resetSelectionButton = document.createElement('button');
+        resetSelectionButton.textContent = 'Reset selection';
+        selectionRow.appendChild(resetSelectionButton);
+
+        gd.parentNode.insertBefore(controls, gd);
+
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height = '100%';
+        document.body.style.height = '100%';
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+
+        plotParent.style.width = '100%';
+        plotParent.style.display = 'flex';
+        plotParent.style.flexDirection = 'column';
+        plotParent.style.overflow = 'hidden';
+
+        controls.style.flex = '0 0 auto';
+        gd.style.flex = '1 1 auto';
+        gd.style.minHeight = '0';
+        gd.style.width = '100%';
+
+        function viewportSize() {
+            const viewport = window.visualViewport;
+
+            return {
+                width: Math.max(
+                    320,
+                    Math.floor(
+                        viewport ?
+                        viewport.width :
+                        (document.documentElement.clientWidth || window.innerWidth || 320)
+                    )
+                ),
+                height: Math.max(
+                    320,
+                    Math.floor(
+                        viewport ?
+                        viewport.height :
+                        (document.documentElement.clientHeight || window.innerHeight || 320)
+                    )
+                )
+            };
+        }
+
+        function resizePlotToViewport() {
+            const size = viewportSize();
+            const parentTop = plotParent.getBoundingClientRect().top;
+
+            plotParent.style.height = Math.max(320, size.height - parentTop) + 'px';
+
+            const controlsHeight = controls.getBoundingClientRect().height;
+            const availableHeight = Math.max(
+                320,
+                size.height - parentTop - controlsHeight - 8
+            );
+
+            gd.style.height = availableHeight + 'px';
+            gd.style.width = size.width + 'px';
+
+            return Plotly.relayout(gd, {
+                width: size.width,
+                height: availableHeight,
+                autosize: false
+            }).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        function applyColorSelection() {
+            const selectedKey = colorSelect.value;
+            const selectedValues = colorData[selectedKey];
+
+            if (!Array.isArray(selectedValues)) {
+                return;
+            }
+
+            const selectedSense = colorSenses[selectedKey] || 'min';
+            const bounds = colorBounds(selectedValues, selectedSense);
+            const highlightedValues = selectedValues.filter(function (_, index) {
+                return highlightMask[index] === true;
+            });
+
+            const traceIndices = [];
+            const traceColors = [];
+
+            gd.data.forEach(function (trace, traceIndex) {
+                if (trace.meta === 'matrix-colour-runs') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push(selectedValues);
+                } else if (trace.meta === 'matrix-colour-highlight') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push(highlightedValues);
+                } else if (trace.meta === 'matrix-colour-dummy') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push([selectedValues[0]]);
+                }
+            });
+
+            const restylePromise = traceIndices.length > 0 ?
+                Plotly.restyle(
+                    gd,
+                    {'marker.color': traceColors},
+                    traceIndices
+                ) :
+                Promise.resolve();
+
+            return restylePromise.then(function () {
+                return Plotly.relayout(gd, {
+                    'coloraxis.cmin': bounds[0],
+                    'coloraxis.cmax': bounds[1],
+                    'coloraxis.reversescale': selectedSense !== 'max',
+                    'coloraxis.colorbar.title.text': selectedKey
+                });
+            });
+        }
+
+        colorSelect.addEventListener('change', function () {
+            applyColorSelection();
+        });
+
+        resetSelectionButton.addEventListener('click', function () {
+            colorSelect.value = initialColor;
+            applyColorSelection();
+        });
+
+        let resizeFrame = null;
+
+        function scheduleMatrixResize() {
+            if (resizeFrame !== null) {
+                cancelAnimationFrame(resizeFrame);
+            }
+
+            resizeFrame = requestAnimationFrame(function () {
+                resizeFrame = null;
+                resizePlotToViewport();
+            });
+        }
+
+        window.addEventListener('resize', scheduleMatrixResize);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener(
+                'resize',
+                scheduleMatrixResize
+            );
+        }
+
+        applyColorSelection();
+        scheduleMatrixResize();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener(
+            'DOMContentLoaded',
+            setupMatrixControls
+        );
+    } else {
+        setupMatrixControls();
+    }
+})();
+</script>
+"""
+
+        if occursin("</head>", html)
+            html = replace(html,
+                           "</head>" => controls_injection * "\n</head>";
+                           count=1)
+        else
+            html *= controls_injection
+        end
+
+        write(file_path, html)
+    end
 
     return file_path
 end
