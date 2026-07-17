@@ -1049,6 +1049,8 @@ for the overarching slicing algorithm the PLR must be a required input.
 - `in_temp::Temperature`: Input temperature.
 - `out_temp::Temperature`: Output temperature.
 - `plr::Float64`: The PLR of the slice.
+- `ignore_cop_warning::Bool`: Bool to suppress warnings for cases when this function is evaluated by an optimiser.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
 # Returns
 - `Floathing`: Used input heat.
 - `Floathing`: Used electricity.
@@ -1064,7 +1066,9 @@ function handle_slice(unit::HeatPump,
                       in_temp::Temperature,
                       out_temp::Temperature,
                       plr::Float64,
-                      ignore_cop_warning::Bool)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature,Float64}
+                      ignore_cop_warning::Bool,
+                      sim_params::Dict{String,Any})::Tuple{Floathing,Floathing,Floathing,
+                                                           Temperature,Temperature,Float64}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
     cop_has_been_plr_corrected = false
     if unit.constant_cop !== nothing
@@ -1087,18 +1091,19 @@ function handle_slice(unit::HeatPump,
     end
 
     if cop < 1.0
-        cop = 1.0
         if !ignore_cop_warning
             if cop_has_been_plr_corrected
-                @warn "Calculated COP of heat pump $(unit.uac) was below 1.0. This was probably due to an " *
-                      "part-load-correction by the factor of $(round(unit.plf_function(plr);digits=4)) due to the " *
-                      "operation at $(round(plr*100;digits=2)) % compared to full load. " *
-                      "The COP was set from $(round(cop;digits=2)) to 1.0"
+                @warn "In timestep $(sim_params["current_date"]), the calculated COP of heat pump $(unit.uac) was " *
+                      "below 1.0. This was probably due to an part-load-correction by the factor of " *
+                      "$(round(unit.plf_function(plr);digits=4)) due to the operation at $(round(plr*100;digits=2)) % " *
+                      "compared to full load. The COP was set from $(round(cop;digits=2)) to 1.0"
             else
-                @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
-                       "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
+                @warn "In timestep $(sim_params["current_date"]), the calculated COP of heat pump $(unit.uac) was " *
+                      "below 1.0. Please check the input for mistakes as this should not happen. COP was set from " *
+                      "$(round(cop;digits=2)) to 1.0"
             end
         end
+        cop = 1.0
     end
 
     # calculate energies with the current cop
@@ -1279,7 +1284,8 @@ function calculate_slices(unit::HeatPump,
                            src_temperature,
                            snk_temperature,
                            plrs[plr_idx],
-                           ignore_cop_warning)
+                           ignore_cop_warning,
+                           sim_params)
 
         used_time = used_heat_out * 3600 / used_power
         energies.used_plrs[plr_idx] = used_heat_out / sim_params["watt_to_wh"](max_power)
