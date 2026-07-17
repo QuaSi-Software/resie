@@ -1096,13 +1096,13 @@ function handle_slice(unit::HeatPump,
         if !ignore_cop_warning
             if cop_has_been_plr_corrected
                 @warn "In timestep $(sim_params["current_date"]), the calculated COP of heat pump $(unit.uac) was " *
-                      "below 1.0. This was probably due to an part-load-correction by the factor of " *
+                      "below 1.0 for the current slice. This was probably due to an part-load-correction by the factor of " *
                       "$(round(unit.plf_function(plr);digits=4)) due to the operation at $(round(plr*100;digits=2)) % " *
-                      "compared to full load. The COP was set from $(round(cop;digits=2)) to 1.0"
+                      "compared to full load. The COP was set from $(round(cop;digits=2)) to 1.0 for this slice."
             else
                 @warn "In timestep $(sim_params["current_date"]), the calculated COP of heat pump $(unit.uac) was " *
-                      "below 1.0. Please check the input for mistakes as this should not happen. COP was set from " *
-                      "$(round(cop;digits=2)) to 1.0"
+                      "below 1.0 for the current slice. Please check the input for mistakes as this should not happen. " *
+                      "COP was set from $(round(cop;digits=2)) to 1.0 for this slice."
             end
         end
         cop = 1.0
