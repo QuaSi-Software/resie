@@ -1063,10 +1063,13 @@ function handle_slice(unit::HeatPump,
                       available_heat_out::Floathing,
                       in_temp::Temperature,
                       out_temp::Temperature,
-                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature,Float64}
+                      plr::Float64,
+                      ignore_cop_warning::Bool)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature,Float64}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
+    cop_has_been_plr_corrected = false
     if unit.constant_cop !== nothing
         cop = unit.constant_cop * unit.plf_function(plr)
+        cop_has_been_plr_corrected = true
     elseif in_temp >= out_temp
         cop = unit.bypass_cop
     else
@@ -1077,15 +1080,25 @@ function handle_slice(unit::HeatPump,
             throw(InputError())
         end
         cop *= unit.plf_function(plr)
+        cop_has_been_plr_corrected = true
         if unit.consider_icing
             cop = icing_correction(unit, cop, in_temp)
         end
     end
 
     if cop < 1.0
-        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
-               "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
         cop = 1.0
+        if !ignore_cop_warning
+            if cop_has_been_plr_corrected
+                @warn "Calculated COP of heat pump $(unit.uac) was below 1.0. This was probably due to an " *
+                      "part-load-correction by the factor of $(round(unit.plf_function(plr);digits=4)) due to the " *
+                      "operation at $(round(plr*100;digits=2)) % compared to full load. " *
+                      "The COP was set from $(round(cop;digits=2)) to 1.0"
+            else
+                @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
+                       "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
+            end
+        end
     end
 
     # calculate energies with the current cop
@@ -1147,7 +1160,8 @@ function calculate_slices(unit::HeatPump,
                           plrs::Vector{Float64},
                           is_final::Bool,
                           fixed_heat_in::Union{Nothing,Integer}=nothing,
-                          fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
+                          fixed_heat_out::Union{Nothing,Integer}=nothing;
+                          ignore_cop_warning::Bool=false)::HPEnergies
     # reset at the beginning, because the optimisation algorithm will call this function
     # multiple times with different plrs (and also at least once in both the potential and
     # process step)
@@ -1264,7 +1278,8 @@ function calculate_slices(unit::HeatPump,
                            available_heat_out,
                            src_temperature,
                            snk_temperature,
-                           plrs[plr_idx])
+                           plrs[plr_idx],
+                           ignore_cop_warning)
 
         used_time = used_heat_out * 3600 / used_power
         energies.used_plrs[plr_idx] = used_heat_out / sim_params["watt_to_wh"](max_power)
@@ -1364,8 +1379,9 @@ function find_best_slicing(unit::HeatPump,
     # run optimisation to find PLRs that meet demands and are optimal by criteria depending
     # on the model type (see function evaluate)
     results = optimize(plrs -> evaluate(calculate_slices(unit,
-                                                         sim_params, energies, plrs, false,
-                                                         fixed_heat_in, fixed_heat_out), unit, plrs, sim_params),
+                                                         sim_params, energies, plrs, false, fixed_heat_in,
+                                                         fixed_heat_out; ignore_cop_warning=true),
+                                        unit, plrs, sim_params),
                        lower_plrs, upper_plrs, initial_plrs, NelderMead(),
                        Options(; iterations=Int64(unit.nr_optimisation_passes),
                                x_abstol=unit.x_abstol,
