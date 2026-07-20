@@ -60,19 +60,6 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
         end
     end
 
-    #TODO postponed maybe this should be moved to profile processing to allow the profiles to be 
-    # defined with "profiles" group, scale and addon without optimiser
-    # if haskey(cfg, "profiles")
-    #     profile_paths = Dict{String,String}()
-    #     profile_scales = Dict{String,Float64}()
-    #     profile_addons = Dict{String,Float64}()
-    #     for (name, profile) in pairs(cfg["profiles"])
-    #         profile_paths[name] = profile["path"]
-    #         profile_scales[name] = profile["scale"]
-    #         profile_addons[name] = profile["addon"]
-    #     end
-    # end
-
     return cfg
 end
 

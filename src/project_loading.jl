@@ -857,7 +857,6 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
-    #TODO remove type and only use algorithm to choose package internally
     "type" => (
         default="nothing",
         description="Sets type of optimisation algorithm",
@@ -2069,9 +2068,6 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
                              fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]
-
-    else
-        #TODO plot outputs like pareto front -> example see optimisation-cli.jl
     end
 
     return optimiser
