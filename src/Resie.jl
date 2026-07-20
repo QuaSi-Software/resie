@@ -472,6 +472,7 @@ Load a project from the given file and run the simulation with it.
 # Arguments
 - `filepath::String`: Filepath to the project config file.
 - `run_ID::UUID`: The run ID used in the run registry
+- `logger::Union{Nothing,Resie_Logger.CustomLogger}`: Logger used for ReSiE
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
@@ -508,20 +509,10 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     @globalInfo "-- Now preparing inputs"
     preparation_cache = PreparationCache()
 
+    # set log level by operating mode
+    Resie_Logger.set_min_log_level!(logger, get_min_log_level(project_config, logger))
     io_settings = get_io_settings(project_config)
-    sim_params = get_simulation_params(project_config, io_settings;
-                                       preparation_cache=preparation_cache)
-
-    if logger !== nothing
-        if sim_params["optimisation"]["run_optimisation"]
-            # for optimisation runs, allow only logs >= GlobalInfo
-            min_log_level = Logging.LogLevel(600)
-        else
-            # for single simulations, set min log level to Info level
-            min_log_level = Logging.Info
-        end
-        Resie_Logger.set_min_log_level!(logger, min_log_level)
-    end
+    sim_params = get_simulation_params(project_config, io_settings; preparation_cache=preparation_cache)
 
     if sim_params["optimisation"]["run_optimisation"]
         # perform multiple simulation runs

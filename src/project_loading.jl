@@ -3,6 +3,7 @@
 # helpful information data structures from the inputs in the config
 using JSON: JSON
 using OrderedCollections: OrderedDict
+using Logging
 
 const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
@@ -1020,6 +1021,37 @@ function read_JSON(filepath::String)::OrderedDict{String,Any}
     open(filepath, "r") do file_handle
         content = read(file_handle, String)
         return JSON.parse(content; dicttype=OrderedDict)
+    end
+end
+
+"""
+    get_min_log_level(project_config, logger)
+
+Determine log level:
+- for optimisation runs, allow only logs >= GlobalInfo
+- for single simulations, set min log level to Info level
+
+Therefore, we need to have early-access to the flag "run_optimisation".
+
+# Arguments
+- `project_config::OrderedDict{String,Any}`: Base project configuration used to generate
+  simulation variants.
+- `logger::Union{Nothing,Resie_Logger.CustomLogger}`: Logger used for ReSiE
+# Returns
+- `min_log_level::LogLevel`: minimum log level used in ReSiE for logging
+"""
+function get_min_log_level(project_config, logger)
+    optimisation_config = get(project_config, "optimisation_parameters", nothing)
+    run_optimisation = optimisation_config isa AbstractDict &&
+                       get(optimisation_config, "run_optimisation", false) == true
+    if logger !== nothing
+        if run_optimisation
+            # for optimisation runs, allow only logs >= GlobalInfo
+            min_log_level = Logging.LogLevel(600)
+        else
+            # for single simulations, set min log level to Info level
+            min_log_level = Logging.Info
+        end
     end
 end
 
