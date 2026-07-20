@@ -6712,15 +6712,14 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                               objective_keys=nothing,
                                               objective_senses=nothing,
                                               color_key=nothing)
-    matrix = if io_settings["matrix_plot"] != "nothing"
-        create_matrix_plot(results,
-                           io_settings,
-                           sim_params;
-                           objective_keys=objective_keys,
-                           objective_senses=objective_senses,
-                           color_key=color_key)
-    else
-        ""
+    if io_settings["matrix_plot"] != "nothing"
+        matrix = create_matrix_plot(results,
+                                    io_settings,
+                                    sim_params;
+                                    objective_keys=objective_keys,
+                                    objective_senses=objective_senses,
+                                    color_key=color_key)
+        @globalInfo "Optimisation matrix plot created and saved to $matrix"
     end
 
     convergence = create_objective_convergence_plot(results,
@@ -6728,6 +6727,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                     sim_params;
                                                     objective_keys=objective_keys,
                                                     objective_senses=objective_senses)
+    @globalInfo "Optimisation convergence plot created and saved to $convergence"
 
     parameter_plots = create_objective_parameter_plots(results,
                                                        io_settings,
@@ -6735,6 +6735,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                        objective_keys=objective_keys,
                                                        objective_senses=objective_senses,
                                                        color_key=color_key)
+    @globalInfo "Optimisation parameter plot created and saved to $parameter_plots"
 
     parallel_coordinates = create_parallel_coordinates_plot(results,
                                                             io_settings,
@@ -6742,6 +6743,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                             objective_keys=objective_keys,
                                                             objective_senses=objective_senses,
                                                             color_key=color_key)
+    @globalInfo "Optimisation parallel plot created and saved to $parallel_coordinates"
 
     interactive_3d = create_interactive_3d_optimisation_plot(results,
                                                              io_settings,
@@ -6750,9 +6752,5 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                              objective_senses=objective_senses,
                                                              color_key=color_key)
 
-    return (; matrix,
-            convergence,
-            parameter_plots,
-            parallel_coordinates,
-            interactive_3d)
+    @globalInfo "Optimisation 3D plot created and saved to $interactive_3d"
 end
