@@ -140,6 +140,53 @@ function to_physical_optim_values(sample_values, bounds::AbstractMatrix{<:Real})
 end
 
 """
+    report_best_optimisation_result(all_results, optimiser)
+
+Log the best successfully evaluated single-objective optimisation result.
+Optimisation parameters are reported in their physical units.
+
+# Arguments
+- `all_results::Vector{Any}`: Results of all runs
+- `optimiser::Dict{String,Any}`: The dict with the optimiser parameters
+"""
+function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
+    if isempty(all_results)
+        @globalInfo "No optimisation result is available."
+        return
+    end
+
+    if optimiser["N_obj"] != 1
+        # No single best solution can be reported for multi-objective optimisation.
+        return
+    end
+
+    # Failed simulation runs use Inf as their objective and must not be selected.
+    valid_results = filter(all_results) do result
+        haskey(result, "objective") && result["objective"] isa Real && isfinite(result["objective"])
+    end
+
+    if isempty(valid_results)
+        @globalInfo "No valid optimisation solution was found."
+        return
+    end
+
+    objectives = Float64[result["objective"] for result in valid_results]
+    best_objective, best_idx = findmin(objectives)
+    best_result = valid_results[best_idx]
+
+    format_value(value) = value isa Real ?
+                          string(round(Float64(value); sigdigits=8)) :
+                          string(value)
+
+    parameter_lines = ["  $key = $(format_value(best_result[key]))" for key in optimiser["optim_params_keys"]]
+
+    @globalInfo("Best optimisation result:\n" *
+                "  Objective = $(format_value(best_objective))\n" *
+                "  Physical parameter values:\n" *
+                join(parameter_lines, "\n"))
+end
+
+"""
     monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, optim_results_path, 
                            project_config, idx, run_ID, run_lock, output_lock, 
                            results_lock)
@@ -698,11 +745,17 @@ function perform_optimisation(io_settings::Dict{String,Any},
         @globalInfo "$workflow_name interrupted by user after $main_runtime_minutes min " *
                     "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed. " *
                     "Recovering intermediate results..."
+
+        # detect and output best simulation result, independent of any package-specific results
+        report_best_optimisation_result(all_results, optimiser)
         return false, all_results
     end
 
     @globalInfo "$workflow_name completed in $main_runtime_minutes min " *
                 "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
+
+    # detect and output best simulation result, independent of any package-specific results
+    report_best_optimisation_result(all_results, optimiser)
 
     # Start sensitivity analysis based on the former and additional simulation runs.
     if optimiser["run_sensitivity"] && get(optimiser, "objective_function_name", "") == "multi-objective"
