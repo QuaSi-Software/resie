@@ -111,27 +111,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         return all_keys
     end
 
-    # Select keys for a channel, given its parsed mode and custom inputs
-    #TODO not used right now
-    function select_keys_for_channel(do_create::Bool,
-                                     mode::Symbol,
-                                     setting_name::String,
-                                     all_excl::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                                     all_incl::Union{Nothing,Vector{EnergySystems.OutputKey}};
-                                     custom_extractor::Function)
-        if !do_create
-            return nothing
-        end
-
-        if mode == :all_incl_flows
-            return all_incl
-        elseif mode == :all_excl_flows
-            return all_excl
-        else
-            return custom_extractor(io_settings[setting_name])
-        end
-    end
-
     # Economy and emissions filter
     function is_economic_emissions_key(ok::EnergySystems.OutputKey)
         occursin("OUT", ok.value_key) ||
