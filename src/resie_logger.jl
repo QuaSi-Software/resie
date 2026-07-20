@@ -3,7 +3,7 @@ module Resie_Logger
 using Dates
 using Logging
 
-export @balanceWarn, @globalInfo
+export @balanceWarn, @globalInfo, set_min_log_level!
 
 """
 CustomLogger
@@ -27,12 +27,18 @@ Avaiblable logging level:
  Warn           | @warn         | Logging.LogLevel( 1000)
  Error          | @error        | Logging.LogLevel( 2000)
 """
-struct CustomLogger <: Logging.AbstractLogger
+mutable struct CustomLogger <: Logging.AbstractLogger
     io_general::Union{IO,Nothing}
     io_balanceWarnings::Union{IO,Nothing}
     log_to_console::Bool
     log_to_file::Bool
     min_level::Logging.LogLevel
+end
+
+function set_min_log_level!(logger::CustomLogger,
+                            level::Logging.LogLevel)::CustomLogger
+    logger.min_level = level
+    return logger
 end
 
 """
@@ -106,7 +112,7 @@ function Logging.handle_message(logger::CustomLogger, level, message, _module, g
     if logger.log_to_console
         if level.level == BalanceWarning.level  # directly comparing the levels here as this is easier to implement
             handle_BalanceWarning_message(level, message)
-        elseif level.level == GlobalInfo.level 
+        elseif level.level == GlobalInfo.level
             handle_GlobalInfo_message(level, message)
         else
             default_logger = ConsoleLogger(stderr, logger.min_level)

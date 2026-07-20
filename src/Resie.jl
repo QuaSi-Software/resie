@@ -4,6 +4,7 @@ using Printf
 using Dates: now, seconds
 using UUIDs
 using Base.Threads
+using Logging
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -474,7 +475,7 @@ Load a project from the given file and run the simulation with it.
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function load_and_run(filepath::String, run_ID::UUID)::Bool
+function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resie_Logger.CustomLogger}=nothing)::Bool
     start = now()
     success = true
     @globalInfo "---- Simulation setup ----"
@@ -511,6 +512,17 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     sim_params = get_simulation_params(project_config, io_settings;
                                        preparation_cache=preparation_cache)
 
+    if logger !== nothing
+        if sim_params["optimisation"]["run_optimisation"]
+            # for optimisation runs, allow only logs >= GlobalInfo
+            min_log_level = Logging.LogLevel(600)
+        else
+            # for single simulations, set min log level to Info level
+            min_log_level = Logging.Info
+        end
+        Resie_Logger.set_min_log_level!(logger, min_log_level)
+    end
+
     if sim_params["optimisation"]["run_optimisation"]
         # perform multiple simulation runs
         success, all_results = perform_optimisation(io_settings, sim_params, project_config;
@@ -531,7 +543,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
                            preparation_cache=preparation_cache)
         catch e
             if e isa InterruptException
-                @globalInfo "Optimisation interrupted by user."
+                @globalInfo "Simulation interrupted by user."
                 success = false
             else
                 rethrow()
