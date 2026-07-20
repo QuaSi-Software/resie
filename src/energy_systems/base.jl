@@ -307,7 +307,13 @@ function _weighted_mean(values::Union{Floathing,Vector{<:Floathing}},
     end
 
     valid_weights = filter(!isnothing, weights)
-    normalized_weights = valid_weights ./ _sum(valid_weights)
+    valid_weights_sum = _sum(valid_weights)
+
+    if valid_weights_sum == 0.0 || valid_weights_sum === nothing
+        return 0.0
+    end
+
+    normalized_weights = valid_weights ./ valid_weights_sum
     valid_values = filter(!isnothing, values)
 
     if length(valid_values) != length(normalized_weights)
