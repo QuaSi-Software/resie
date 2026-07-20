@@ -6691,6 +6691,8 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                               objective_keys=nothing,
                                               objective_senses=nothing,
                                               color_key=nothing)
+    @globalInfo("Preparing optimisation figures...")
+
     if io_settings["matrix_plot"] != "nothing"
         matrix = create_matrix_plot(results,
                                     io_settings,

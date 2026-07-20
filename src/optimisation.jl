@@ -610,9 +610,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
                                preparation_cache=preparation_cache)
         end
 
-        # f takes and returns the normalised simulation parameter and results
-        # It converts the normalised sample_values from the optimiser to physical values 
-        # and converts the physical results from f_physical to normalised values
+        # f takes the normalised sample_values and converts them to physical values for the simulation run
         f = function (sample_values)
             physical_values = to_physical_optim_values(sample_values, optimiser["bounds"])
             return f_physical(physical_values)
@@ -626,7 +624,9 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
         # handles the progress logging of f
         f_progress = function (sample_values)
+            cancel_optimisation[] && throw(InterruptException())
             result = f(sample_values)
+            cancel_optimisation[] && throw(InterruptException())
 
             lock(progress_lock) do
                 progress_evaluations[] += 1
@@ -742,13 +742,18 @@ function perform_optimisation(io_settings::Dict{String,Any},
     main_run_count = length(all_results)
 
     if cancel_optimisation[]
+        # use snapshot to avoid interference from threads that may still be running
+        final_results = lock(results_lock) do
+            copy(all_results)
+        end
+        main_run_count = length(final_results)
         @globalInfo "$workflow_name interrupted by user after $main_runtime_minutes min " *
                     "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed. " *
                     "Recovering intermediate results..."
 
         # detect and output best simulation result, independent of any package-specific results
-        report_best_optimisation_result(all_results, optimiser)
-        return false, all_results
+        report_best_optimisation_result(final_results, optimiser)
+        return false, final_results
     end
 
     @globalInfo "$workflow_name completed in $main_runtime_minutes min " *
