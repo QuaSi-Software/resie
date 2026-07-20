@@ -302,6 +302,9 @@ mutable struct Profile
             end
         end
 
+        # validate data read from source
+        validate_finite_profile_values(profile_values, file_path; timestamps=profile_timestamps_date, context="input")
+
         # shift the profile timestep according to the given shift to get the correct definition:
         # Values are given as the mean/sum over the upcoming time step.
         if shift > Second(0)
@@ -411,6 +414,10 @@ mutable struct Profile
                                                             sunrise_sunset=sunrise_sunset,
                                                             do_not_shorten_profile=do_not_shorten_profile)
 
+        # validate converted data
+        validate_finite_profile_values(profile_values, file_path; timestamps=profile_timestamps_date,
+                                       context="converted")
+
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
         return new(sim_params["time_step_seconds"],   # Period [s]: time_step, equals simulation time step after conversion
@@ -466,6 +473,39 @@ function parse_datestamp(datetime_str::String,
                "timestamp given `$(datetime_str)`.\n The following error occured: $e"
         throw(InputError())
     end
+end
+
+"""
+Check a profile for NaN, Inf, and -Inf values.
+
+Throws `InputError` when one or more non-finite values are found.
+"""
+function validate_finite_profile_values(values::AbstractVector{<:Real},
+                                        file_path::AbstractString;
+                                        timestamps::Union{Nothing,AbstractVector{DateTime}}=nothing,
+                                        context::AbstractString="input")
+    invalid_indices = findall(value -> !isfinite(value), values)
+    isempty(invalid_indices) && return nothing
+
+    number_of_examples = min(length(invalid_indices), 10)
+    examples = String[]
+
+    for index in invalid_indices[1:number_of_examples]
+        location = timestamps !== nothing &&
+                   length(timestamps) == length(values) ?
+                   Dates.format(timestamps[index], dateformat"yyyy-mm-dd HH:MM:SS") : "index $index"
+        push!(examples, "$location = $(repr(values[index]))")
+    end
+
+    omitted = length(invalid_indices) - number_of_examples
+    omitted_text = omitted > 0 ? "; $omitted additional value(s) omitted" : ""
+
+    message = "The $context data of profile '$file_path' contains " *
+              "$(length(invalid_indices)) non-finite value(s), such as NaN or ±Inf. " *
+              "Examples: $(join(examples, ", "))$omitted_text"
+
+    @error message
+    throw(InputError(message))
 end
 
 """

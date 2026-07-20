@@ -4,6 +4,13 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.14.5
+* add check&error for profiles values being Inf or NaN
+* add possibility to apply storage_driven control module to storages used as source by adding the parameter "control_mode"
+* fix calculation of averaged input/output temperature in heat pump failing in certain cases and update reference output plot of scenario secondary_interface due to now fixed output temperature of heat pump
+* fix bug in set_storage_transfer!() for secondary interfaces of heat pumps 
+* clarify warn message in heat pump if COP falls below 1.0 if a plf_function is applied. This is still misleading as this warn message appear for single slices before a check is performed if min_usage_fraction is valid.
+
 ### Version 0.14.4
 * Improve error handling during project loading and component operation
   * Add clearer error messages for unknown component types
