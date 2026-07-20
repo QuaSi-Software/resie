@@ -990,8 +990,8 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
     ),
     "x_tol_abs" => (
         default=nothing,
-        description="Absolute tolerance for the objective parameters",
-        display_name="Absolute tolerance objective parameters",
+        description="Absolute tolerance for the normalised optimisation parameters (`optim_params`) in the range [0,1]",
+        display_name="Absolute tolerance of normalised optimisation parameters",
         required=false,
         conditionals=[("type", "is_one_of", ("Optim", "NLopt", "NOMAD"))],
         type=Float64,
@@ -1735,7 +1735,21 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             end
         end
     end
+
+    # check start values
+    if any(bounds[:, 3] .< bounds[:, 1]) || any(bounds[:, 3] .> bounds[:, 2])
+        @error "The start value of every optimisation parameter must lie within its bounds."
+        throw(InputError())
+    end
     optimiser["bounds"] = bounds
+
+    # normalise bounds and start values to [0,1]
+    ranges = bounds[:, 2] .- bounds[:, 1]
+    if any(ranges .<= 0.0)
+        @error "The maximum of every optimisation parameter must be greater than its minimum."
+        throw(InputError())
+    end
+    normalised_bounds = hcat(zeros(size(bounds, 1)), ones(size(bounds, 1)), (bounds[:, 3] .- bounds[:, 1]) ./ ranges)
 
     # read and parse objective_params
     optimiser["objective_keys_sum_mean"] = Dict{String,Any}()
@@ -1829,18 +1843,18 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         elseif optimiser_config["algorithm"] == "SAMIN"
             alg = Optim.SAMIN()
-            push!(optimiser["args"], bounds[:, 1])
-            push!(optimiser["args"], bounds[:, 2])
+            push!(optimiser["args"], normalised_bounds[:, 1])
+            push!(optimiser["args"], normalised_bounds[:, 2])
 
         elseif optimiser_config["algorithm"] == "ParticleSwarm"
-            alg = Optim.ParticleSwarm(; upper=bounds[:, 2], lower=bounds[:, 1])
+            alg = Optim.ParticleSwarm(; upper=normalised_bounds[:, 2], lower=normalised_bounds[:, 1])
         else
             @error "For optimisation type 'Optim' the algorithm has to be one of " *
                    "'NelderMead', 'SAMIN', 'ParticleSwarm'."
             throw(InputError())
         end
 
-        push!(optimiser["args"], bounds[:, 3])
+        push!(optimiser["args"], normalised_bounds[:, 3])
         push!(optimiser["args"], alg)
 
         optimiser["kwargs"] = Dict{Symbol,Any}()
@@ -1868,7 +1882,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     elseif optimiser_config["type"] == "BlackBoxOptim"
         alg = Symbol(optimiser_config["algorithm"])
 
-        optimiser["args"] = [bounds[:, 3]]
+        optimiser["args"] = [normalised_bounds[:, 3]]
         optimiser["kwargs"] = Dict{Symbol,Any}()
 
         if optimiser["objective_function_name"] == "multi-objective"
@@ -1883,8 +1897,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         end
 
         optimiser["kwargs"][:Method] = alg
-        optimiser["kwargs"][:SearchRange] = Tuple.(eachrow(bounds[:, 1:2]))
-        optimiser["kwargs"][:NumDimensions] = size(bounds, 1)
+        optimiser["kwargs"][:SearchRange] = Tuple.(eachrow(normalised_bounds[:, 1:2]))
+        optimiser["kwargs"][:NumDimensions] = size(normalised_bounds, 1)
         optimiser["kwargs"][:NThreads] = Threads.nthreads() - 1
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
@@ -1909,7 +1923,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         alg = getproperty(Metaheuristics, Symbol(optimiser_config["algorithm"]))
 
-        optimiser["args"] = Any[[bounds[:, 1] bounds[:, 2]]']
+        optimiser["args"] = Any[[normalised_bounds[:, 1] normalised_bounds[:, 2]]']
 
         args_alg = []
         kwargs_general = Dict{Symbol,Any}()
@@ -1927,7 +1941,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                        "objective_function='multi-objective'"
                 throw(InputError())
             end
-            push!(args_alg, Metaheuristics.gen_ref_dirs(size(bounds, 1), population_size))
+            push!(args_alg, Metaheuristics.gen_ref_dirs(size(normalised_bounds, 1), population_size))
         end
 
         if Threads.nthreads() > 1
@@ -1966,12 +1980,12 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             optimiser_config["algorithm"] = split(optimiser_config["algorithm"], "NLOPT_")[2]
         end
 
-        n_dim_opt = length(bounds[:, 1])
+        n_dim_opt = length(normalised_bounds[:, 1])
         alg = NLopt.Opt(Symbol(optimiser_config["algorithm"]), n_dim_opt)
         optimiser["kwargs"] = Dict{Symbol,Any}()
 
-        optimiser["kwargs"][:lower_bounds] = bounds[:, 1]
-        optimiser["kwargs"][:upper_bounds] = bounds[:, 2]
+        optimiser["kwargs"][:lower_bounds] = normalised_bounds[:, 1]
+        optimiser["kwargs"][:upper_bounds] = normalised_bounds[:, 2]
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:maxeval] = optimiser_config["max_runs"]
         end
@@ -1998,15 +2012,15 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         for (keyword, val) in pairs(optimiser["kwargs"])
             NLopt.setproperty!(alg, keyword, val)
         end
-        optimiser["args"] = [alg, bounds[:, 3]]
+        optimiser["args"] = [alg, normalised_bounds[:, 3]]
 
     elseif optimiser_config["type"] == "NOMAD"
         optimiser["kwargs"] = Dict{Symbol,Any}()
-        optimiser["kwargs"][:lower_bound] = bounds[:, 1]
-        optimiser["kwargs"][:upper_bound] = bounds[:, 2]
+        optimiser["kwargs"][:lower_bound] = normalised_bounds[:, 1]
+        optimiser["kwargs"][:upper_bound] = normalised_bounds[:, 2]
 
         if !isnothing(optimiser_config["x_tol_abs"])
-            optimiser["kwargs"][:min_mesh_size] = fill(optimiser_config["x_tol_abs"], length(start_values))
+            optimiser["kwargs"][:min_mesh_size] = fill(optimiser_config["x_tol_abs"], size(bounds, 1))
         end
 
         kwargs_general = Dict{Symbol,Any}()
@@ -2027,8 +2041,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         optimiser["kwargs"][:options] = NOMAD.NomadOptions(; kwargs_general...)
 
-        optimiser["args"] = [size(bounds, 1), optimiser["N_obj"],
-                             fill("OBJ", optimiser["N_obj"]), bounds[:, 3]]
+        optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
+                             fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]
 
     else
         #TODO plot outputs like pareto front -> example see optimisation-cli.jl

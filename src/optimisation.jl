@@ -133,6 +133,12 @@ function objective_for_optimiser(results::AbstractDict, optimiser::Dict{String,A
     return Float64.(objective) .* optimiser["objective_signs"]
 end
 
+# transform normalized optim_params back to physical values
+function to_physical_optim_values(sample_values, bounds::AbstractMatrix{<:Real})::Vector{Float64}
+    values = sample_values isa Real ? [Float64(sample_values)] : vec(Float64.(sample_values))
+    return bounds[:, 1] .+ values .* (bounds[:, 2] .- bounds[:, 1])
+end
+
 """
     monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, optim_results_path, 
                            project_config, idx, run_ID, run_lock, output_lock, 
@@ -477,16 +483,15 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
                     # decide which algorithm to run based on type of optimiser
                     if optimiser["type"] == "parametervariation"
-                        normalised_sample_values = sample_values isa Real ?
-                                                   Float64(sample_values) :
-                                                   Float64.(collect(sample_values))
+                        float_sample_values = sample_values isa Real ? Float64(sample_values) :
+                                              Float64.(collect(sample_values))
 
                         optim_func!(all_results,
                                     io_settings,
                                     sim_params,
                                     optim_results_path,
                                     project_config,
-                                    normalised_sample_values,
+                                    float_sample_values,
                                     run_lock,
                                     output_lock,
                                     results_lock;
@@ -545,15 +550,25 @@ function perform_optimisation(io_settings::Dict{String,Any},
         end
     else
         # generic optimisation function
-        f = function (sample_values)
+        # f_physical takes and returns the physical correct simulation parameter and results
+        f_physical = function (sample_values)
             if cancel_optimisation[]
                 throw(InterruptException())
             end
+
             return optim_func!(all_results, io_settings, sim_params, optim_results_path,
                                project_config, sample_values,
                                run_lock, output_lock, results_lock;
                                cancel_flag=cancel_optimisation,
                                preparation_cache=preparation_cache)
+        end
+
+        # f takes and returns the normalised simulation parameter and results
+        # It converts the normalised sample_values from the optimiser to physical values 
+        # and converts the physical results from f_physical to normalised values
+        f = function (sample_values)
+            physical_values = to_physical_optim_values(sample_values, optimiser["bounds"])
+            return f_physical(physical_values)
         end
 
         # handle Logging for all algorithms
@@ -562,6 +577,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
         progress_best = Ref(Inf)
         progress_every = get(optimiser, "progress_every", 1)
 
+        # handles the progress logging of f
         f_progress = function (sample_values)
             result = f(sample_values)
 
@@ -704,7 +720,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
                                          optimiser["optim_params_keys"], sim_params, cancel_optimisation)
 
             else
-                calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results,
+                calc_global_sensitivity!(f_physical, optimiser["bounds"][:, 1:2], all_results,
                                          optimiser["optim_params_keys"], sim_params, cancel_optimisation)
             end
         catch e
