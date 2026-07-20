@@ -864,8 +864,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         display_name="optimisation type",
         required=false,
         conditionals=["run_optimisation", "is", true],
-        options=["parametervariation", "monte_carlo_annealing", "Optim", "BlackBoxOptim", 
-                 "Metaheuristics", "NLopt", "NOMAD"],
+        options=["parametervariation", "Optim", "BlackBoxOptim", "Metaheuristics", "NLopt", "NOMAD"],
         type=String,
         json_type="string",
         unit="-"
@@ -889,8 +888,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         display_name="Optimisation algorithm",
         required=false,
         conditionals=[("type", "is_one_of", 
-                       ("Optim", "BlackBoxOptim", "Metaheuristics", "NLopt", 
-                        "parametervariation")
+                       ("Optim", "BlackBoxOptim", "Metaheuristics", "NLopt", "parametervariation")
                        )],
         type=String,
         json_type="string",
@@ -1855,10 +1853,6 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                    "`random_*`, where * is a integer]" *
                    throw(InputError())
         end
-
-    elseif optimiser_config["type"] == "monte_carlo_annealing"
-        optimiser["iterator"] = range(1, optimiser_config["max_runs"]; step=1)
-        optimiser["nbh_scale"] = default(optimiser_config, "nbh_scale", 0.5)
 
     elseif optimiser_config["type"] == "Optim"
         if optimiser["objective_function_name"] == "multi-objective"

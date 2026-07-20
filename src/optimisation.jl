@@ -187,91 +187,6 @@ function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Di
 end
 
 """
-    monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, optim_results_path, 
-                           project_config, idx, run_ID, run_lock, output_lock, 
-                           results_lock)
-
-Combined monte carlo and simulated annealing algorithm. The temperature determines if a 
-completely random or existing sample is used as starting point, determines the size of the 
-neighborhood and the number of results (sorted by) global measure, from which a new sample 
-is drawn.
-
-# Arguments
-- `all_results::Vector{Any}`: Results of all runs
-- `io_settings::Dict{String,Any}`: IO settings used for simulation output and result writing.
-- `obj::Array{Union{Float64,Nothing}}`: Objectives for optimisation
-- `obj_lock::ReentrantLock`:: Lock for obj
-- `sim_params::Dict{String,Any}`: Simulation parameters
-- `optim_results_path::String`: Filepath for optim_results
-- `project_config::OrderedDict{String,Any}`: The project config
-- `idx::Int64`: The current run number 
-- `run_ID::UUID`: The run ID used in the run registry
-- `run_lock::ReentrantLock`: Lock for writing to current_runs
-- `output_lock::ReentrantLock`: Lock for file at optim_results_path
-- `results_lock::ReentrantLock`: Lock for all_results
-- `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
-"""
-function monte_carlo_annealing!(all_results::Vector{Any}, io_settings::Dict{String,Any},
-                                obj::Array{Union{Float64,Nothing}}, obj_lock::ReentrantLock,
-                                sim_params::Dict{String,Any}, optim_results_path::String,
-                                project_config::OrderedDict{String,Any}, idx::Int64,
-                                run_ID::UUID, run_lock::ReentrantLock,
-                                output_lock::ReentrantLock, results_lock::ReentrantLock;
-                                cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
-                                preparation_cache::Union{Nothing,PreparationCache}=nothing)
-    optimiser = sim_params["optimisation"]
-    # temperature schedule is simple inverse logistic curve
-    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimiser["iterator"]) - 0.5)))
-
-    if length(all_results) == 0 || rand() < temperature
-        # set parameters to equally distributed random values across whole parameter space
-        sample_params = Dict{String,Any}()
-        for (key, values) in zip(optimiser["optim_params_keys"], optimiser["optim_params_values"])
-            sample_params[key] = rand(values)
-        end
-    else
-        # set parameters to neighborhood of existing result, drawn from the top results
-        # by global measure, where temperature determines the results pool and size of
-        # neighborhood
-        sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
-        # sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
-        sample = all_results[sample_idx]
-
-        sample_params = Dict{String,Any}()
-        for (key, values) in zip(optimiser["optim_params_keys"], optimiser["optim_params_values"])
-            range = optimiser["nbh_scale"] * temperature * (maximum(values) - minimum(values))
-            value = sample[key] + rand((-0.5 * range):(0.5 * range))
-            sample_params[key] = clamp(value, minimum(values), maximum(values))
-        end
-    end
-
-    # run sim and calculate objective results
-    results = run_sample(io_settings, sim_params, optim_results_path, project_config,
-                         sample_params, run_ID, run_lock, output_lock;
-                         suppress_all_output=optimiser["disable_all_simulation_outputs"],
-                         cancel_flag=cancel_flag,
-                         preparation_cache=preparation_cache)
-
-    # calculate minimum of results
-    if any(!isnothing(obj))
-        @lock obj_lock obj = results["objective"]
-    else
-        @lock obj_lock obj .= min.(obj, results["objective"])
-    end
-
-    # write output to all_results
-    lock(results_lock) do
-        push!(all_results, results)
-
-        # calculate global measure and sort by it
-        for res in all_results
-            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(optimiser["objective_params_keys"], obj))
-        end
-        sort!(all_results; by=x -> x["gm"])
-    end
-end
-
-"""
     calc_global_sensitivity!(model_function, bounds, all_results, sim_params)
 
 Calculate the global sensitivity indices with polynomial chaos expansion (PCE). A 
@@ -509,10 +424,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
     main_start_time = now()
 
     if length(optimiser["iterator"]) > 1
-        if optimiser["type"] == "monte_carlo_annealing"
-            obj = Array{Union{Float64,Nothing}}(nothing)
-            obj_lock = ReentrantLock()
-        end
+        ## Run predefined parameter sets
         try
             # handling status
             variation_start_time = now()
@@ -520,6 +432,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
             max_runs = length(optimiser["iterator"])
             worker_count = min(Threads.nthreads(), max_runs)
 
+            # run parameter sets on multi threads
             @threads for sample_values in collect(optimiser["iterator"])
                 if cancel_optimisation[]
                     continue
@@ -527,42 +440,21 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
                 try
                     run_start_time = now()
+                    float_sample_values = sample_values isa Real ? Float64(sample_values) :
+                                          Float64.(collect(sample_values))
+                    optim_func!(all_results,
+                                io_settings,
+                                sim_params,
+                                optim_results_path,
+                                project_config,
+                                float_sample_values,
+                                run_lock,
+                                output_lock,
+                                results_lock;
+                                cancel_flag=cancel_optimisation,
+                                preparation_cache=preparation_cache)
 
-                    # decide which algorithm to run based on type of optimiser
-                    if optimiser["type"] == "parametervariation"
-                        float_sample_values = sample_values isa Real ? Float64(sample_values) :
-                                              Float64.(collect(sample_values))
-
-                        optim_func!(all_results,
-                                    io_settings,
-                                    sim_params,
-                                    optim_results_path,
-                                    project_config,
-                                    float_sample_values,
-                                    run_lock,
-                                    output_lock,
-                                    results_lock;
-                                    cancel_flag=cancel_optimisation,
-                                    preparation_cache=preparation_cache)
-
-                    elseif optimiser["type"] == "monte_carlo_annealing"
-                        # TODO this is not working currently...
-                        monte_carlo_annealing!(all_results,
-                                               io_settings,
-                                               obj,
-                                               obj_lock,
-                                               sim_params,
-                                               optim_results_path,
-                                               project_config,
-                                               sample_values,
-                                               sample_ID,
-                                               run_lock,
-                                               output_lock,
-                                               results_lock;
-                                               cancel_flag=cancel_optimisation,
-                                               preparation_cache=preparation_cache)
-                    end
-
+                    # handle logging
                     runtime_seconds = round(Int, seconds(now() - run_start_time))
                     runtime_minutes, runtime_remaining_seconds = divrem(runtime_seconds, 60)
                     completed = atomic_add!(completed_runs, 1) + 1
@@ -596,6 +488,7 @@ function perform_optimisation(io_settings::Dict{String,Any},
             end
         end
     else
+        ## Run optimisation
         # generic optimisation function
         # f_physical takes and returns the physical correct simulation parameter and results
         f_physical = function (sample_values)
@@ -731,8 +624,6 @@ function perform_optimisation(io_settings::Dict{String,Any},
     # handle info messages
     workflow_name = if optimiser["type"] == "parametervariation"
         "Parameter variation"
-    elseif optimiser["type"] == "monte_carlo_annealing"
-        "Monte Carlo annealing"
     else
         "Optimisation"
     end
