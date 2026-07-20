@@ -242,7 +242,9 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
                                   bounds::Array{Float64},
                                   all_results::Vector{Any},
                                   optim_params_keys::Array{String},
-                                  sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64},Float64,Float64}
+                                  sim_params::Dict{String,Any},
+                                  cancel_optimisation::Threads.Atomic{Bool})::Tuple{Vector{Float64},Vector{Float64},
+                                                                                    Float64,Float64}
     d = size(bounds, 1)
     deg = 3
     op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
@@ -293,31 +295,75 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
         X_phys = Array{Float64}(undef, 0, d)
     end
 
+    target_rel_rmse = 0.1
+    target_r2 = 0.9
+
     if model_function !== nothing
-        print = true
-        while (rel_rmse > 0.1 || r2 < 0.9) && length(y) < sim_params["optimisation"]["max_runs"] * 2
-            if print
-                @globalInfo "Performing additional runs for sensitivity analysis."
-                print = false
+        print_message = true
+        maximum_sensitivity_runs = sim_params["optimisation"]["max_runs"] * 2
+        status_lock = ReentrantLock()
+        try
+            while (rel_rmse > target_rel_rmse || r2 < target_r2) && length(y) < maximum_sensitivity_runs
+                if print_message
+                    @globalInfo("Performing additional runs for sensitivity analysis.\n" *
+                                "Press Ctrl+C any time to stop creating additional runs and to " *
+                                "calculate the sensitivity from the already completed runs.")
+                    print_message = false
+                end
+
+                current_sample_count = length(y)
+                if current_sample_count < mop.dim
+                    n_new = max(mop.dim + 1 - current_sample_count, Threads.nthreads())
+                else
+                    n_new = Threads.nthreads()
+                end
+
+                # Do not exceed the configured sensitivity-run limit.
+                remaining_runs = maximum_sensitivity_runs - current_sample_count
+                n_new = min(n_new, remaining_runs)
+                n_new > 0 || break
+
+                X_std_new = rand(n_new, d) .* 2 .- 1
+                X_phys_new = hcat([to_phys.(X_std_new[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+
+                y_new = zeros(Float64, n_new)
+                completed_in_batch = Ref(0)
+                Threads.@threads for i in 1:n_new
+                    y_new[i] = model_function(X_phys_new[i, :])
+
+                    lock(status_lock) do
+                        completed_in_batch[] += 1
+                        total_completed = current_sample_count + completed_in_batch[]
+                        @globalInfo "Sensitivity status: $total_completed of up to $maximum_sensitivity_runs runs completed."
+                    end
+                end
+
+                # Create candidate arrays first. They are committed only
+                # after the new surrogate fit has completed successfully.
+                X_phys_candidate = vcat(X_phys, X_phys_new)
+                y_candidate = vcat(y, y_new)
+                X_std_candidate = hcat([to_std.(X_phys_candidate[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
+
+                coeffs_candidate, rel_rmse_candidate, r2_candidate = fit_surrogate(X_std_candidate, y_candidate, mop)
+
+                # Commit only a completely simulated and fitted batch.
+                X_phys = X_phys_candidate
+                y = y_candidate
+                coeffs = coeffs_candidate
+                rel_rmse = rel_rmse_candidate
+                r2 = r2_candidate
+
+                @globalInfo("Current quality: relative RMSE=$(round(rel_rmse; digits=4)) (goal <= $target_rel_rmse), " *
+                            "R²=$(round(r2; digits=4)) (goal >= $target_r2).")
             end
-            if n_existing < mop.dim
-                n_new = max(mop.dim - n_existing, Threads.nthreads())
+        catch e
+            if e isa InterruptException
+                cancel_optimisation[] = true
+                @globalInfo("Additional sensitivity runs interrupted by Ctrl+C. " *
+                            "Continuing sensitivity calculation with $(length(y)) completed runs.")
             else
-                n_new = max(mop.dim, Threads.nthreads())
+                rethrow()
             end
-
-            X_std_new = rand(n_new, d) .* 2 .- 1
-            X_phys_new = hcat([to_phys.(X_std_new[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
-            y_new = zeros(n_new)
-            @threads for i in 1:n_new
-                y_new[i] = model_function(X_phys_new[i, :])
-            end
-
-            X_phys = vcat(X_phys, X_phys_new)
-            y = vcat(y, y_new)
-
-            X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
-            coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
         end
     end
 
@@ -339,7 +385,7 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
     S_total ./= total_var
 
     width = length.(optim_params_keys)
-    @globalInfo "Global sensitivity: \n" *
+    @globalInfo "Global sensitivity results: \n" *
                 "\t $(join(optim_params_keys, "\t")) \n" *
                 "S_total\t $(join(rpad.(round.(S_total, digits=3), width), "\t")) \n" *
                 "S_first\t $(join(rpad.(round.(S_first, digits=3), width), "\t")) \n" *
@@ -655,11 +701,11 @@ function perform_optimisation(io_settings::Dict{String,Any},
         try
             if length(optimiser["iterator"]) > 1
                 calc_global_sensitivity!(nothing, optimiser["bounds"][:, 1:2], all_results,
-                                         optimiser["optim_params_keys"], sim_params)
+                                         optimiser["optim_params_keys"], sim_params, cancel_optimisation)
 
             else
                 calc_global_sensitivity!(f, optimiser["bounds"][:, 1:2], all_results,
-                                         optimiser["optim_params_keys"], sim_params)
+                                         optimiser["optim_params_keys"], sim_params, cancel_optimisation)
             end
         catch e
             if e isa InterruptException
