@@ -1852,8 +1852,14 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                    "`random_*`, where * is a integer]" *
                    throw(InputError())
         end
+    else
+        configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
+    end
+    return optimiser
+end
 
-    elseif optimiser_config["type"] == "Optim"
+function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
+    if optimiser_config["type"] == "Optim"
         if optimiser["objective_function_name"] == "multi-objective"
             @error "Objective function multi-objective not supported for algorithms from " *
                    "package 'Optim'"
@@ -1943,7 +1949,8 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
     elseif optimiser_config["type"] == "Metaheuristics"
         m_obj_algs = ["MOEAD_DE", "NSGA2", "NSGA3", "SMS_EMOA", "SPEA2", "CCMO"]
-        if optimiser["objective_function_name"] == "multi-objective" && !(optimiser_config["algorithm"] in m_obj_algs)
+        if optimiser["objective_function_name"] == "multi-objective" &&
+           !(optimiser_config["algorithm"] in m_obj_algs)
             @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
                    "support multi-objective optimisation. Choose a different " *
                    "objective_function or algorithm, e.g. one of $(join(string.(m_obj_algs), ", "))."
@@ -2084,8 +2091,6 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
                              fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]
     end
-
-    return optimiser
 end
 
 function parse_objective_function(eff_def::String,

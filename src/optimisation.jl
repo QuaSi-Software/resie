@@ -126,6 +126,27 @@ function to_physical_optim_values(sample_values, bounds::AbstractMatrix{<:Real})
     return bounds[:, 1] .+ values .* (bounds[:, 2] .- bounds[:, 1])
 end
 
+# transform physical optim_params to normalized values
+function to_normalised_optim_values(sample_values, bounds::AbstractMatrix{<:Real})
+    values = sample_values isa Real ? [Float64(sample_values)] : vec(Float64.(sample_values))
+    return (values .- bounds[:, 1]) ./ (bounds[:, 2] .- bounds[:, 1])
+end
+
+function best_optimisation_result(all_results::AbstractVector, optimiser::Dict{String,Any})
+    optimiser["N_obj"] == 1 || return nothing
+
+    valid_results = filter(all_results) do result
+        result isa AbstractDict || return false
+
+        objective = get(result, "objective", nothing)
+        return objective isa Real && isfinite(objective)
+    end
+
+    isempty(valid_results) && return nothing
+
+    return valid_results[argmin(result["objective"] for result in valid_results)]
+end
+
 """
     report_best_optimisation_result(all_results, optimiser)
 
@@ -136,7 +157,7 @@ Optimisation parameters are reported in their physical units.
 - `all_results::Vector{Any}`: Results of all runs
 - `optimiser::Dict{String,Any}`: The dict with the optimiser parameters
 """
-function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
+function report_best_optimisation_result(all_results::AbstractVector, optimiser::Dict{String,Any})
     if isempty(all_results)
         @globalInfo "No optimisation result is available."
         return
@@ -148,19 +169,12 @@ function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Di
         return
     end
 
-    # Failed simulation runs use Inf as their objective and must not be selected.
-    valid_results = filter(all_results) do result
-        haskey(result, "objective") && result["objective"] isa Real && isfinite(result["objective"])
-    end
+    best_result = best_optimisation_result(all_results, optimiser)
 
-    if isempty(valid_results)
+    if isnothing(best_result)
         @globalInfo "No valid optimisation solution was found."
         return
     end
-
-    objectives = Float64[result["objective"] for result in valid_results]
-    best_objective, best_idx = findmin(objectives)
-    best_result = valid_results[best_idx]
 
     format_value(value) = value isa Real ?
                           string(round(Float64(value); sigdigits=8)) :
@@ -169,7 +183,7 @@ function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Di
     parameter_lines = ["  $key = $(format_value(best_result[key]))" for key in optimiser["optim_params_keys"]]
 
     @globalInfo("Best optimisation result:\n" *
-                "  Objective = $(format_value(best_objective))\n" *
+                "  Objective = $(format_value(best_result["objective"]))\n" *
                 "  Physical parameter values:\n" *
                 join(parameter_lines, "\n"))
 end
@@ -528,92 +542,8 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
             return result
         end
-
         try
-            if optimiser["type"] == "Optim"
-                Optim.optimize(f_progress, optimiser["args"]...)
-            elseif optimiser["type"] == "BlackBoxOptim"
-                if optimiser["N_obj"] == 1
-                    f_wrap = f_progress
-                else
-                    f_wrap(x) = Tuple(f_progress(x))
-                end
-                BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
-            elseif optimiser["type"] == "Metaheuristics"
-                # Scalar evaluation: used by MOEA/D-DE and other non-batch algorithms.
-                function f_metaheuristics(sample_values::AbstractVector)
-                    result = f_progress(sample_values)
-
-                    if optimiser["N_obj"] == 1
-                        return Float64(result)
-                    end
-                    # Metaheuristics multi-objective scalar callback format:
-                    # (objectives, inequality constraints, equality constraints)
-                    return vec(Float64.(result)), [0.0], [0.0]
-                end
-
-                # Batch evaluation: used only by algorithms supporting parallel_evaluation.
-                function f_metaheuristics(sample_values::AbstractMatrix)
-                    N_samples = size(sample_values, 1)
-                    objectives = zeros(N_samples, optimiser["N_obj"])
-
-                    Threads.@threads for i in 1:N_samples
-                        if cancel_optimisation[]
-                            continue
-                        end
-
-                        try
-                            result = f_progress(view(sample_values, i, :))
-
-                            if optimiser["N_obj"] == 1
-                                objectives[i, 1] = Float64(result)
-                            else
-                                objectives[i, :] = vec(Float64.(result))
-                            end
-                        catch e
-                            if e isa InterruptException
-                                cancel_optimisation[] = true
-                            else
-                                rethrow()
-                            end
-                        end
-                    end
-
-                    if cancel_optimisation[]
-                        throw(InterruptException())
-                    end
-
-                    if optimiser["N_obj"] == 1
-                        return vec(objectives)
-                    else
-                        return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
-                    end
-                end
-
-                res = Metaheuristics.optimize(f_metaheuristics, optimiser["args"]...)
-                @globalInfo "Metaheuristics optimisation result:\n$res"
-
-            elseif optimiser["type"] == "NLopt"
-                f_nlopt = function (sample_values, gradient)
-                    return f_progress(sample_values)
-                end
-                NLopt.min_objective!(optimiser["args"][1], f_nlopt)
-                res = NLopt.optimize(optimiser["args"]...)
-                @globalInfo "NLopt optimisation results: $res"
-            elseif optimiser["type"] == "NOMAD"
-                f_nomad = function (sample_values)
-                    result = f_progress(sample_values)
-                    outputs = result isa Real ? [Float64(result)] : Float64.(collect(result))
-                    success = all(isfinite, outputs)
-                    return success, true, outputs
-                end
-
-                prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]...,
-                                          f_nomad;
-                                          optimiser["kwargs"]...)
-
-                NOMAD.solve(prob, optimiser["args"][4])
-            end
+            run_optimiser_backend!(optimiser, f_progress, cancel_optimisation)
         catch e
             if e isa InterruptException
                 cancel_optimisation[] = true
@@ -721,4 +651,93 @@ function perform_optimisation(io_settings::Dict{String,Any},
     end
 
     return true, all_results
+end
+
+function run_optimiser_backend!(optimiser::Dict{String,Any}, f_progress::Function,
+                                cancel_optimisation::Threads.Atomic{Bool})
+    if optimiser["type"] == "Optim"
+        return Optim.optimize(f_progress, optimiser["args"]...)
+    elseif optimiser["type"] == "BlackBoxOptim"
+        if optimiser["N_obj"] == 1
+            f_wrap = f_progress
+        else
+            f_wrap(x) = Tuple(f_progress(x))
+        end
+
+        return BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
+    elseif optimiser["type"] == "Metaheuristics"
+        # Scalar evaluation: used by MOEA/D-DE and other non-batch algorithms.
+        function f_metaheuristics(sample_values::AbstractVector)
+            result = f_progress(sample_values)
+
+            if optimiser["N_obj"] == 1
+                return Float64(result)
+            end
+            # Metaheuristics multi-objective scalar callback format:
+            # (objectives, inequality constraints, equality constraints)
+            return vec(Float64.(result)), [0.0], [0.0]
+        end
+
+        # Batch evaluation: used only by algorithms supporting parallel_evaluation.
+        function f_metaheuristics(sample_values::AbstractMatrix)
+            N_samples = size(sample_values, 1)
+            objectives = zeros(N_samples, optimiser["N_obj"])
+
+            Threads.@threads for i in 1:N_samples
+                if cancel_optimisation[]
+                    continue
+                end
+
+                try
+                    result = f_progress(view(sample_values, i, :))
+
+                    if optimiser["N_obj"] == 1
+                        objectives[i, 1] = Float64(result)
+                    else
+                        objectives[i, :] = vec(Float64.(result))
+                    end
+                catch e
+                    if e isa InterruptException
+                        cancel_optimisation[] = true
+                    else
+                        rethrow()
+                    end
+                end
+            end
+
+            if cancel_optimisation[]
+                throw(InterruptException())
+            end
+
+            if optimiser["N_obj"] == 1
+                return vec(objectives)
+            else
+                return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
+            end
+        end
+
+        return Metaheuristics.optimize(f_metaheuristics, optimiser["args"]...)
+    elseif optimiser["type"] == "NLopt"
+        f_nlopt = function (sample_values, gradient)
+            return f_progress(sample_values)
+        end
+        NLopt.min_objective!(optimiser["args"][1], f_nlopt)
+
+        return NLopt.optimize(optimiser["args"]...)
+    elseif optimiser["type"] == "NOMAD"
+        f_nomad = function (sample_values)
+            result = f_progress(sample_values)
+            outputs = result isa Real ? [Float64(result)] : Float64.(collect(result))
+            success = all(isfinite, outputs)
+            return success, true, outputs
+        end
+
+        prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]...,
+                                  f_nomad;
+                                  optimiser["kwargs"]...)
+
+        return NOMAD.solve(prob, optimiser["args"][4])
+    end
+
+    @error "Unsupported optimiser type: $(optimiser["type"])"
 end
