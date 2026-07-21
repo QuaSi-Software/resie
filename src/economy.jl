@@ -28,6 +28,7 @@ Base.@kwdef mutable struct EconomicResult
     total_annuity::Float64 = 0.0
     annuity_capex::Float64 = 0.0
     annuity_opex::Float64 = 0.0
+    annuity_opex_including_energies::Float64 = 0.0
     annuity_energies::Float64 = 0.0
     breakdown::Dict{String,Any} = Dict{String,Any}()
 end
@@ -165,6 +166,7 @@ function calculate_economy(shared_data::Vector{EconomyEmissionsData}, sim_params
         # start and end energy of storage?! TODO
     end
     result.total_annuity = result.annuity_capex + result.annuity_opex + result.annuity_energies
+    result.annuity_opex_including_energies = result.annuity_opex + result.annuity_energies
     return result
 end
 
