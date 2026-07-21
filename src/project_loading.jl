@@ -1924,7 +1924,11 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         optimiser["kwargs"][:Method] = alg
         optimiser["kwargs"][:SearchRange] = Tuple.(eachrow(normalised_bounds[:, 1:2]))
         optimiser["kwargs"][:NumDimensions] = size(normalised_bounds, 1)
-        optimiser["kwargs"][:NThreads] = Threads.nthreads() - 1
+        n_evaluation_threads = Threads.nthreads(:default) - 1
+        if n_evaluation_threads > 1
+            optimiser["kwargs"][:NThreads] = n_evaluation_threads
+            optimiser["kwargs"][:PopulationSize] = max(20, 4 * n_evaluation_threads)
+        end
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
         end
@@ -1942,7 +1946,7 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         if optimiser["objective_function_name"] == "multi-objective" && !(optimiser_config["algorithm"] in m_obj_algs)
             @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
                    "support multi-objective optimisation. Choose a different " *
-                   "objective_function or algorithm."
+                   "objective_function or algorithm, e.g. one of $(join(string.(m_obj_algs), ", "))."
             throw(InputError())
         end
 
@@ -1950,15 +1954,11 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
 
         optimiser["args"] = Any[[normalised_bounds[:, 1] normalised_bounds[:, 2]]']
 
-        args_alg = []
+        args_alg = Any[]
         kwargs_general = Dict{Symbol,Any}()
         kwargs_alg = Dict{Symbol,Any}()
 
-        if !isnothing(optimiser_config["max_runs"]) && optimiser_config["max_runs"] < 100
-            @warn "'max_runs' of optimiser are smaller than algorithm default for " *
-                  "one generation of 100. This may lead to poor results."
-            kwargs_alg[:N] = ceil(optimiser_config["max_runs"]/4)
-        end
+        optim_kwargs = get(optimiser_config, "optim_kwargs", Dict{String,Any}())
 
         if optimiser_config["algorithm"] == "MOEAD_DE"
             if optimiser["N_obj"] == 1
@@ -1966,7 +1966,16 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
                        "objective_function='multi-objective'"
                 throw(InputError())
             end
-            push!(args_alg, Metaheuristics.gen_ref_dirs(size(normalised_bounds, 1), population_size))
+
+            n_partitions = get(optim_kwargs, "n_partitions", 12)
+            reference_directions = Metaheuristics.gen_ref_dirs(optimiser["N_obj"], n_partitions)
+
+            push!(args_alg, reference_directions)
+        end
+
+        if !isnothing(optimiser_config["max_runs"]) && optimiser_config["max_runs"] < 100 && :N in fieldnames(alg)
+            @warn "'max_runs' is smaller than the default population size of 100. This may lead to poor results."
+            kwargs_alg[:N] = max(2, ceil(Int, optimiser_config["max_runs"] / 4))
         end
 
         if Threads.nthreads() > 1
@@ -1979,15 +1988,22 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
             kwargs_general[:time_limit] = optimiser_config["max_time"]
         end
 
-        if haskey(optimiser_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
-                if Symbol(keyword) in fieldnames(Metaheuristics.Options)
-                    kwargs_general[Symbol(keyword)] = val
-                elseif Symbol(keyword) in fieldnames(alg)
-                    kwargs_alg[Symbol(keyword)] = val
-                end
+        for (keyword, val) in pairs(optim_kwargs)
+            # This is consumed above when constructing MOEA/D weights.
+            keyword == "n_partitions" && continue
+
+            key = Symbol(keyword)
+
+            if key in fieldnames(Metaheuristics.Options)
+                kwargs_general[key] = val
+            elseif key in fieldnames(alg)
+                kwargs_alg[key] = val
+            else
+                @warn "Unknown Metaheuristics option '$keyword' for " *
+                      "algorithm '$(optimiser_config["algorithm"])'."
             end
         end
+
         options = Metaheuristics.Options(; kwargs_general...)
         if optimiser_config["algorithm"] == "CCMO"
             push!(optimiser["args"], alg(Metaheuristics.NSGA2(args_alg...; kwargs_alg...); options=options))
@@ -2065,7 +2081,6 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         end
 
         optimiser["kwargs"][:options] = NOMAD.NomadOptions(; kwargs_general...)
-
         optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
                              fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]
     end
@@ -2157,22 +2172,16 @@ function parse_objective_senses(objective_keys::Vector{String},
         )
 
         configured_keys = collect(keys(normalized))
-
-        missing_keys = setdiff(objective_keys,
-                               configured_keys)
-
-        unknown_keys = setdiff(configured_keys,
-                               objective_keys)
+        missing_keys = setdiff(objective_keys, configured_keys)
+        unknown_keys = setdiff(configured_keys, objective_keys)
 
         if !isempty(missing_keys)
-            @error("objective_senses is missing directions for: " *
-                   join(missing_keys, ", "),)
+            @error ("objective_senses is missing directions for: " * join(missing_keys, ", "))
             throw(InputError())
         end
 
         if !isempty(unknown_keys)
-            @error("objective_senses contains unknown objective keys: " *
-                   join(unknown_keys, ", "),)
+            @error ("objective_senses contains unknown objective keys: " * join(unknown_keys, ", "),)
             throw(InputError())
         end
 
@@ -2182,8 +2191,7 @@ function parse_objective_senses(objective_keys::Vector{String},
             sense = Symbol(lowercase(strip(String(normalized[key]))))
 
             if !(sense in (:min, :max))
-                @error("The objective sense for \"$key\" must be " *
-                       "`min` or `max`, got \"$(normalized[key])\".",)
+                @error("The objective sense for \"$key\" must be " * "`min` or `max`, got \"$(normalized[key])\".",)
                 throw(InputError())
             end
 

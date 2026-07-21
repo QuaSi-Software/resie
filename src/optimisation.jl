@@ -144,6 +144,7 @@ function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Di
 
     if optimiser["N_obj"] != 1
         # No single best solution can be reported for multi-objective optimisation.
+        @globalInfo "No single best solution can be reported for multi-objective optimisation."
         return
     end
 
@@ -539,45 +540,57 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 end
                 BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
             elseif optimiser["type"] == "Metaheuristics"
-                #TODO implement batch evaluation for other packages that need it        
-                if Threads.nthreads() > 1
-                    if optimiser["N_obj"] == 1
-                        f_arr(x) = [f_progress(x)]
-                    else
-                        f_arr = f_progress
-                    end
-                    f_wrap = function (sample_values)
-                        N_samples = size(sample_values, 1)
-                        if N_samples > 1
-                            objectives = zeros(N_samples, optimiser["N_obj"])
-                            @threads for i in 1:N_samples
-                                if cancel_optimisation[]
-                                    continue
-                                end
+                # Scalar evaluation: used by MOEA/D-DE and other non-batch algorithms.
+                function f_metaheuristics(sample_values::AbstractVector)
+                    result = f_progress(sample_values)
 
-                                try
-                                    objectives[i, :] = f_arr(sample_values[i, :])
-                                catch e
-                                    if e isa InterruptException
-                                        cancel_optimisation[] = true
-                                    else
-                                        rethrow()
-                                    end
-                                end
-                            end
-                            if cancel_optimisation[]
-                                throw(InterruptException())
-                            end
-                        else
-                            objectives = f_arr(sample_values)
-                        end
-                        return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
+                    if optimiser["N_obj"] == 1
+                        return Float64(result)
                     end
-                else
-                    f_wrap = f_progress
+                    # Metaheuristics multi-objective scalar callback format:
+                    # (objectives, inequality constraints, equality constraints)
+                    return vec(Float64.(result)), [0.0], [0.0]
                 end
 
-                res = Metaheuristics.optimize(f_wrap, optimiser["args"]...)
+                # Batch evaluation: used only by algorithms supporting parallel_evaluation.
+                function f_metaheuristics(sample_values::AbstractMatrix)
+                    N_samples = size(sample_values, 1)
+                    objectives = zeros(N_samples, optimiser["N_obj"])
+
+                    Threads.@threads for i in 1:N_samples
+                        if cancel_optimisation[]
+                            continue
+                        end
+
+                        try
+                            result = f_progress(view(sample_values, i, :))
+
+                            if optimiser["N_obj"] == 1
+                                objectives[i, 1] = Float64(result)
+                            else
+                                objectives[i, :] = vec(Float64.(result))
+                            end
+                        catch e
+                            if e isa InterruptException
+                                cancel_optimisation[] = true
+                            else
+                                rethrow()
+                            end
+                        end
+                    end
+
+                    if cancel_optimisation[]
+                        throw(InterruptException())
+                    end
+
+                    if optimiser["N_obj"] == 1
+                        return vec(objectives)
+                    else
+                        return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
+                    end
+                end
+
+                res = Metaheuristics.optimize(f_metaheuristics, optimiser["args"]...)
                 @globalInfo "Metaheuristics optimisation result:\n$res"
 
             elseif optimiser["type"] == "NLopt"
@@ -589,15 +602,17 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 @globalInfo "NLopt optimisation results: $res"
             elseif optimiser["type"] == "NOMAD"
                 f_nomad = function (sample_values)
-                    res = f_progress(sample_values)
-                    success = res == Inf ? false : true
-                    if length(res) == 1
-                        res = [res]
-                    end
-                    return success, true, res
+                    result = f_progress(sample_values)
+                    outputs = result isa Real ? [Float64(result)] : Float64.(collect(result))
+                    success = all(isfinite, outputs)
+                    return success, true, outputs
                 end
-                prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]..., f_nomad; optimiser["kwargs"]...)
-                NOMAD.solve(prob, optimiser["args"][end])
+
+                prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]...,
+                                          f_nomad;
+                                          optimiser["kwargs"]...)
+
+                NOMAD.solve(prob, optimiser["args"][4])
             end
         catch e
             if e isa InterruptException
