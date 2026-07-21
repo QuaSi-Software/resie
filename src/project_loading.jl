@@ -982,7 +982,7 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         description="Set the maximum time in seconds before the optimisation stops.",
         display_name="Max time",
         required=false,
-        type=Int64,
+        type=Float64,
         json_type="number",
         unit="-"
     ),
@@ -1005,6 +1005,17 @@ OPTIMISATION_PARAMATERS_DEF = Dict{String,Any}(
         type=Float64,
         json_type="number",
         unit="-"
+    ),
+    "refinement" => (
+        default=nothing,
+        description="Optional second optimisation stage starting from the best result " *
+                    "of the primary optimisation. Can have the following fields: " *
+                    "type, algorithm, max_runs, max_time, x_tol_abs, f_tol_abs, optim_kwargs",
+        display_name="Refinement optimiser",
+        required=false,
+        type=Dict{String,Any},
+        json_type="object",
+        unit="-",
     ),
 )
 #! format: on
@@ -1728,6 +1739,9 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
     optimiser["run_sensitivity"] = optimiser_config["run_sensitivity"]
     optimiser["disable_all_simulation_outputs"] = optimiser_config["disable_all_simulation_outputs"]
 
+    # load general parameter of refinement optimiser. Details will be loaded later when start values are known.
+    optimiser["refinement"] = get_refinement_optimiser_config(optimiser_config["refinement"])
+
     # read and parse optim_params in Arrays to preserve order
     optimiser["optim_params_keys"] = String[]
     optimiser["optim_params_values"] = []
@@ -1856,6 +1870,25 @@ function load_optimiser(optimiser_config::Dict{String,Any}, sim_params::Dict{Str
         configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
     end
     return optimiser
+end
+
+function get_refinement_optimiser_config(config::Union{Nothing,AbstractDict})
+    isnothing(config) && return nothing
+
+    defaults = Dict{String,Any}(
+        "algorithm" => nothing,
+        "max_runs" => nothing,
+        "max_time" => nothing,
+        "x_tol_abs" => nothing,
+        "f_tol_abs" => nothing,
+        "optim_kwargs" => Dict{String,Any}(),
+    )
+
+    supplied = Dict{String,Any}(String(key) => deepcopy(value)
+                                for (key, value) in pairs(config)
+                                )
+
+    return merge(defaults, supplied)
 end
 
 function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
@@ -2091,6 +2124,34 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
                              fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]
     end
+end
+
+function load_refinement_optimiser(base_optimiser::Dict{String,Any},
+                                   stage_config::AbstractDict,
+                                   start_values::AbstractVector{<:Real})
+    n_inputs = length(base_optimiser["optim_params_keys"])
+    normalised_start = clamp.(Float64.(start_values), 0.0, 1.0)
+    normalised_bounds = hcat(zeros(n_inputs), ones(n_inputs), normalised_start)
+
+    # Copy common data such as physical bounds, objective definitions, parameter keys and result configuration.
+    stage = copy(base_optimiser)
+
+    # Remove configuration belonging to the previous backend.
+    pop!(stage, "args", nothing)
+    pop!(stage, "kwargs", nothing)
+    pop!(stage, "refinement", nothing)
+    stage["type"] = stage_config["type"]
+    stage["algorithm"] = get(stage_config, "algorithm", nothing)
+
+    try
+        configure_optimiser_backend!(stage, stage_config, normalised_bounds)
+    catch e
+        @globalInfo "Loading of refinement algorithm was not successful. The generation of the results will be " *
+                    "continued without a refinement. Check the inputs.\n" *
+                    "  The following error occurred: $e"
+        return nothing
+    end
+    return stage
 end
 
 function parse_objective_function(eff_def::String,

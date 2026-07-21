@@ -132,7 +132,7 @@ function to_normalised_optim_values(sample_values, bounds::AbstractMatrix{<:Real
     return (values .- bounds[:, 1]) ./ (bounds[:, 2] .- bounds[:, 1])
 end
 
-function best_optimisation_result(all_results::AbstractVector, optimiser::Dict{String,Any})
+function best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
     optimiser["N_obj"] == 1 || return nothing
 
     valid_results = filter(all_results) do result
@@ -157,7 +157,7 @@ Optimisation parameters are reported in their physical units.
 - `all_results::Vector{Any}`: Results of all runs
 - `optimiser::Dict{String,Any}`: The dict with the optimiser parameters
 """
-function report_best_optimisation_result(all_results::AbstractVector, optimiser::Dict{String,Any})
+function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
     if isempty(all_results)
         @globalInfo "No optimisation result is available."
         return
@@ -542,6 +542,8 @@ function perform_optimisation(io_settings::Dict{String,Any},
 
             return result
         end
+
+        # run main optimisation
         try
             run_optimiser_backend!(optimiser, f_progress, cancel_optimisation)
         catch e
@@ -549,6 +551,23 @@ function perform_optimisation(io_settings::Dict{String,Any},
                 cancel_optimisation[] = true
             else
                 rethrow()
+            end
+        end
+
+        # run optional refinement optimisation
+        if !cancel_optimisation[]
+            try
+                refinement_optimiser = create_refinement_optimiser(optimiser, optimiser["refinement"], all_results)
+                if !isnothing(refinement_optimiser)
+                    @globalInfo "Start refinement simulations..."
+                    run_optimiser_backend!(refinement_optimiser, f_progress, cancel_optimisation)
+                end
+            catch e
+                if e isa InterruptException
+                    cancel_optimisation[] = true
+                else
+                    rethrow()
+                end
             end
         end
     end
@@ -651,6 +670,29 @@ function perform_optimisation(io_settings::Dict{String,Any},
     end
 
     return true, all_results
+end
+
+function create_refinement_optimiser(optimiser::Dict{String,Any},
+                                     refinement_config::Union{Nothing,AbstractDict},
+                                     stage_results::Vector{Any})
+    if isnothing(refinement_config)
+        return nothing
+    end
+
+    if optimiser["objective_function_name"] == "multi-objective"
+        @globalInfo "No refinement will be done, as this is not possible for multi-objective optimisation."
+        return nothing
+    end
+
+    best_result = best_optimisation_result(stage_results, optimiser)
+    if isnothing(best_result)
+        return nothing
+    end
+
+    physical_start = Float64[best_result[key] for key in optimiser["optim_params_keys"]]
+    normalised_start = to_normalised_optim_values(physical_start, optimiser["bounds"])
+
+    return load_refinement_optimiser(optimiser, refinement_config, normalised_start)
 end
 
 function run_optimiser_backend!(optimiser::Dict{String,Any}, f_progress::Function,
