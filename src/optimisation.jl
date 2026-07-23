@@ -8,8 +8,10 @@ using LinearAlgebra
 using Statistics
 using Random
 
+# Shared parameter-study evaluation
+
 """
-    create_variant(io_settings, sim_params, project_config, sample_params)
+    create_parameter_variant(io_settings, sim_params, project_config, parameter_set)
 
 Create a variant of the input file for the simulation run
 
@@ -17,13 +19,13 @@ Create a variant of the input file for the simulation run
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String, Any}`: Simulation parameters
 - `project_config::OrderedDict{String,Any}`: The project config read from the input file
-- `sample_params::Dict{String,Any}`: The parameters that get changed for the simulation run
+- `parameter_set::Dict{String,Any}`: The parameters that get changed for the simulation run
 # Returns
 - `OrderedDict{String,Any}`: Modified project_config
 """
-function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
-                        project_config::OrderedDict{String,Any},
-                        sample_params::Dict{String,Any})::OrderedDict{String,Any}
+function create_parameter_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
+                                  project_config::OrderedDict{String,Any},
+                                  parameter_set::Dict{String,Any})::OrderedDict{String,Any}
     # helper function to shorten parameter values for output file naming
     function compact_value(value)
         if abs(value) >= 100
@@ -40,7 +42,7 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
 
     # set up the parameters for this simulation variant
     run_name = ""
-    for (key, value) in pairs(sample_params)
+    for (key, value) in pairs(parameter_set)
         uac, param_key = split(key, " ")
         if uac in keys(cfg["components"])
             cfg["components"][uac][param_key] = value
@@ -64,78 +66,81 @@ function create_variant(io_settings::Dict{String,Any}, sim_params::Dict{String,A
 end
 
 """
-    optim_func!(all_results, io_settings, sim_params, optim_results_path, project_config, 
-                sample_values, run_lock, output_lock, results_lock)
+    evaluate_parameter_set!(evaluated_parameter_sets, io_settings, sim_params,
+                            parameter_study_results_path, project_config, parameter_values,
+                            run_lock, output_lock, results_lock)
 
-Objective function called by algorithms. Wraps running of single simulations in a 
-compatible format. Can be used as a batch function with Arrays for algorithms supporting it.
+Evaluate one physical parameter set and store the simulation result. The returned objective is
+compatible with optimisation algorithms and sensitivity calculations.
 
 # Arguments
-- `all_results::Vector{Any}`: Results of all runs
+- `evaluated_parameter_sets::Vector{Any}`: Results of all completed parameter sets
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `optim_results_path::String`: Filepath for optim_results
+- `parameter_study_results_path::String`: File path for parameter-study results
 - `project_config::OrderedDict{String,Any}`: The project config
-- `sample_values::Union{Array{Float64},Float64}`: Values of the sample_params that get 
-                                                  changed for the next simulation run or 
-                                                  batch runs
+- `parameter_values::Union{Array{Float64},Float64}`: Physical parameter values for the simulation run.
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
-- `output_lock::ReentrantLock`: Lock for file at optim_results_path
-- `results_lock::ReentrantLock`: Lock for all_results
+- `output_lock::ReentrantLock`: Lock for file at parameter_study_results_path
+- `results_lock::ReentrantLock`: Lock for evaluated_parameter_sets
 - `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 # Returns
-- `Union{Array{Float64},Float64}`: Objective of the simulation run or batch runs
+- `Union{Array{Float64},Float64}`: Objective value used by the configured study
 """
-function optim_func!(all_results::Vector{Any}, io_settings::Dict{String,Any},
-                     sim_params::Dict{String,Any}, optim_results_path::String,
-                     project_config::OrderedDict{String,Any},
-                     sample_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
-                     output_lock::ReentrantLock,
-                     results_lock::ReentrantLock;
-                     cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
-                     preparation_cache::Union{Nothing,PreparationCache}=nothing)::Union{Array{Float64},Float64}
-    sample_params = Dict{String,Any}(zip(sim_params["optimisation"]["optim_params_keys"], sample_values))
+function evaluate_parameter_set!(evaluated_parameter_sets::Vector{Any}, io_settings::Dict{String,Any},
+                                 sim_params::Dict{String,Any}, parameter_study_results_path::String,
+                                 project_config::OrderedDict{String,Any},
+                                 parameter_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
+                                 output_lock::ReentrantLock,
+                                 results_lock::ReentrantLock;
+                                 cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
+                                 preparation_cache::Union{Nothing,PreparationCache}=nothing)::Union{Array{Float64},
+                                                                                                    Float64}
+    parameter_set = Dict{String,Any}(zip(sim_params["parameter_study"]["runtime"]["parameter_keys"], parameter_values))
     run_ID = uuid4()
-    results = run_sample(io_settings, sim_params, optim_results_path, project_config,
-                         sample_params, run_ID, run_lock, output_lock;
-                         suppress_all_output=sim_params["optimisation"]["disable_all_simulation_outputs"],
-                         cancel_flag=cancel_flag,
-                         preparation_cache=preparation_cache)
+    results = run_simulation_sample(io_settings, sim_params, parameter_study_results_path, project_config,
+                                    parameter_set, run_ID, run_lock, output_lock;
+                                    suppress_all_output=sim_params["parameter_study"]["disable_all_simulation_outputs"],
+                                    cancel_flag=cancel_flag,
+                                    preparation_cache=preparation_cache)
 
     lock(results_lock) do
-        push!(all_results, results)
+        push!(evaluated_parameter_sets, results)
     end
 
-    return return objective_for_optimiser(results, sim_params["optimisation"])
+    return objective_for_parameter_study(results, sim_params["parameter_study"])
 end
 
-function objective_for_optimiser(results::AbstractDict, optimiser::Dict{String,Any})
+# Parameter-study result helpers
+
+function objective_for_parameter_study(results::AbstractDict, parameter_study::Dict{String,Any})
     objective = results["objective"]
 
-    if optimiser["N_obj"] == 1
+    if parameter_study["runtime"]["N_obj"] == 1
         return objective
     end
 
     # apply signs for each objective for multi-objective optimisation
-    return Float64.(objective) .* optimiser["objective_signs"]
+    return Float64.(objective) .* parameter_study["runtime"]["objective_signs"]
 end
 
-# transform normalized optim_params back to physical values
+# transform normalised optimisation parameters back to physical values
 function to_physical_optim_values(sample_values, bounds::AbstractMatrix{<:Real})::Vector{Float64}
     values = sample_values isa Real ? [Float64(sample_values)] : vec(Float64.(sample_values))
     return bounds[:, 1] .+ values .* (bounds[:, 2] .- bounds[:, 1])
 end
 
-# transform physical optim_params to normalized values
+# transform physical parameters to normalised optimisation values
 function to_normalised_optim_values(sample_values, bounds::AbstractMatrix{<:Real})
     values = sample_values isa Real ? [Float64(sample_values)] : vec(Float64.(sample_values))
     return (values .- bounds[:, 1]) ./ (bounds[:, 2] .- bounds[:, 1])
 end
 
-function best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
-    optimiser["N_obj"] == 1 || return nothing
+function best_objective_result(evaluated_parameter_sets::Vector{Any},
+                               parameter_study::Dict{String,Any})
+    parameter_study["runtime"]["N_obj"] == 1 || return nothing
 
-    valid_results = filter(all_results) do result
+    valid_results = filter(evaluated_parameter_sets) do result
         result isa AbstractDict || return false
 
         objective = get(result, "objective", nothing)
@@ -148,73 +153,87 @@ function best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{Stri
 end
 
 """
-    report_best_optimisation_result(all_results, optimiser)
+    report_best_objective_result(evaluated_parameter_sets, parameter_study, workflow_name)
 
-Log the best successfully evaluated single-objective optimisation result.
-Optimisation parameters are reported in their physical units.
+Log the best successfully evaluated single-objective parameter-study result.
+Parameter values are reported in their physical units.
 
 # Arguments
-- `all_results::Vector{Any}`: Results of all runs
-- `optimiser::Dict{String,Any}`: The dict with the optimiser parameters
+- `evaluated_parameter_sets::Vector{Any}`: Results of all completed parameter sets
+- `parameter_study::Dict{String,Any}`: The parameter-study configuration
+- `workflow_name::String`: The workflow name
+
 """
-function report_best_optimisation_result(all_results::Vector{Any}, optimiser::Dict{String,Any})
-    if isempty(all_results)
-        @globalInfo "No optimisation result is available."
+function report_best_objective_result(evaluated_parameter_sets::Vector{Any},
+                                      parameter_study::Dict{String,Any},
+                                      workflow_name::String)
+    if isempty(evaluated_parameter_sets)
+        @globalInfo "No $workflow_name result is available."
         return
     end
 
-    if optimiser["N_obj"] != 1
-        # No single best solution can be reported for multi-objective optimisation.
-        @globalInfo "No single best solution can be reported for multi-objective optimisation."
+    if parameter_study["runtime"]["N_obj"] != 1
+        # No single best solution can be reported for multi-objective parameter studies.
+        @globalInfo "No single best solution can be reported for multi-objective parameter studies."
         return
     end
 
-    best_result = best_optimisation_result(all_results, optimiser)
+    best_result = best_objective_result(evaluated_parameter_sets, parameter_study)
 
     if isnothing(best_result)
-        @globalInfo "No valid optimisation solution was found."
+        @globalInfo "No valid $workflow_name result was found."
         return
     end
 
-    format_value(value) = value isa Real ?
-                          string(round(Float64(value); sigdigits=8)) :
-                          string(value)
+    parameter_keys = parameter_study["runtime"]["parameter_keys"]
+    parameter_width = max(length("Parameter"), maximum(length.(parameter_keys)))
 
-    parameter_lines = ["  $key = $(format_value(best_result[key]))" for key in optimiser["optim_params_keys"]]
+    header = @sprintf("%-*s  %16s", parameter_width, "Parameter", "Value",)
+    lines = [header, repeat("-", length(header))]
 
-    @globalInfo("Best optimisation result:\n" *
-                "  Objective = $(format_value(best_result["objective"]))\n" *
-                "  Physical parameter values:\n" *
-                join(parameter_lines, "\n"))
+    for key in parameter_keys
+        push!(lines, @sprintf("%-*s  %16.8g", parameter_width, key, Float64(best_result[key]),))
+    end
+
+    @globalInfo("Best $workflow_name result:\n" *
+                "Objective: $(round(Float64(best_result["objective"]); sigdigits=8))\n\n" *
+                join(lines, "\n") * "\n")
 end
 
+# Sensitivity calculations
+
 """
-    calc_global_sensitivity!(model_function, bounds, all_results, sim_params)
+    calculate_global_sensitivity!(evaluate_physical_values, bounds, evaluated_parameter_sets, parameter_keys,
+                                  parameter_study, cancel_parameter_study)
 
 Calculate the global sensitivity indices with polynomial chaos expansion (PCE). A 
-surrogate 3rd degree polynomial model is fit to the existing data. If the existing data is 
+surrogate 3rd degree polynomial model is fit to the existing data. If the existing data
 doesn't produce a well enough fit more data is generated in batches until RMSE is < 0.1 or 
-2x the max_runs is hit.
+the configured sensitivity run limit is hit.
 
 # Arguments
-- `model_function::Function`: Function to run if more datapoints are needed
+- `evaluate_physical_values::Function`: Function to run if more datapoints are needed
 - `bounds::Array{Float64}`: Bounds in which to analyse parameters
-- `all_results::Vector{Any}`: Results of all runs
-- `optim_params_keys::Vector{String}`: Names of all variable parameters
-- `sim_params::Dict{String,Any}`: Simulation parameters
+- `evaluated_parameter_sets::Vector{Any}`: Results of all completed parameter sets
+- `parameter_keys::Vector{String}`: Names of all variable parameters
+- `parameter_study::Dict{String,Any}`: Parameter-study configuration
+- `cancel_parameter_study::Threads.Atomic{Bool}`: Shared cancellation flag
 # Returns
 - `Float64`: Total-order Sobol sensitivity index
 - `Float64`: First-order Sobol sensitivity index
 - `Float64`: Relative root mean square error for the surrogate model
 - `Float64`: R^2 for the surrogate model
 """
-function calc_global_sensitivity!(model_function::Union{Nothing,Function},
-                                  bounds::Array{Float64},
-                                  all_results::Vector{Any},
-                                  optim_params_keys::Array{String},
-                                  sim_params::Dict{String,Any},
-                                  cancel_optimisation::Threads.Atomic{Bool})::Tuple{Vector{Float64},Vector{Float64},
-                                                                                    Float64,Float64}
+function calculate_global_sensitivity!(evaluate_physical_values::Union{Nothing,Function},
+                                       bounds::Array{Float64},
+                                       evaluated_parameter_sets::Vector{Any},
+                                       parameter_keys::Array{String},
+                                       parameter_study::Dict{String,Any},
+                                       cancel_parameter_study::Threads.Atomic{Bool})::Tuple{Vector{Float64},
+                                                                                            Vector{Float64},
+                                                                                            Float64,Float64}
+    @globalInfo "Calculating global sensitivity..."
+
     d = size(bounds, 1)
     deg = 3
     op = PolyChaos.Uniform01OrthoPoly(deg; Nrec=5 * deg)
@@ -241,41 +260,69 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
         resid = y .- Phi * coeffs
         H = Phi * pinv(Phi' * Phi) * Phi'     # hat matrix, only needed for its diagonal
         leverage = diag(H)
-        loocv_resid = resid ./ (1 .- leverage)
-        rel_rmse = sqrt(mean(loocv_resid .^ 2)) / std(y)
-        r2 = 1 - sum(loocv_resid .^ 2) / sum((y .- mean(y)) .^ 2)
+        loocv_resid = resid ./ max.(1 .- leverage, eps(Float64))
+        variance_scale = std(y)
+        total_deviation = sum((y .- mean(y)) .^ 2)
+        rel_rmse = variance_scale <= eps(Float64) ? Inf :
+                   sqrt(mean(loocv_resid .^ 2)) / variance_scale
+        r2 = total_deviation <= eps(Float64) ? 0.0 :
+             1 - sum(loocv_resid .^ 2) / total_deviation
 
         return coeffs, rel_rmse, r2
     end
 
-    # Take samples (standardized on [-1,1])
-    n_existing = size(all_results, 1)
+    # Take samples (standardized on [-1,1]). Only results inside the selected bounds
+    # can be reused for global sensitivity.
+    valid_results = filter(evaluated_parameter_sets) do result
+        result isa AbstractDict || return false
+        objective = get(result, "objective", nothing)
+        objective isa Real && isfinite(objective) || return false
+
+        for (i, key) in enumerate(parameter_keys)
+            value = get(result, key, nothing)
+            value isa Real && isfinite(value) || return false
+            bounds[i, 1] <= value <= bounds[i, 2] || return false
+        end
+        return true
+    end
+
+    n_existing = length(valid_results)
+    keys = vcat("objective", parameter_keys...)
     if n_existing > 0
-        keys = vcat("objective", sim_params["optimisation"]["optim_params_keys"]...)
-        res_matrix = [d[k] for d in all_results, k in keys]
+        res_matrix = Float64[d[k] for d in valid_results, k in keys]
         X_phys = res_matrix[:, 2:end]
-        y = res_matrix[:, 1]
+        y = vec(res_matrix[:, 1])
+    else
+        y = Float64[]
+        X_phys = Array{Float64}(undef, 0, d)
+    end
+
+    minimum_fit_samples = mop.dim + 1
+    if n_existing >= minimum_fit_samples
         X_std = hcat([to_std.(X_phys[:, i], bounds[i, 1], bounds[i, 2]) for i in 1:d]...)
         coeffs, rel_rmse, r2 = fit_surrogate(X_std, y, mop)
     else
         rel_rmse = 1.0
-        coeffs = 0.0
+        coeffs = zeros(mop.dim)
         r2 = 0.0
-        y = []
-        X_phys = Array{Float64}(undef, 0, d)
     end
 
     target_rel_rmse = 0.1
     target_r2 = 0.9
 
-    if model_function !== nothing
+    if evaluate_physical_values !== nothing
         print_message = true
-        maximum_sensitivity_runs = sim_params["optimisation"]["max_runs"] * 2
+        maximum_sensitivity_runs = parameter_study["runtime"]["sensitivity_max_runs"] + length(y)
+        if length(y) < minimum_fit_samples && maximum_sensitivity_runs < minimum_fit_samples
+            @error "Global sensitivity requires at least $minimum_fit_samples runs for " *
+                   "$(length(parameter_keys)) parameters, but max_runs is $maximum_sensitivity_runs."
+            return [0.0], [0.0], 0.0, 0.0
+        end
         status_lock = ReentrantLock()
         try
             while (rel_rmse > target_rel_rmse || r2 < target_r2) && length(y) < maximum_sensitivity_runs
                 if print_message
-                    @globalInfo("Performing additional runs for sensitivity analysis.\n" *
+                    @globalInfo("Performing simulation runs for sensitivity analysis.\n" *
                                 "Press Ctrl+C any time to stop creating additional runs and to " *
                                 "calculate the sensitivity from the already completed runs.")
                     print_message = false
@@ -299,12 +346,12 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
                 y_new = zeros(Float64, n_new)
                 completed_in_batch = Ref(0)
                 Threads.@threads for i in 1:n_new
-                    y_new[i] = model_function(X_phys_new[i, :])
+                    y_new[i] = evaluate_physical_values(X_phys_new[i, :])
 
                     lock(status_lock) do
                         completed_in_batch[] += 1
                         total_completed = current_sample_count + completed_in_batch[]
-                        @globalInfo "Sensitivity status: $total_completed of up to $maximum_sensitivity_runs runs completed."
+                        @globalInfo "Global sensitivity status: $total_completed of up to $maximum_sensitivity_runs runs completed."
                     end
                 end
 
@@ -328,7 +375,7 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
             end
         catch e
             if e isa InterruptException
-                cancel_optimisation[] = true
+                cancel_parameter_study[] = true
                 @globalInfo("Additional sensitivity runs interrupted by Ctrl+C. " *
                             "Continuing sensitivity calculation with $(length(y)) completed runs.")
             else
@@ -339,6 +386,11 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
 
     # Calculate Sobol indices from coefficients 
     total_var = sum(coeffs[2:end] .^ 2)
+    if total_var <= eps(Float64)
+        @error "Global sensitivity cannot be calculated because the surrogate objective " *
+               "has no variance."
+        return [0.0], [0.0], 0.0, 0.0
+    end
 
     S_first = zeros(d)
     S_total = zeros(d)
@@ -354,52 +406,492 @@ function calc_global_sensitivity!(model_function::Union{Nothing,Function},
     S_first ./= total_var
     S_total ./= total_var
 
-    width = length.(optim_params_keys)
-    @globalInfo "Global sensitivity results: \n" *
-                "\t $(join(optim_params_keys, "\t")) \n" *
-                "S_total\t $(join(rpad.(round.(S_total, digits=3), width), "\t")) \n" *
-                "S_first\t $(join(rpad.(round.(S_first, digits=3), width), "\t")) \n" *
-                "Surrogate RMSE: $(round(rel_rmse, digits=3)), R2: $(round(r2, digits=3)) \n" *
-                "Important: Sobol indices depend on the selected parameter bounds!"
+    parameter_width = max(length("Parameter"), maximum(length.(parameter_keys)))
+    header = @sprintf("%-*s  %24s", parameter_width, "Parameter", "S_first (S_total)",)
+    lines = [header, repeat("-", length(header))]
+
+    for (key, first_order, total_order) in zip(parameter_keys, S_first, S_total)
+        indices = @sprintf("%.3f (%.3f)", first_order, total_order,)
+        push!(lines, @sprintf("%-*s  %24s", parameter_width, key, indices,))
+    end
+
+    @globalInfo("Global sensitivity results:\n\n" *
+                join(lines, "\n") *
+                "\n\nSurrogate quality: RMSE=$(round(rel_rmse; digits=3)), " *
+                "R²=$(round(r2; digits=3))\n" *
+                "Sobol indices depend on the selected parameter bounds.\n",)
 
     return S_total, S_first, rel_rmse, r2
 end
 
+function find_evaluated_parameter_set(evaluated_parameter_sets::Vector{Any},
+                                      parameter_keys::Vector{String},
+                                      parameter_values::AbstractVector{<:Real})
+    for result in evaluated_parameter_sets
+        result isa AbstractDict || continue
+        objective = get(result, "objective", nothing)
+        objective isa Real && isfinite(objective) || continue
+        all(haskey(result, key) &&
+                result[key] isa Real &&
+                isapprox(Float64(result[key]), Float64(value); rtol=1e-10, atol=1e-12)
+            for (key, value) in zip(parameter_keys, parameter_values)) || continue
+        return result
+    end
+    return nothing
+end
+
+function get_or_evaluate_parameter_set!(evaluate_physical_values::Function,
+                                        evaluated_parameter_sets::Vector{Any},
+                                        parameter_keys::Vector{String},
+                                        parameter_values::AbstractVector{<:Real})
+    result = find_evaluated_parameter_set(evaluated_parameter_sets, parameter_keys, parameter_values)
+    if isnothing(result)
+        evaluate_physical_values(Float64.(parameter_values))
+        result = find_evaluated_parameter_set(evaluated_parameter_sets, parameter_keys, parameter_values)
+    end
+
+    isnothing(result) && error("No result was stored for the evaluated parameter point.")
+    return result
+end
+
 """
-    perform_optimisation(io_settings, sim_params, optim_results_path, project_config, all_results)
+    calculate_local_sensitivity!(evaluate_physical_values, evaluated_parameter_sets, parameter_study)
 
-Run the configured optimisation or parameter variation and collect the resulting simulation
-outputs.
+Calculate local one-at-a-time sensitivities around a configured start point or the best
+single-objective optimisation result. Explicit sensitivity_lower and sensitivity_upper
+values can be configured per parameter. Otherwise, the configured relative variation is
+applied in both directions. No optimisation bounds are applied to local sensitivity points.
 
-This function initializes the locks required for parallel execution, clears the optimisation
-results file, selects the optimisation backend from `sim_params["optimisation"]["type"]`,
-and dispatches the corresponding optimisation workflow.
+Existing simulation results are reused if all parameter values match the requested point.
+
+# Arguments
+- `evaluate_physical_values::Function`: Function evaluating physical parameter values.
+- `evaluated_parameter_sets::Vector{Any}`: Results of all completed parameter-study runs.
+- `parameter_study::Dict{String,Any}`: Parameter-study configuration.
+# Returns
+- `Vector{Dict{String,Any}}`: Local sensitivity results for each parameter.
+"""
+function calculate_local_sensitivity!(evaluate_physical_values::Function,
+                                      evaluated_parameter_sets::Vector{Any},
+                                      parameter_study::Dict{String,Any})::Vector{Dict{String,Any}}
+    @globalInfo "Calculating local sensitivity..."
+
+    sensitivity_results = Vector{Dict{String,Any}}()
+    parameter_keys = parameter_study["runtime"]["parameter_keys"]
+
+    # determine reference values 
+    if parameter_study["sensitivity_analysis"]["local_reference"] == "best_result"
+        best_result = best_objective_result(evaluated_parameter_sets, parameter_study)
+        if isnothing(best_result)
+            @error "No valid optimisation result is available as reference for local sensitivity."
+            return sensitivity_results
+        end
+        reference_values = Float64[best_result[key] for key in parameter_keys]
+    else
+        reference_values = Float64.(parameter_study["runtime"]["start_values"])
+    end
+
+    reference_results_exists = !isnothing(find_evaluated_parameter_set(evaluated_parameter_sets,
+                                                                       parameter_keys,
+                                                                       reference_values))
+    if reference_results_exists
+        number_of_evaluation_points = 2 * length(parameter_keys)
+    else
+        number_of_evaluation_points = 1 + 2 * length(parameter_keys)
+    end
+    completed_points = 0
+
+    function evaluate_local_point((parameter_values::Vector{Float64}); report::Bool=true)::AbstractDict
+        result = get_or_evaluate_parameter_set!(evaluate_physical_values,
+                                                evaluated_parameter_sets,
+                                                parameter_keys,
+                                                parameter_values)
+        if report
+            completed_points += 1
+            @globalInfo "Local sensitivity status: $completed_points of $number_of_evaluation_points runs completed."
+        end
+        return result
+    end
+
+    reference_result = evaluate_local_point(reference_values; report=(!reference_results_exists))
+    reference_objective = Float64(reference_result["objective"])
+
+    for (i, key) in enumerate(parameter_keys)
+        lower_value = parameter_study["runtime"]["sensitivity_lower_values"][i]
+        upper_value = parameter_study["runtime"]["sensitivity_upper_values"][i]
+
+        if !(isfinite(lower_value) && isfinite(upper_value))
+            delta = abs(reference_values[i]) * parameter_study["sensitivity_analysis"]["local_variation"]
+            if delta == 0.0
+                @error "Local sensitivity for parameter $key cannot use a relative variation " *
+                       "because its reference value is zero. Configure sensitivity_lower and sensitivity_upper explicitly."
+                continue
+            end
+            lower_value = reference_values[i] - delta
+            upper_value = reference_values[i] + delta
+        end
+
+        if !(lower_value < reference_values[i] < upper_value)
+            @error "Local sensitivity values for parameter $key must satisfy sensitivity_lower < reference < sensitivity_upper."
+            continue
+        end
+
+        lower_values = copy(reference_values)
+        upper_values = copy(reference_values)
+        lower_values[i] = lower_value
+        upper_values[i] = upper_value
+
+        lower_result = evaluate_local_point(lower_values)
+        upper_result = evaluate_local_point(upper_values)
+
+        lower_objective = Float64(lower_result["objective"])
+        upper_objective = Float64(upper_result["objective"])
+
+        lower_change = lower_objective - reference_objective
+        upper_change = upper_objective - reference_objective
+        lower_change_relative = reference_objective == 0.0 ? NaN :
+                                lower_change / abs(reference_objective)
+        upper_change_relative = reference_objective == 0.0 ? NaN :
+                                upper_change / abs(reference_objective)
+        gradient = (upper_objective - lower_objective) / (upper_value - lower_value)
+        elasticity = if reference_values[i] == 0.0 || reference_objective == 0.0
+            NaN
+        else
+            gradient * reference_values[i] / reference_objective
+        end
+
+        push!(sensitivity_results,
+              Dict{String,Any}(
+                  "parameter" => key,
+                  "lower_value" => lower_value,
+                  "reference_value" => reference_values[i],
+                  "upper_value" => upper_value,
+                  "lower_objective" => lower_objective,
+                  "reference_objective" => reference_objective,
+                  "upper_objective" => upper_objective,
+                  "lower_change" => lower_change,
+                  "upper_change" => upper_change,
+                  "lower_change_relative" => lower_change_relative,
+                  "upper_change_relative" => upper_change_relative,
+                  "gradient" => gradient,
+                  "elasticity" => elasticity,
+              ))
+    end
+
+    parameter_width = max(length("Parameter"), maximum(length.(parameter_keys)))
+    header = @sprintf("%-*s  %12s  %24s  %12s  %24s  %10s",
+                      parameter_width,
+                      "Parameter",
+                      "Lower",
+                      "Δ objective (Δ %)",
+                      "Upper",
+                      "Δ objective (Δ %)",
+                      "Elasticity",)
+
+    lines = [header, repeat("-", length(header))]
+
+    for result in sensitivity_results
+        lower_change = @sprintf("%.7g (%+.3f %%)", result["lower_change"], 100 * result["lower_change_relative"],)
+        upper_change = @sprintf("%.7g (%+.3f %%)", result["upper_change"], 100 * result["upper_change_relative"],)
+
+        push!(lines,
+              @sprintf("%-*s  %12.7g  %24s  %12.7g  %24s  %10.4g",
+                       parameter_width,
+                       result["parameter"],
+                       result["lower_value"],
+                       lower_change,
+                       result["upper_value"],
+                       upper_change,
+                       result["elasticity"],))
+    end
+
+    @globalInfo("Local sensitivity results:\n" *
+                "Reference objective: $(round(reference_objective; sigdigits=8))\n\n" *
+                join(lines, "\n") * "\n")
+
+    return sensitivity_results
+end
+
+# Parameter-study stages
+
+"""
+    run_parameter_variation!(evaluate_physical_values, parameter_study, cancel_parameter_study)
+
+Evaluate all configured parameter combinations.
+"""
+function run_parameter_variation!(evaluate_physical_values::Function,
+                                  parameter_study::Dict{String,Any},
+                                  cancel_parameter_study::Threads.Atomic{Bool})
+    try
+        # handling status
+        variation_start_time = now()
+        completed_runs = Atomic{Int}(0)
+        max_runs = length(parameter_study["runtime"]["iterator"])
+        worker_count = min(Threads.nthreads(), max_runs)
+
+        # run parameter sets on multi threads
+        @threads for parameter_values in collect(parameter_study["runtime"]["iterator"])
+            if cancel_parameter_study[]
+                continue
+            end
+
+            try
+                run_start_time = now()
+                float_parameter_values = parameter_values isa Real ? Float64(parameter_values) :
+                                         Float64.(collect(parameter_values))
+                evaluate_physical_values(float_parameter_values)
+
+                # handle logging
+                runtime_seconds = round(Int, seconds(now() - run_start_time))
+                runtime_minutes, runtime_remaining_seconds = divrem(runtime_seconds, 60)
+                completed = atomic_add!(completed_runs, 1) + 1
+                elapsed_seconds = max(1, round(Int, seconds(now() - variation_start_time)))
+                if completed < worker_count
+                    eta_text = "calculating..."
+                else
+                    results_per_second = completed / elapsed_seconds
+                    eta_seconds = round(Int, (max_runs - completed) / results_per_second)
+                    eta_minutes, eta_remaining_seconds = divrem(max(eta_seconds, 0), 60)
+                    eta_text = "$eta_minutes min $(lpad(eta_remaining_seconds, 2, '0')) s"
+                end
+
+                @globalInfo "[$completed/$max_runs] → completed in $runtime_minutes min " *
+                            "$(lpad(runtime_remaining_seconds, 2, '0')) s. ETA: $eta_text"
+            catch e
+                if e isa InterruptException
+                    cancel_parameter_study[] = true
+                    continue
+                else
+                    rethrow()
+                end
+            end
+        end
+    catch e
+        if e isa InterruptException
+            # Handles Ctrl+C delivered to the task coordinating @threads.
+            cancel_parameter_study[] = true
+        else
+            rethrow()
+        end
+    end
+end
+
+"""
+    run_optimisation!(evaluate_physical_values, evaluated_parameter_sets, parameter_study,
+                      cancel_parameter_study)
+
+Run the configured optimisation and optional refinement stage.
+"""
+function run_optimisation!(evaluate_physical_values::Function,
+                           evaluated_parameter_sets::Vector{Any},
+                           parameter_study::Dict{String,Any},
+                           cancel_parameter_study::Threads.Atomic{Bool})
+    # evaluate_normalised_values converts normalised parameter values to physical values
+    # for the simulation run.
+    evaluate_normalised_values = function (parameter_values)
+        physical_values = to_physical_optim_values(parameter_values, parameter_study["runtime"]["parameter_bounds"])
+        return evaluate_physical_values(physical_values)
+    end
+
+    # handle Logging for all algorithms
+    progress_lock = ReentrantLock()
+    progress_evaluations = Ref(0)
+    progress_best = Ref(Inf)
+    progress_every = 1
+
+    # handles the progress logging of evaluate_normalised_values
+    evaluate_with_progress = function (parameter_values)
+        cancel_parameter_study[] && throw(InterruptException())
+        result = evaluate_normalised_values(parameter_values)
+        cancel_parameter_study[] && throw(InterruptException())
+
+        lock(progress_lock) do
+            progress_evaluations[] += 1
+
+            best_text = if parameter_study["runtime"]["N_obj"] == 1
+                value = result isa Real ? Float64(result) : Float64(first(result))
+                progress_best[] = min(progress_best[], value)
+                string(round(progress_best[]; sigdigits=8))
+            else
+                "multi-objective"
+            end
+
+            if progress_evaluations[] == 1 ||
+               progress_evaluations[] % progress_every == 0
+                @globalInfo("Optimisation progress: evaluations=$(progress_evaluations[]), best=$best_text",)
+            end
+        end
+
+        return result
+    end
+
+    # run main optimisation
+    try
+        run_optimiser_backend!(parameter_study, evaluate_with_progress, cancel_parameter_study)
+    catch e
+        if e isa InterruptException
+            cancel_parameter_study[] = true
+        else
+            rethrow()
+        end
+    end
+
+    # run optional refinement optimisation
+    if !cancel_parameter_study[]
+        try
+            refinement_optimiser = create_refinement_optimiser(parameter_study,
+                                                               parameter_study["optimisation"]["refinement"],
+                                                               evaluated_parameter_sets)
+            if !isnothing(refinement_optimiser)
+                @globalInfo "Start refinement simulations..."
+                run_optimiser_backend!(refinement_optimiser,
+                                       evaluate_with_progress,
+                                       cancel_parameter_study)
+            end
+        catch e
+            if e isa InterruptException
+                cancel_parameter_study[] = true
+            else
+                rethrow()
+            end
+        end
+    end
+end
+
+"""
+    run_global_sensitivity!(evaluate_physical_values, evaluated_parameter_sets,
+                            parameter_study, cancel_parameter_study)
+
+Run the configured global sensitivity analysis and report its runtime.
+"""
+function run_global_sensitivity!(evaluate_physical_values::Function,
+                                 evaluated_parameter_sets::Vector{Any},
+                                 parameter_study::Dict{String,Any},
+                                 cancel_parameter_study::Threads.Atomic{Bool})::Bool
+    sensitivity_start_time = now()
+    results_before_sensitivity = length(evaluated_parameter_sets)
+
+    try
+        calculate_global_sensitivity!(evaluate_physical_values,
+                                      parameter_study["runtime"]["parameter_bounds"][:, 1:2],
+                                      evaluated_parameter_sets,
+                                      parameter_study["runtime"]["parameter_keys"],
+                                      parameter_study,
+                                      cancel_parameter_study)
+    catch e
+        if e isa InterruptException
+            cancel_parameter_study[] = true
+        else
+            rethrow()
+        end
+    end
+
+    sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
+    sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds, 60)
+    sensitivity_runs = length(evaluated_parameter_sets) - results_before_sensitivity
+
+    if cancel_parameter_study[]
+        @globalInfo "Global sensitivity analysis interrupted after $sensitivity_runtime_minutes min " *
+                    "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. " *
+                    "$sensitivity_runs additional runs completed."
+        return false
+    end
+
+    @globalInfo "Global sensitivity analysis completed in $sensitivity_runtime_minutes min " *
+                "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. " *
+                "$sensitivity_runs additional runs completed."
+    return true
+end
+
+"""
+    run_local_sensitivity!(evaluate_physical_values, evaluated_parameter_sets,
+                           parameter_study, cancel_parameter_study)
+
+Run the configured local sensitivity analysis and report its runtime.
+"""
+function run_local_sensitivity!(evaluate_physical_values::Function,
+                                evaluated_parameter_sets::Vector{Any},
+                                parameter_study::Dict{String,Any},
+                                cancel_parameter_study::Threads.Atomic{Bool})::Bool
+    sensitivity_start_time = now()
+    results_before_sensitivity = length(evaluated_parameter_sets)
+
+    try
+        calculate_local_sensitivity!(evaluate_physical_values,
+                                     evaluated_parameter_sets,
+                                     parameter_study)
+    catch e
+        if e isa InterruptException
+            cancel_parameter_study[] = true
+        else
+            rethrow()
+        end
+    end
+
+    sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
+    sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds, 60)
+    sensitivity_runs = length(evaluated_parameter_sets) - results_before_sensitivity
+
+    if cancel_parameter_study[]
+        @globalInfo "Local sensitivity analysis interrupted after $sensitivity_runtime_minutes min " *
+                    "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. " *
+                    "$sensitivity_runs additional runs completed."
+        return false
+    end
+
+    @globalInfo "Local sensitivity analysis completed in $sensitivity_runtime_minutes min " *
+                "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. " *
+                "$sensitivity_runs additional runs completed."
+    return true
+end
+
+function write_parameter_study_results(parameter_study_results_path::String,
+                                       evaluated_parameter_sets::Vector{Any})
+    open(parameter_study_results_path, "w") do file_handle
+        # write header
+        header = join(collect(keys(evaluated_parameter_sets[1])), ';') * "\n"
+        write(file_handle, header)
+
+        # write results
+        for results in evaluated_parameter_sets
+            row = join(collect(values(results)), ';') * "\n"
+            row = replace(row, '.' => ',')
+            write(file_handle, row)
+        end
+    end
+end
+
+"""
+    perform_parameter_study(io_settings, sim_params, project_config)
+
+Run the configured parameter variation, optimisation and sensitivity analyses and collect the
+resulting simulation outputs. Sensitivity analyses are executed after the primary study and
+reuse already completed simulation results where possible. They can also run standalone.
 
 # Arguments
 - `io_settings::Dict{String,Any}`: IO settings used for simulation output and result writing.
-- `sim_params::Dict{String,Any}`: Simulation and optimisation parameters. 
+- `sim_params::Dict{String,Any}`: Simulation and parameter-study parameters.
 - `project_config::OrderedDict{String,Any}`: Base project configuration used to generate
   simulation variants.
 
 # Returns
-- `Bool`: Flag is simulation was successful (true) or not (false)
-- `Vector{Any}`: The updated `all_results` collection containing the results of all
-  completed optimisation or parameter-variation runs.
+- `Bool`: Flag if the parameter study was successful (true) or not (false).
+- `Vector{Any}`: Results of all completed parameter-study runs.
 """
-function perform_optimisation(io_settings::Dict{String,Any},
-                              sim_params::Dict{String,Any},
-                              project_config::OrderedDict{String,Any};
-                              preparation_cache::Union{Nothing,PreparationCache}=nothing)::Tuple{Bool,Vector{Any}}
+function perform_parameter_study(io_settings::Dict{String,Any},
+                                 sim_params::Dict{String,Any},
+                                 project_config::OrderedDict{String,Any};
+                                 preparation_cache::Union{Nothing,PreparationCache}=nothing)::Tuple{Bool,Vector{Any}}
     # establish overarching locks for parallelization
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
     results_lock = ReentrantLock()
 
-    optim_results_path = sim_params["run_path"](io_settings["optimisation_csv_file_path"])
-    open(optim_results_path, "w") do f
+    parameter_study_results_path = sim_params["run_path"](io_settings["parameter_study_csv_file_path"])
+    open(parameter_study_results_path, "w") do file_handle
     end
 
-    optimiser = sim_params["optimisation"]
+    parameter_study = sim_params["parameter_study"]
 
     # calculate inputs that should be cashed
     if preparation_cache !== nothing
@@ -408,269 +900,122 @@ function perform_optimisation(io_settings::Dict{String,Any},
         prepare_inputs(project_config, warmup_run_ID; preparation_cache=preparation_cache)
     end
 
-    # warn if file outputs for multi-thread simulations should be created, as this can lead to troubles
-    uses_threaded_sample_evaluation = length(optimiser["iterator"]) > 1 ||
-                                      (optimiser["type"] == "Metaheuristics" && Threads.nthreads() > 1)
-    if uses_threaded_sample_evaluation && !optimiser["disable_all_simulation_outputs"]
-        @warn "Writing simulation outputs during multi-threaded optimisation may cause file-access conflicts or crashes. " *
-              "To be safe, set `disable_all_simulation_outputs` to `true`, or run the optimisation with a single thread."
-    end
-
-    # handle interruption via STR+C for parallel runs and optimisation
-    cancel_optimisation = Threads.Atomic{Bool}(false)
+    # handle interruption via STR+C for parallel parameter-study runs
+    cancel_parameter_study = Threads.Atomic{Bool}(false)
 
     # prepare result vector
-    all_results = Vector{Any}()
+    evaluated_parameter_sets = Vector{Any}()
 
-    @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
+    # generic function using physical simulation parameter values. It is also used by
+    # standalone sensitivity analyses and appends every new result to evaluated_parameter_sets.
+    evaluate_physical_values = function (parameter_values)
+        if cancel_parameter_study[]
+            throw(InterruptException())
+        end
+
+        return evaluate_parameter_set!(evaluated_parameter_sets,
+                                       io_settings,
+                                       sim_params,
+                                       parameter_study_results_path,
+                                       project_config,
+                                       parameter_values,
+                                       run_lock,
+                                       output_lock,
+                                       results_lock;
+                                       cancel_flag=cancel_parameter_study,
+                                       preparation_cache=preparation_cache)
+    end
+
     main_start_time = now()
+    local_reference_values = nothing
 
-    if length(optimiser["iterator"]) > 1
-        ## Run predefined parameter sets
-        try
-            # handling status
-            variation_start_time = now()
-            completed_runs = Atomic{Int}(0)
-            max_runs = length(optimiser["iterator"])
-            worker_count = min(Threads.nthreads(), max_runs)
-
-            # run parameter sets on multi threads
-            @threads for sample_values in collect(optimiser["iterator"])
-                if cancel_optimisation[]
-                    continue
-                end
-
-                try
-                    run_start_time = now()
-                    float_sample_values = sample_values isa Real ? Float64(sample_values) :
-                                          Float64.(collect(sample_values))
-                    optim_func!(all_results,
-                                io_settings,
-                                sim_params,
-                                optim_results_path,
-                                project_config,
-                                float_sample_values,
-                                run_lock,
-                                output_lock,
-                                results_lock;
-                                cancel_flag=cancel_optimisation,
-                                preparation_cache=preparation_cache)
-
-                    # handle logging
-                    runtime_seconds = round(Int, seconds(now() - run_start_time))
-                    runtime_minutes, runtime_remaining_seconds = divrem(runtime_seconds, 60)
-                    completed = atomic_add!(completed_runs, 1) + 1
-                    elapsed_seconds = max(1, round(Int, seconds(now() - variation_start_time)))
-                    if completed < worker_count
-                        eta_text = "calculating..."
-                    else
-                        results_per_second = completed / elapsed_seconds
-                        eta_seconds = round(Int, (max_runs - completed) / results_per_second)
-                        eta_minutes, eta_remaining_seconds = divrem(max(eta_seconds, 0), 60)
-                        eta_text = "$eta_minutes min $(lpad(eta_remaining_seconds, 2, '0')) s"
-                    end
-
-                    @globalInfo "[$completed/$max_runs] → completed in $runtime_minutes min " *
-                                "$(lpad(runtime_remaining_seconds, 2, '0')) s. ETA: $eta_text"
-                catch e
-                    if e isa InterruptException
-                        cancel_optimisation[] = true
-                        continue
-                    else
-                        rethrow()
-                    end
-                end
-            end
-        catch e
-            if e isa InterruptException
-                # Handles Ctrl+C delivered to the task coordinating @threads.
-                cancel_optimisation[] = true
-            else
-                rethrow()
-            end
-        end
-    else
-        ## Run optimisation
-        # generic optimisation function
-        # f_physical takes and returns the physical correct simulation parameter and results
-        f_physical = function (sample_values)
-            if cancel_optimisation[]
-                throw(InterruptException())
-            end
-
-            return optim_func!(all_results, io_settings, sim_params, optim_results_path,
-                               project_config, sample_values,
-                               run_lock, output_lock, results_lock;
-                               cancel_flag=cancel_optimisation,
-                               preparation_cache=preparation_cache)
+    if parameter_study["runtime"]["run_primary_study"]
+        # warn if file outputs for multi-thread simulations should be created, as this can lead to troubles
+        uses_threaded_sample_evaluation = (parameter_study["parameter_variation"]["run_parameter_variation"] &&
+                                           length(parameter_study["runtime"]["iterator"]) > 1) ||
+                                          (parameter_study["optimisation"]["type"] == "Metaheuristics" &&
+                                           Threads.nthreads() > 1)
+        if uses_threaded_sample_evaluation && !parameter_study["disable_all_simulation_outputs"]
+            @warn "Writing simulation outputs during multi-threaded parameter studies may cause file-access conflicts or crashes. " *
+                  "To be safe, set `disable_all_simulation_outputs` to `true`, or run the study with a single thread."
         end
 
-        # f takes the normalised sample_values and converts them to physical values for the simulation run
-        f = function (sample_values)
-            physical_values = to_physical_optim_values(sample_values, optimiser["bounds"])
-            return f_physical(physical_values)
+        @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
+        primary_start_time = now()
+        workflow_name = parameter_study["parameter_variation"]["run_parameter_variation"] ?
+                        "Parameter variation" : "Optimisation"
+
+        if parameter_study["parameter_variation"]["run_parameter_variation"]
+            run_parameter_variation!(evaluate_physical_values,
+                                     parameter_study,
+                                     cancel_parameter_study)
+        else
+            run_optimisation!(evaluate_physical_values,
+                              evaluated_parameter_sets,
+                              parameter_study,
+                              cancel_parameter_study)
         end
 
-        # handle Logging for all algorithms
-        progress_lock = ReentrantLock()
-        progress_evaluations = Ref(0)
-        progress_best = Ref(Inf)
-        progress_every = get(optimiser, "progress_every", 1)
+        primary_runtime_seconds = round(Int, seconds(now() - primary_start_time))
+        primary_runtime_minutes, primary_runtime_remaining_seconds = divrem(primary_runtime_seconds, 60)
+        primary_run_count = length(evaluated_parameter_sets)
 
-        # handles the progress logging of f
-        f_progress = function (sample_values)
-            cancel_optimisation[] && throw(InterruptException())
-            result = f(sample_values)
-            cancel_optimisation[] && throw(InterruptException())
-
-            lock(progress_lock) do
-                progress_evaluations[] += 1
-
-                best_text = if optimiser["N_obj"] == 1
-                    value = result isa Real ? Float64(result) : Float64(first(result))
-                    progress_best[] = min(progress_best[], value)
-                    string(round(progress_best[]; sigdigits=8))
-                else
-                    "multi-objective"
-                end
-
-                if progress_evaluations[] == 1 ||
-                   progress_evaluations[] % progress_every == 0
-                    @globalInfo("Optimisation progress: evaluations=$(progress_evaluations[]), best=$best_text",)
-                end
+        if cancel_parameter_study[]
+            # use snapshot to avoid interference from threads that may still be running
+            final_results = lock(results_lock) do
+                copy(evaluated_parameter_sets)
             end
+            primary_run_count = length(final_results)
+            @globalInfo "$workflow_name interrupted by user after $primary_runtime_minutes min " *
+                        "$(lpad(primary_runtime_remaining_seconds, 2, '0')) s. " *
+                        "$primary_run_count runs completed. Recovering intermediate results..."
 
-            return result
+            # detect and output best simulation result, independent of any backend-specific results
+            report_best_objective_result(final_results, parameter_study, workflow_name)
+            return false, final_results
         end
 
-        # run main optimisation
-        try
-            run_optimiser_backend!(optimiser, f_progress, cancel_optimisation)
-        catch e
-            if e isa InterruptException
-                cancel_optimisation[] = true
-            else
-                rethrow()
-            end
-        end
+        @globalInfo "$workflow_name completed in $primary_runtime_minutes min " *
+                    "$(lpad(primary_runtime_remaining_seconds, 2, '0')) s. " *
+                    "$primary_run_count runs completed."
 
-        # run optional refinement optimisation
-        if !cancel_optimisation[]
-            try
-                refinement_optimiser = create_refinement_optimiser(optimiser, optimiser["refinement"], all_results)
-                if !isnothing(refinement_optimiser)
-                    @globalInfo "Start refinement simulations..."
-                    run_optimiser_backend!(refinement_optimiser, f_progress, cancel_optimisation)
-                end
-            catch e
-                if e isa InterruptException
-                    cancel_optimisation[] = true
-                else
-                    rethrow()
-                end
-            end
-        end
+        # detect and output best simulation result, independent of any backend-specific results
+        report_best_objective_result(evaluated_parameter_sets, parameter_study, workflow_name)
     end
 
-    # handle info messages
-    workflow_name = if optimiser["type"] == "parametervariation"
-        "Parameter variation"
-    else
-        "Optimisation"
+    # Sensitivity analyses are calculated after parameter variation or optimisation so that
+    # completed simulation results can be reused. They can also run without a primary study.
+    if parameter_study["sensitivity_analysis"]["run_global_sensitivity"] &&
+       !run_global_sensitivity!(evaluate_physical_values,
+                                evaluated_parameter_sets,
+                                parameter_study,
+                                cancel_parameter_study)
+        return false, evaluated_parameter_sets
     end
 
-    main_runtime_seconds = round(Int, seconds(now() - main_start_time))
-    main_runtime_minutes, main_runtime_remaining_seconds = divrem(main_runtime_seconds, 60)
-    main_run_count = length(all_results)
-
-    if cancel_optimisation[]
-        # use snapshot to avoid interference from threads that may still be running
-        final_results = lock(results_lock) do
-            copy(all_results)
-        end
-        main_run_count = length(final_results)
-        @globalInfo "$workflow_name interrupted by user after $main_runtime_minutes min " *
-                    "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed. " *
-                    "Recovering intermediate results..."
-
-        # detect and output best simulation result, independent of any package-specific results
-        report_best_optimisation_result(final_results, optimiser)
-        return false, final_results
+    if parameter_study["sensitivity_analysis"]["run_local_sensitivity"] &&
+       !run_local_sensitivity!(evaluate_physical_values,
+                               evaluated_parameter_sets,
+                               parameter_study,
+                               cancel_parameter_study)
+        return false, evaluated_parameter_sets
     end
 
-    @globalInfo "$workflow_name completed in $main_runtime_minutes min " *
-                "$(lpad(main_runtime_remaining_seconds, 2, '0')) s. $main_run_count runs completed."
+    overall_runtime_seconds = round(Int, seconds(now() - main_start_time))
+    overall_runtime_minutes, overall_runtime_remaining_seconds = divrem(overall_runtime_seconds, 60)
+    @globalInfo "Complete parameter study finished in $overall_runtime_minutes min " *
+                "$(lpad(overall_runtime_remaining_seconds, 2, '0')) s. " *
+                "$(length(evaluated_parameter_sets)) total runs completed."
 
-    # detect and output best simulation result, independent of any package-specific results
-    report_best_optimisation_result(all_results, optimiser)
-
-    # Start sensitivity analysis based on the former and additional simulation runs.
-    if optimiser["run_sensitivity"] && get(optimiser, "objective_function_name", "") == "multi-objective"
-        @warn "Sensitivity analysis will not be performed because a multi-objective optimiser was selected."
-        optimiser["run_sensitivity"] = false
+    # write results to parameter-study result file if not written continuously
+    if !io_settings["write_parameter_study_csv_continuously"] && !isempty(evaluated_parameter_sets)
+        write_parameter_study_results(parameter_study_results_path, evaluated_parameter_sets)
     end
 
-    if optimiser["run_sensitivity"]
-        sensitivity_start_time = now()
-        results_before_sensitivity = length(all_results)
-
-        try
-            if length(optimiser["iterator"]) > 1
-                calc_global_sensitivity!(nothing, optimiser["bounds"][:, 1:2], all_results,
-                                         optimiser["optim_params_keys"], sim_params, cancel_optimisation)
-
-            else
-                calc_global_sensitivity!(f_physical, optimiser["bounds"][:, 1:2], all_results,
-                                         optimiser["optim_params_keys"], sim_params, cancel_optimisation)
-            end
-        catch e
-            if e isa InterruptException
-                cancel_optimisation[] = true
-
-                sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
-                sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds,
-                                                                                            60)
-                sensitivity_runs = length(all_results) - results_before_sensitivity
-
-                @globalInfo "Global sensitivity analysis interrupted after $sensitivity_runtime_minutes min " *
-                            "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. $sensitivity_runs additional runs completed."
-
-                return false, all_results
-            else
-                rethrow()
-            end
-        end
-
-        sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
-        sensitivity_runtime_minutes, sensitivity_runtime_remaining_seconds = divrem(sensitivity_runtime_seconds, 60)
-        sensitivity_runs = length(all_results) - results_before_sensitivity
-        @globalInfo "Global sensitivity analysis completed in $sensitivity_runtime_minutes min " *
-                    "$(lpad(sensitivity_runtime_remaining_seconds, 2, '0')) s. $sensitivity_runs additional runs completed."
-
-        overall_runtime_seconds = round(Int, seconds(now() - main_start_time))
-        overall_runtime_minutes, overall_runtime_remaining_seconds = divrem(overall_runtime_seconds, 60)
-        @globalInfo "Complete $workflow_name workflow finished in $overall_runtime_minutes min " *
-                    "$(lpad(overall_runtime_remaining_seconds, 2, '0')) s. $(length(all_results)) total runs completed."
-    end
-
-    # write results to optimisation result file if not written continuously
-    if !io_settings["write_optimisation_csv_continuously"] && !isempty(all_results)
-        open(optim_results_path, "w") do file_handle
-            # write header
-            header = join(collect(keys(all_results[1])), ';') * "\n"
-            write(file_handle, header)
-
-            # write results
-            for results in all_results
-                row = join(collect(values(results)), ';') * "\n"
-                row = replace(row, '.' => ',')
-                write(file_handle, row)
-            end
-        end
-    end
-
-    return true, all_results
+    return true, evaluated_parameter_sets
 end
+
+# Optimisation backends
 
 function create_refinement_optimiser(optimiser::Dict{String,Any},
                                      refinement_config::Union{Nothing,AbstractDict},
@@ -679,40 +1024,40 @@ function create_refinement_optimiser(optimiser::Dict{String,Any},
         return nothing
     end
 
-    if optimiser["objective_function_name"] == "multi-objective"
+    if optimiser["runtime"]["objective_function_name"] == "multi-objective"
         @globalInfo "No refinement will be done, as this is not possible for multi-objective optimisation."
         return nothing
     end
 
-    best_result = best_optimisation_result(stage_results, optimiser)
+    best_result = best_objective_result(stage_results, optimiser)
     if isnothing(best_result)
         return nothing
     end
 
-    physical_start = Float64[best_result[key] for key in optimiser["optim_params_keys"]]
-    normalised_start = to_normalised_optim_values(physical_start, optimiser["bounds"])
+    physical_start = Float64[best_result[key] for key in optimiser["runtime"]["parameter_keys"]]
+    normalised_start = to_normalised_optim_values(physical_start, optimiser["runtime"]["parameter_bounds"])
 
     return load_refinement_optimiser(optimiser, refinement_config, normalised_start)
 end
 
 function run_optimiser_backend!(optimiser::Dict{String,Any}, f_progress::Function,
-                                cancel_optimisation::Threads.Atomic{Bool})
-    if optimiser["type"] == "Optim"
-        return Optim.optimize(f_progress, optimiser["args"]...)
-    elseif optimiser["type"] == "BlackBoxOptim"
-        if optimiser["N_obj"] == 1
+                                cancel_parameter_study::Threads.Atomic{Bool})
+    if optimiser["optimisation"]["type"] == "Optim"
+        return Optim.optimize(f_progress, optimiser["runtime"]["args"]...)
+    elseif optimiser["optimisation"]["type"] == "BlackBoxOptim"
+        if optimiser["runtime"]["N_obj"] == 1
             f_wrap = f_progress
         else
             f_wrap(x) = Tuple(f_progress(x))
         end
 
-        return BlackBoxOptim.bboptimize(f_wrap, optimiser["args"]...; optimiser["kwargs"]...)
-    elseif optimiser["type"] == "Metaheuristics"
+        return BlackBoxOptim.bboptimize(f_wrap, optimiser["runtime"]["args"]...; optimiser["runtime"]["kwargs"]...)
+    elseif optimiser["optimisation"]["type"] == "Metaheuristics"
         # Scalar evaluation: used by MOEA/D-DE and other non-batch algorithms.
         function f_metaheuristics(sample_values::AbstractVector)
             result = f_progress(sample_values)
 
-            if optimiser["N_obj"] == 1
+            if optimiser["runtime"]["N_obj"] == 1
                 return Float64(result)
             end
             # Metaheuristics multi-objective scalar callback format:
@@ -723,50 +1068,50 @@ function run_optimiser_backend!(optimiser::Dict{String,Any}, f_progress::Functio
         # Batch evaluation: used only by algorithms supporting parallel_evaluation.
         function f_metaheuristics(sample_values::AbstractMatrix)
             N_samples = size(sample_values, 1)
-            objectives = zeros(N_samples, optimiser["N_obj"])
+            objectives = zeros(N_samples, optimiser["runtime"]["N_obj"])
 
             Threads.@threads for i in 1:N_samples
-                if cancel_optimisation[]
+                if cancel_parameter_study[]
                     continue
                 end
 
                 try
                     result = f_progress(view(sample_values, i, :))
 
-                    if optimiser["N_obj"] == 1
+                    if optimiser["runtime"]["N_obj"] == 1
                         objectives[i, 1] = Float64(result)
                     else
                         objectives[i, :] = vec(Float64.(result))
                     end
                 catch e
                     if e isa InterruptException
-                        cancel_optimisation[] = true
+                        cancel_parameter_study[] = true
                     else
                         rethrow()
                     end
                 end
             end
 
-            if cancel_optimisation[]
+            if cancel_parameter_study[]
                 throw(InterruptException())
             end
 
-            if optimiser["N_obj"] == 1
+            if optimiser["runtime"]["N_obj"] == 1
                 return vec(objectives)
             else
                 return objectives, zeros(N_samples, 1), zeros(N_samples, 1)
             end
         end
 
-        return Metaheuristics.optimize(f_metaheuristics, optimiser["args"]...)
-    elseif optimiser["type"] == "NLopt"
+        return Metaheuristics.optimize(f_metaheuristics, optimiser["runtime"]["args"]...)
+    elseif optimiser["optimisation"]["type"] == "NLopt"
         f_nlopt = function (sample_values, gradient)
             return f_progress(sample_values)
         end
-        NLopt.min_objective!(optimiser["args"][1], f_nlopt)
+        NLopt.min_objective!(optimiser["runtime"]["args"][1], f_nlopt)
 
-        return NLopt.optimize(optimiser["args"]...)
-    elseif optimiser["type"] == "NOMAD"
+        return NLopt.optimize(optimiser["runtime"]["args"]...)
+    elseif optimiser["optimisation"]["type"] == "NOMAD"
         f_nomad = function (sample_values)
             result = f_progress(sample_values)
             outputs = result isa Real ? [Float64(result)] : Float64.(collect(result))
@@ -774,12 +1119,12 @@ function run_optimiser_backend!(optimiser::Dict{String,Any}, f_progress::Functio
             return success, true, outputs
         end
 
-        prob = NOMAD.NomadProblem(optimiser["args"][1:(end - 1)]...,
+        prob = NOMAD.NomadProblem(optimiser["runtime"]["args"][1:(end - 1)]...,
                                   f_nomad;
-                                  optimiser["kwargs"]...)
+                                  optimiser["runtime"]["kwargs"]...)
 
-        return NOMAD.solve(prob, optimiser["args"][4])
+        return NOMAD.solve(prob, optimiser["runtime"]["args"][4])
     end
 
-    @error "Unsupported optimiser type: $(optimiser["type"])"
+    @error "Unsupported optimiser type: $(optimiser["optimisation"]["type"])"
 end

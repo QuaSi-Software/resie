@@ -4,12 +4,14 @@ using Random
 using CSV
 
 """
-    get_output_keys(io_settings, components)
+    get_output_keys(io_settings, economic_parameters, emissions_parameters, parameter_study,
+                    components, suppress_all_output)
 
 Determines output keys for:
   - lineplot
   - csv export
-  - economic output (filtered to value_key containing "OUT" or "IN")
+  - economic and emissions calculations
+  - parameter-study objective evaluation
 
 For each output channel:
   - if not requested, returns `nothing`
@@ -20,7 +22,7 @@ For each output channel:
 function get_output_keys(io_settings::AbstractDict{String,Any},
                          economic_parameters::Union{Nothing,AbstractDict{String,Any}},
                          emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
-                         optimiser_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         parameter_study::AbstractDict{String,Any},
                          components::Grouping,
                          suppress_all_output::Bool)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                            Union{Nothing,Vector{EnergySystems.OutputKey}},
@@ -123,7 +125,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot", suppress_all_output)
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output", suppress_all_output)
     do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
-    do_optimise = optimiser_parameters["run_optimisation"]
+    collect_objective_results = parameter_study["runtime"]["enabled"]
     do_matrix_plot = io_settings["matrix_plot"] == "custom"
 
     # Decide if we need all-keys lists
@@ -172,23 +174,23 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         output_keys_economic_emissions = nothing
     end
 
-    # optimiser keys
-    if do_optimise
-        output_keys_optimise = output_keys(components, optimiser_parameters["objective_keys_sum_mean"])
+    # parameter-study objective keys
+    if collect_objective_results
+        output_keys_parameter_study = output_keys(components, parameter_study["runtime"]["objective_output_spec"])
         if do_matrix_plot
             for (func, spec) in pairs(io_settings["matrix_plot_spec"])
                 if func == "sum" || func == "mean"
                     matrix_keys = output_keys(components, spec)
-                    append!(output_keys_optimise, matrix_keys)
+                    append!(output_keys_parameter_study, matrix_keys)
                 end
             end
         end
-        output_keys_optimise = unique(output_keys_optimise)
+        output_keys_parameter_study = unique(output_keys_parameter_study)
     else
-        output_keys_optimise = nothing
+        output_keys_parameter_study = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_optimise
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_parameter_study
 end
 
 """
@@ -1268,17 +1270,17 @@ function aggregate_csv(input_path::AbstractString,
 end
 
 # ------------------------------------------------------------------------------------------
-# Optimisation plotting
+# Parameter-study plotting
 # ------------------------------------------------------------------------------------------
 
 """
     create_matrix_plot(results, io_settings, sim_params; ...)
 
-Create a lower-triangular optimisation-parameter matrix.
+Create a lower-triangular parameter-study matrix.
 
 The diagonal contains histograms of evaluated parameter values. Pairwise scatter plots are
 shown below the diagonal; the redundant upper triangle remains empty. Scatter colours use the
-selected optimisation parameter, objective, objective component or scalar result quantity. For a single objective, the best point
+selected parameter-study parameter, objective, objective component or scalar result quantity. For a single objective, the best point
 is highlighted. For multiple objectives, all Pareto-optimal points are highlighted.
 
 All panels that display the same parameter are linked with Plotly's `matches` axes. Zooming or
@@ -1292,16 +1294,16 @@ function create_matrix_plot(results::Vector{Any},
                             objective_senses=nothing,
                             color_key=nothing,
                             histogram_bins::Union{Nothing,Int}=nothing)
-    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+    param_names = String.(sim_params["parameter_study"]["runtime"]["parameter_keys"])
 
     if isempty(param_names)
-        @error("Cannot create matrix plot: no optimisation parameters were found.")
+        @error("Cannot create matrix plot: no parameter-study parameters were found.")
         return ""
     end
 
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
     results_dict = spec.results_dict
     isempty(spec.objective_keys) && return ""
 
@@ -1331,19 +1333,19 @@ function create_matrix_plot(results::Vector{Any},
         configured_color_key = first(spec.objective_keys)
     end
 
-    senses = optimisation_objective_senses(spec.objective_keys,
-                                           sim_params;
-                                           objective_senses=objective_senses)
+    senses = parameter_study_objective_senses(spec.objective_keys,
+                                              sim_params;
+                                              objective_senses=objective_senses)
     isempty(senses) && return ""
 
-    # Use the complete scalar optimisation result set for the colour selector.
+    # Use the complete scalar parameter-study result set for the colour selector.
     # This includes the configured objective, named objective components and
-    # other finite scalar objective/KPI result columns. Variable optimisation
+    # other finite scalar objective/KPI result columns. Variable parameter-study
     # parameters remain in their own dropdown group.
-    result_color_keys = optimisation_result_axis_keys(results,
-                                                      results_dict,
-                                                      sim_params,
-                                                      spec.objective_keys)
+    result_color_keys = parameter_study_result_axis_keys(results,
+                                                         results_dict,
+                                                         sim_params,
+                                                         spec.objective_keys)
     objective_color_keys = unique(vcat(result_color_keys,
                                        [configured_color_key]))
     selectable_color_keys = unique(vcat(param_names,
@@ -1764,7 +1766,7 @@ function create_matrix_plot(results::Vector{Any},
         end
     end
 
-    # With one optimisation parameter there is no scatter cell. Add a fully
+    # With one parameter-study parameter there is no scatter cell. Add a fully
     # transparent marker so Plotly still renders the shared colour bar.
     if !scatter_trace_added
         first_parameter = first(param_names)
@@ -1794,7 +1796,7 @@ function create_matrix_plot(results::Vector{Any},
     end
 
     layout_values[:title] = attr(;
-                                 text=("Optimisation parameter matrix — " *
+                                 text=("Parameter-study matrix — " *
                                        "$(length(valid_idx)) valid runs; " *
                                        "red outline: $highlight_description"),
                                  x=0.01,
@@ -1844,12 +1846,12 @@ function create_matrix_plot(results::Vector{Any},
     layout_values[:bargap] = 0.06
 
     p = plot(traces, Layout(; layout_values...))
-    file_path = optimisation_plot_path(sim_params,
-                                       io_settings,
-                                       "matrix_plot")
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "matrix_plot")
     savefig(p, file_path)
 
-    # Add the same toolbar style used by the other interactive optimisation
+    # Add the same toolbar style used by the other interactive parameter-study
     # plots. The graph occupies the viewport space remaining below the toolbar.
     if endswith(lowercase(file_path), ".html")
         html = read(file_path, String)
@@ -1952,12 +1954,12 @@ body {
             return;
         }
 
-        if (document.getElementById('optimisation-matrix-controls')) {
+        if (document.getElementById('parameter-study-matrix-controls')) {
             return;
         }
 
         const controls = document.createElement('div');
-        controls.id = 'optimisation-matrix-controls';
+        controls.id = 'parameter-study-matrix-controls';
         controls.style.fontFamily = 'Arial, sans-serif';
         controls.style.fontSize = '13px';
         controls.style.margin = '8px 0 4px 0';
@@ -2014,7 +2016,7 @@ body {
 
         appendOptionGroup(
             colorSelect,
-            'Optimisation parameters',
+            'Parameter-study parameters',
             parameterKeys
         );
         appendOptionGroup(
@@ -2227,14 +2229,14 @@ function result_value(result, key::String)
 end
 
 """
-    optimisation_results_dict(results)
+    parameter_study_results_dict(results)
 
 Collect every result column in a dictionary of vectors. Missing entries are represented by
 `missing`. String and symbol result keys are handled consistently.
 """
-function optimisation_results_dict(results::Vector{Any})::Dict{String,Vector{Any}}
+function parameter_study_results_dict(results::Vector{Any})::Dict{String,Vector{Any}}
     if isempty(results)
-        @error("Cannot create optimisation plots: results are empty.")
+        @error("Cannot create parameter-study plots: results are empty.")
         return Dict{String,Vector{Any}}()
     end
 
@@ -2252,14 +2254,14 @@ Return `true` for finite scalar real values.
 is_finite_number(value)::Bool = value isa Real && isfinite(Float64(value))
 
 """
-    optimisation_plot_path(sim_params, io_settings, suffix)
+    parameter_study_plot_path(sim_params, io_settings, suffix)
 
-Create a plot path derived from `optim_plots_file_path`.
+Create a plot path derived from `parameter_study_plots_file_path`.
 """
-function optimisation_plot_path(sim_params::Dict{String,Any},
-                                io_settings::Dict{String,Any},
-                                suffix::String)::String
-    base_path = sim_params["run_path"](io_settings["optim_plots_file_path"])
+function parameter_study_plot_path(sim_params::Dict{String,Any},
+                                   io_settings::Dict{String,Any},
+                                   suffix::String)::String
+    base_path = sim_params["run_path"](io_settings["parameter_study_plots_file_path"])
     dir, filename = splitdir(base_path)
     root, _ = splitext(filename)
     ext = ".html"
@@ -2267,11 +2269,11 @@ function optimisation_plot_path(sim_params::Dict{String,Any},
 end
 
 """
-    optimisation_color_bounds(values)
+    parameter_study_color_bounds(values)
 
 Return colour limits spanning the complete finite value range.
 """
-function optimisation_color_bounds(values::Vector{Float64})::Tuple{Float64,Float64}
+function parameter_study_color_bounds(values::Vector{Float64})::Tuple{Float64,Float64}
     if isempty(values)
         @error("Cannot determine colour bounds from an empty vector.")
         return 0.0, 1.0
@@ -2300,7 +2302,7 @@ function objective_colorscale(sense::Symbol)
 end
 
 """
-    optimisation_objective_spec(results, sim_params; objective_keys=nothing)
+    parameter_study_objective_spec(results, sim_params; objective_keys=nothing)
 
 Resolve the scalar objective columns used by the plots.
 
@@ -2309,14 +2311,14 @@ from sum, mean, economic or emissions calculations.
 
 For vector-valued multi-objective results, the objective names are taken from
 `objective_keys` when supplied, otherwise from
-`sim_params["optimisation"]["objective_params_keys"]`. The named scalar columns already stored
-in every optimisation result are used directly; no numerical value matching or predefined
+`sim_params["parameter_study"]["runtime"]["objective_params_keys"]`. The named scalar columns already stored
+in every parameter-study result are used directly; no numerical value matching or predefined
 objective categories are required.
 """
-function optimisation_objective_spec(results::Vector{Any},
-                                     sim_params::Dict{String,Any};
-                                     objective_keys=nothing)
-    results_dict = optimisation_results_dict(results)
+function parameter_study_objective_spec(results::Vector{Any},
+                                        sim_params::Dict{String,Any};
+                                        objective_keys=nothing)
+    results_dict = parameter_study_results_dict(results)
     isempty(results_dict) &&
         return (; results_dict,
                 objective_keys=String[],
@@ -2342,7 +2344,7 @@ function optimisation_objective_spec(results::Vector{Any},
                     vector_objective=false)
         end
 
-        @error("Cannot create optimisation plots: no finite scalar objective was found.")
+        @error("Cannot create parameter-study plots: no finite scalar objective was found.")
         return (; results_dict,
                 objective_keys=String[],
                 is_multiobjective=false,
@@ -2353,7 +2355,7 @@ function optimisation_objective_spec(results::Vector{Any},
 
     if any(length_value -> length_value != n_objectives,
            vector_lengths)
-        @error("Cannot create optimisation plots: vector-valued objective entries have inconsistent lengths.")
+        @error("Cannot create parameter-study plots: vector-valued objective entries have inconsistent lengths.")
         return (; results_dict,
                 objective_keys=String[],
                 is_multiobjective=n_objectives > 1,
@@ -2362,16 +2364,16 @@ function optimisation_objective_spec(results::Vector{Any},
 
     selected_keys = if objective_keys !== nothing
         String.(objective_keys)
-    elseif haskey(sim_params, "optimisation") &&
-           haskey(sim_params["optimisation"], "objective_params_keys")
-        String.(sim_params["optimisation"]["objective_params_keys"])
+    elseif haskey(sim_params, "parameter_study") &&
+           haskey(sim_params["parameter_study"]["runtime"], "objective_params_keys")
+        String.(sim_params["parameter_study"]["runtime"]["objective_params_keys"])
     else
         String[]
     end
 
     if isempty(selected_keys)
         @error("Multi-objective plotting requires the ordered objective parameter keys in " *
-               "sim_params[\"optimisation\"][\"objective_params_keys\"] or via objective_keys.")
+               "sim_params[\"parameter_study\"][\"runtime\"][\"objective_params_keys\"] or via objective_keys.")
         return (; results_dict,
                 objective_keys=String[],
                 is_multiobjective=n_objectives > 1,
@@ -2433,16 +2435,16 @@ function optimisation_objective_spec(results::Vector{Any},
 end
 
 """
-    optimisation_result_axis_keys(results, results_dict, sim_params, objective_keys)
+    parameter_study_result_axis_keys(results, results_dict, sim_params, objective_keys)
 
 Return selectable scalar result axes. True objective columns are listed first, followed by other
 finite scalar result or KPI columns. Parameters and metadata are excluded.
 """
-function optimisation_result_axis_keys(results::Vector{Any},
-                                       results_dict::Dict{String,Vector{Any}},
-                                       sim_params::Dict{String,Any},
-                                       objective_keys::Vector{String})::Vector{String}
-    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
+function parameter_study_result_axis_keys(results::Vector{Any},
+                                          results_dict::Dict{String,Vector{Any}},
+                                          sim_params::Dict{String,Any},
+                                          objective_keys::Vector{String})::Vector{String}
+    param_names = String.(sim_params["parameter_study"]["runtime"]["parameter_keys"])
     excluded_keys = Set(vcat(param_names,
                              ["error",
                               "run",
@@ -2462,37 +2464,38 @@ function optimisation_result_axis_keys(results::Vector{Any},
 end
 
 """
-    optimisation_objective_senses(objective_keys, sim_params; objective_senses=nothing)
+    parameter_study_objective_senses(objective_keys, sim_params; objective_senses=nothing)
 
 Resolve one `:min` or `:max` sense for each objective. The keyword may be a single symbol, a
 vector in objective order or a dictionary keyed by objective name. If omitted, the function
-first uses `sim_params["optimisation"]["objective_senses"]` when available. Otherwise it infers
+first uses `sim_params["parameter_study"]["runtime"]["objective_senses"]` when available. Otherwise it infers
 the direction from the sign of `objective_factors` (positive means minimise, negative means
 maximise) and defaults to `:min` when no factor is available.
 """
-function optimisation_objective_senses(objective_keys::Vector{String},
-                                       sim_params::Dict{String,Any};
-                                       objective_senses=nothing)::Dict{String,Symbol}
-    optimiser = get(sim_params, "optimisation", Dict{String,Any}())
+function parameter_study_objective_senses(objective_keys::Vector{String},
+                                          sim_params::Dict{String,Any};
+                                          objective_senses=nothing)::Dict{String,Symbol}
+    parameter_study = get(sim_params, "parameter_study", Dict{String,Any}())
+    runtime = get(parameter_study, "runtime", Dict{String,Any}())
     configured = objective_senses
 
     # An explicit sense configuration has priority.
-    if configured === nothing && haskey(optimiser, "objective_senses")
-        configured = optimiser["objective_senses"]
+    if configured === nothing && haskey(runtime, "objective_senses")
+        configured = runtime["objective_senses"]
     end
 
     resolved = Dict{String,Symbol}()
 
     if configured === nothing
         # When no explicit senses are supplied, infer the direction from
-        # objective_factors if they are available. The optimisers minimise the
+        # objective_factors if they are available. Optimisation backends minimise the
         # factor-weighted objective values:
         #
         #   positive factor -> minimise the original objective
         #   negative factor -> maximise the original objective
         #
         # The scalar aggregate "objective" remains a minimisation quantity.
-        factors = get(optimiser, "objective_factors", nothing)
+        factors = get(parameter_study, "objective_factors", nothing)
 
         for key in objective_keys
             if key == "objective"
@@ -2517,7 +2520,7 @@ function optimisation_objective_senses(objective_keys::Vector{String},
                     resolved[key] = :max
                 else
                     @warn("Objective factor for \"$key\" is zero. " *
-                          "The objective has no optimisation direction; using :min for plotting.")
+                          "The objective has no effective direction; using :min for plotting.")
                     resolved[key] = :min
                 end
             else
@@ -2620,15 +2623,15 @@ function create_objective_convergence_plot(results::Vector{Any},
                                            sim_params::Dict{String,Any};
                                            objective_keys=nothing,
                                            objective_senses=nothing)
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
     results_dict = spec.results_dict
     isempty(spec.objective_keys) && return ""
 
-    senses = optimisation_objective_senses(spec.objective_keys,
-                                           sim_params;
-                                           objective_senses=objective_senses)
+    senses = parameter_study_objective_senses(spec.objective_keys,
+                                              sim_params;
+                                              objective_senses=objective_senses)
     isempty(senses) && return ""
 
     objective_data = Dict{String,Vector{Union{Nothing,Float64}}}()
@@ -2726,9 +2729,9 @@ function create_objective_convergence_plot(results::Vector{Any},
     plot_object = plot([objective_trace, best_trace], layout)
 
     # Use the same output suffix for single- and multi-objective runs.
-    file_path = optimisation_plot_path(sim_params,
-                                       io_settings,
-                                       "convergence")
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "convergence")
 
     savefig(plot_object, file_path)
 
@@ -3166,7 +3169,7 @@ end
     create_objective_parameter_plots(results, io_settings, sim_params; ...)
 
 Create a single interactive 2D objective/parameter explorer. Both axes and the marker colour
-can be selected independently from all finite scalar optimisation parameters, objectives and
+can be selected independently from all finite scalar parameter-study parameters, objectives and
 result/KPI columns.
 
 Single-objective runs highlight the best solution. Multi-objective runs highlight the global
@@ -3178,29 +3181,29 @@ function create_objective_parameter_plots(results::Vector{Any},
                                           objective_keys=nothing,
                                           objective_senses=nothing,
                                           color_key=nothing)
-    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
-    configured_objective_params = if haskey(sim_params["optimisation"],
+    param_names = String.(sim_params["parameter_study"]["runtime"]["parameter_keys"])
+    configured_objective_params = if haskey(sim_params["parameter_study"]["runtime"],
                                             "objective_params_keys")
-        unique(String.(sim_params["optimisation"]["objective_params_keys"]))
+        unique(String.(sim_params["parameter_study"]["runtime"]["objective_params_keys"]))
     else
         String[]
     end
 
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
     results_dict = spec.results_dict
     isempty(spec.objective_keys) && return ""
 
-    senses = optimisation_objective_senses(spec.objective_keys,
-                                           sim_params;
-                                           objective_senses=objective_senses)
+    senses = parameter_study_objective_senses(spec.objective_keys,
+                                              sim_params;
+                                              objective_senses=objective_senses)
     isempty(senses) && return ""
 
     configured_senses = if objective_senses !== nothing
         objective_senses
-    elseif haskey(sim_params["optimisation"], "objective_senses")
-        sim_params["optimisation"]["objective_senses"]
+    elseif haskey(sim_params["parameter_study"]["runtime"], "objective_senses")
+        sim_params["parameter_study"]["runtime"]["objective_senses"]
     else
         nothing
     end
@@ -3237,7 +3240,7 @@ function create_objective_parameter_plots(results::Vector{Any},
                              if haskey(results_dict, key) && any(is_finite_number, results_dict[key])]
 
     if isempty(available_param_names)
-        @error("Cannot create objective/parameter explorer: no finite optimisation parameters were found.")
+        @error("Cannot create objective/parameter explorer: no finite parameter-study parameters were found.")
         return ""
     end
 
@@ -3280,10 +3283,10 @@ function create_objective_parameter_plots(results::Vector{Any},
         end
     end
 
-    available_result_keys = optimisation_result_axis_keys(results,
-                                                          results_dict,
-                                                          sim_params,
-                                                          spec.objective_keys)
+    available_result_keys = parameter_study_result_axis_keys(results,
+                                                             results_dict,
+                                                             sim_params,
+                                                             spec.objective_keys)
 
     interactive_keys = unique(vcat(available_param_names,
                                    available_result_keys))
@@ -3376,7 +3379,7 @@ function create_objective_parameter_plots(results::Vector{Any},
              showscale=false)
     else
         color_values = Float64[plot_data[initial_color][idx] for idx in initial_valid_idx]
-        cmin, cmax = optimisation_color_bounds(color_values)
+        cmin, cmax = parameter_study_color_bounds(color_values)
 
         initial_color_sense = explorer_objective_sense(initial_color)
 
@@ -3441,9 +3444,9 @@ function create_objective_parameter_plots(results::Vector{Any},
                     autosize=true)
 
     p = plot(GenericTrace[runs_trace, highlight_trace], layout)
-    file_path = optimisation_plot_path(sim_params,
-                                       io_settings,
-                                       "objective_parameter_explorer")
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "objective_parameter_explorer")
     if lowercase(splitext(file_path)[2]) != ".html"
         @error("The objective/parameter explorer requires an HTML output path.")
         return ""
@@ -3479,8 +3482,8 @@ end
                                          initial_y, initial_color)
 
 Inject grouped x-axis, y-axis and colour selectors into the objective/parameter explorer.
-Every finite scalar optimisation parameter, objective and result/KPI column remains available.
-Variables are shown under the two dropdown groups "Optimisation parameters" and "Objectives".
+Every finite scalar parameter-study parameter, objective and result/KPI column remains available.
+Variables are shown under the two dropdown groups "Parameter-study parameters" and "Objectives".
 """
 function inject_objective_parameter_controls!(file_path::String,
                                               plot_data::Dict{String,Vector{Union{Nothing,Float64}}},
@@ -4098,22 +4101,22 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                           objective_keys=nothing,
                                           objective_senses=nothing,
                                           color_key=nothing)
-    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+    param_names = String.(sim_params["parameter_study"]["runtime"]["parameter_keys"])
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
     results_dict = spec.results_dict
     isempty(spec.objective_keys) && return ""
 
-    senses = optimisation_objective_senses(spec.objective_keys,
-                                           sim_params;
-                                           objective_senses=objective_senses)
+    senses = parameter_study_objective_senses(spec.objective_keys,
+                                              sim_params;
+                                              objective_senses=objective_senses)
     isempty(senses) && return ""
 
-    result_axis_keys = optimisation_result_axis_keys(results,
-                                                     results_dict,
-                                                     sim_params,
-                                                     spec.objective_keys)
+    result_axis_keys = parameter_study_result_axis_keys(results,
+                                                        results_dict,
+                                                        sim_params,
+                                                        spec.objective_keys)
 
     color_source_keys = unique(vcat(param_names, result_axis_keys))
 
@@ -4160,7 +4163,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                            for idx in valid_idx]
 
     color_sense = get(senses, selected_color_key, :min)
-    cmin, cmax = optimisation_color_bounds(color_values)
+    cmin, cmax = parameter_study_color_bounds(color_values)
     n_parameters = length(param_names)
     n_dimensions = length(dimensions)
     n_results = n_dimensions - n_parameters
@@ -4204,7 +4207,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                                                                  plot_y_max)
 
     layout = Layout(;
-                    title=attr(; text="Interactive Optimisation Design Space",
+                    title=attr(; text="Interactive Parameter Study Design Space",
                                x=0.5,
                                xanchor="center",
                                y=0.995,
@@ -4215,9 +4218,9 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                     annotations=group_annotations)
 
     p = plot(trace, layout)
-    file_path = optimisation_plot_path(sim_params,
-                                       io_settings,
-                                       "parallel_coordinates")
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "parallel_coordinates")
     savefig(p, file_path)
     inject_parallel_axis_zoom_controls!(file_path,
                                         param_names,
@@ -4302,26 +4305,26 @@ function parallel_group_decorations(n_parameters::Int,
 end
 
 """
-    optimisation_objective_axis_keys(results, sim_params, primary_obj_key="objective";
+    parameter_study_objective_axis_keys(results, sim_params, primary_obj_key="objective";
                                      objective_keys=nothing)
 
 Backward-compatible helper returning all scalar objective or KPI axes. The vector-valued
 `"objective"` column itself is excluded; the configured named scalar objective columns are included.
 """
-function optimisation_objective_axis_keys(results::Vector{Any},
-                                          sim_params::Dict{String,Any},
-                                          primary_obj_key::String="objective";
-                                          objective_keys=nothing)::Vector{String}
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+function parameter_study_objective_axis_keys(results::Vector{Any},
+                                             sim_params::Dict{String,Any},
+                                             primary_obj_key::String="objective";
+                                             objective_keys=nothing)::Vector{String}
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
 
     isempty(spec.objective_keys) && return String[]
 
-    return optimisation_result_axis_keys(results,
-                                         spec.results_dict,
-                                         sim_params,
-                                         spec.objective_keys)
+    return parameter_study_result_axis_keys(results,
+                                            spec.results_dict,
+                                            sim_params,
+                                            spec.objective_keys)
 end
 
 function inject_parallel_axis_zoom_controls!(file_path::String,
@@ -5232,7 +5235,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                 return objectiveSenses[key];
             }
 
-            // Parameters and other result quantities have no optimisation
+            // Parameters and other result quantities have no objective
             // direction. Keep low values yellow and high values purple.
             return "min";
         }
@@ -5608,60 +5611,60 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
 end
 
 """
-    create_interactive_3d_optimisation_plot(results, io_settings, sim_params;
+    create_interactive_3d_parameter_study_plot(results, io_settings, sim_params;
                                             objective_keys=nothing, x_key=nothing,
                                             y_key=nothing, z_key=nothing, color_key=nothing,
                                             objective_sense=:min)
 
-Create an interactive 3D optimisation explorer with selectable axes, colour variable and
+Create an interactive 3D parameter-study explorer with selectable axes, colour variable and
 independent axis zoom controls.
 """
 
 """
-    create_interactive_3d_optimisation_plot(results, io_settings, sim_params; ...)
+    create_interactive_3d_parameter_study_plot(results, io_settings, sim_params; ...)
 
-Create an interactive 3D optimisation explorer with selectable parameter and result axes,
+Create an interactive 3D parameter-study explorer with selectable parameter and result axes,
 selectable colour, two fixed control rows and independent axis zoom controls. Single-objective
 runs highlight the best solution. Multi-objective runs highlight all Pareto-optimal solutions.
 """
-function create_interactive_3d_optimisation_plot(results::Vector{Any},
-                                                 io_settings::Dict{String,Any},
-                                                 sim_params::Dict{String,Any};
-                                                 objective_keys=nothing,
-                                                 objective_senses=nothing,
-                                                 x_key=nothing,
-                                                 y_key=nothing,
-                                                 z_key=nothing,
-                                                 color_key=nothing,
-                                                 objective_sense::Symbol=:min)
+function create_interactive_3d_parameter_study_plot(results::Vector{Any},
+                                                    io_settings::Dict{String,Any},
+                                                    sim_params::Dict{String,Any};
+                                                    objective_keys=nothing,
+                                                    objective_senses=nothing,
+                                                    x_key=nothing,
+                                                    y_key=nothing,
+                                                    z_key=nothing,
+                                                    color_key=nothing,
+                                                    objective_sense::Symbol=:min)
     if !(objective_sense in (:min, :max))
         @error("objective_sense must be :min or :max.")
         return ""
     end
 
-    param_names = String.(sim_params["optimisation"]["optim_params_keys"])
-    spec = optimisation_objective_spec(results,
-                                       sim_params;
-                                       objective_keys=objective_keys)
+    param_names = String.(sim_params["parameter_study"]["runtime"]["parameter_keys"])
+    spec = parameter_study_objective_spec(results,
+                                          sim_params;
+                                          objective_keys=objective_keys)
     results_dict = spec.results_dict
     isempty(spec.objective_keys) && return ""
 
-    has_configured_senses = haskey(sim_params, "optimisation") &&
-                            haskey(sim_params["optimisation"], "objective_senses")
+    has_configured_senses = haskey(sim_params, "parameter_study") &&
+                            haskey(sim_params["parameter_study"]["runtime"], "objective_senses")
 
     senses_input = objective_senses === nothing && !has_configured_senses ?
                    objective_sense :
                    objective_senses
 
-    senses = optimisation_objective_senses(spec.objective_keys,
-                                           sim_params;
-                                           objective_senses=senses_input)
+    senses = parameter_study_objective_senses(spec.objective_keys,
+                                              sim_params;
+                                              objective_senses=senses_input)
     isempty(senses) && return ""
 
-    result_axis_keys = optimisation_result_axis_keys(results,
-                                                     results_dict,
-                                                     sim_params,
-                                                     spec.objective_keys)
+    result_axis_keys = parameter_study_result_axis_keys(results,
+                                                        results_dict,
+                                                        sim_params,
+                                                        spec.objective_keys)
     axis_keys = unique(vcat(param_names, result_axis_keys))
 
     if isempty(axis_keys)
@@ -5763,7 +5766,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                      "Best objective"
 
     color_values = axis_data[color_selected]
-    cmin, cmax = optimisation_color_bounds(color_values)
+    cmin, cmax = parameter_study_color_bounds(color_values)
     color_sense = get(senses, color_selected, :min)
 
     hover_keys = unique(vcat(param_names,
@@ -5781,7 +5784,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                   y=axis_data[y_selected],
                                   z=axis_data[z_selected],
                                   mode="markers",
-                                  name="Optimisation runs",
+                                  name="Parameter-study runs",
                                   marker=attr(; size=5,
                                               opacity=0.75,
                                               color=color_values,
@@ -5813,7 +5816,7 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                                        text=hover_text[highlight_indices],
                                        hovertemplate="%{text}<extra></extra>")
 
-    layout = Layout(; title=attr(; text="Interactive 3D Optimisation Explorer",
+    layout = Layout(; title=attr(; text="Interactive 3D Parameter Study Explorer",
                                  x=0.5,
                                  xanchor="center"),
                     scene=attr(; xaxis=attr(; title=x_selected, autorange=true),
@@ -5831,9 +5834,9 @@ function create_interactive_3d_optimisation_plot(results::Vector{Any},
                     height=720)
 
     p = plot([runs_trace, highlight_trace], layout)
-    file_path = optimisation_plot_path(sim_params,
-                                       io_settings,
-                                       "interactive_3d")
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "interactive_3d")
 
     if lowercase(splitext(file_path)[2]) != ".html"
         @error("The interactive 3D plot requires an HTML output path.")
@@ -5865,7 +5868,7 @@ end
                                        initial_z, initial_color)
 
 Inject axis selection, colour selection, camera reset and axis-zoom controls into a saved
-3D optimisation HTML plot.
+3D parameter-study HTML plot.
 """
 function inject_3d_axis_selection_controls!(file_path::String,
                                             axis_data::Dict{String,Vector{Float64}},
@@ -5925,14 +5928,14 @@ function inject_3d_axis_selection_controls!(file_path::String,
             return;
         }
 
-        if (document.getElementById("optimisation-3d-controls")) {
+        if (document.getElementById("parameter-study-3d-controls")) {
             return;
         }
 
         const runTraceIndex = gd.data.findIndex(
             trace =>
                 trace.type === "scatter3d" &&
-                trace.name === "Optimisation runs"
+                trace.name === "Parameter-study runs"
         );
 
         const highlightTraceIndex = gd.data.findIndex(
@@ -5963,7 +5966,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
         };
 
         const controls = document.createElement("div");
-        controls.id = "optimisation-3d-controls";
+        controls.id = "parameter-study-3d-controls";
         controls.style.flex = "0 0 auto";
         controls.style.width = "100%";
         controls.style.boxSizing = "border-box";
@@ -6371,7 +6374,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
         }
 
         function hoverText(xKey, yKey, zKey, colorKey) {
-            // Show every optimisation parameter and preserve selected
+            // Show every parameter-study parameter and preserve selected
             // non-parameter axis/colour quantities without duplicate lines.
             const hoverKeys = Array.from(
                 new Set([
@@ -6678,20 +6681,20 @@ function inject_3d_axis_selection_controls!(file_path::String,
 end
 
 """
-    create_optimisation_diagnostic_plots(results, io_settings, sim_params; ...)
+    create_parameter_study_diagnostic_plots(results, io_settings, sim_params; ...)
 
-Create all optimisation diagnostic plots and return their output paths. Objective columns are
+Create all parameter-study diagnostic plots and return their output paths. Objective columns are
 resolved from the scalar `"objective"` column for single-objective runs and from
-`sim_params["optimisation"]["objective_params_keys"]` for multi-objective runs. Optional
+`sim_params["parameter_study"]["runtime"]["objective_params_keys"]` for multi-objective runs. Optional
 objective names, senses and colour selection are forwarded consistently to all figures.
 """
-function create_optimisation_diagnostic_plots(results::Vector{Any},
-                                              io_settings::Dict{String,Any},
-                                              sim_params::Dict{String,Any};
-                                              objective_keys=nothing,
-                                              objective_senses=nothing,
-                                              color_key=nothing)
-    @globalInfo("Preparing optimisation figures...")
+function create_parameter_study_diagnostic_plots(results::Vector{Any},
+                                                 io_settings::Dict{String,Any},
+                                                 sim_params::Dict{String,Any};
+                                                 objective_keys=nothing,
+                                                 objective_senses=nothing,
+                                                 color_key=nothing)
+    @globalInfo("Preparing parameter-study figures...")
 
     if io_settings["matrix_plot"] != "nothing"
         matrix = create_matrix_plot(results,
@@ -6700,7 +6703,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                     objective_keys=objective_keys,
                                     objective_senses=objective_senses,
                                     color_key=color_key)
-        @globalInfo "Optimisation matrix plot created and saved to $matrix"
+        @globalInfo "Parameter-study matrix plot created and saved to $matrix"
     end
 
     convergence = create_objective_convergence_plot(results,
@@ -6708,7 +6711,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                     sim_params;
                                                     objective_keys=objective_keys,
                                                     objective_senses=objective_senses)
-    @globalInfo "Optimisation convergence plot created and saved to $convergence"
+    @globalInfo "Parameter-study convergence plot created and saved to $convergence"
 
     parameter_plots = create_objective_parameter_plots(results,
                                                        io_settings,
@@ -6716,7 +6719,7 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                        objective_keys=objective_keys,
                                                        objective_senses=objective_senses,
                                                        color_key=color_key)
-    @globalInfo "Optimisation parameter plot created and saved to $parameter_plots"
+    @globalInfo "Parameter-study parameter plot created and saved to $parameter_plots"
 
     parallel_coordinates = create_parallel_coordinates_plot(results,
                                                             io_settings,
@@ -6724,14 +6727,14 @@ function create_optimisation_diagnostic_plots(results::Vector{Any},
                                                             objective_keys=objective_keys,
                                                             objective_senses=objective_senses,
                                                             color_key=color_key)
-    @globalInfo "Optimisation parallel plot created and saved to $parallel_coordinates"
+    @globalInfo "Parameter-study parallel plot created and saved to $parallel_coordinates"
 
-    interactive_3d = create_interactive_3d_optimisation_plot(results,
-                                                             io_settings,
-                                                             sim_params;
-                                                             objective_keys=objective_keys,
-                                                             objective_senses=objective_senses,
-                                                             color_key=color_key)
+    interactive_3d = create_interactive_3d_parameter_study_plot(results,
+                                                                io_settings,
+                                                                sim_params;
+                                                                objective_keys=objective_keys,
+                                                                objective_senses=objective_senses,
+                                                                color_key=color_key)
 
-    @globalInfo "Optimisation 3D plot created and saved to $interactive_3d"
+    @globalInfo "Parameter-study 3D plot created and saved to $interactive_3d"
 end

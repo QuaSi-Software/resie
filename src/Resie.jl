@@ -116,21 +116,23 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                              operations::OrderOfOperations;
                              suppress_all_output::Bool=false,
                              cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)
+    parameter_study = sim_params["parameter_study"]
+    collect_objective_results = parameter_study["runtime"]["enabled"]
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot,
     output_keys_to_CSV,
     output_keys_economic_emissions,
-    output_keys_optimise = get_output_keys(io_settings,
-                                           sim_params["economic_parameters"],
-                                           sim_params["emissions_parameters"],
-                                           sim_params["optimisation"],
-                                           components,
-                                           suppress_all_output)
+    output_keys_parameter_study = get_output_keys(io_settings,
+                                                  sim_params["economic_parameters"],
+                                                  sim_params["emissions_parameters"],
+                                                  parameter_study,
+                                                  components,
+                                                  suppress_all_output)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
                                                                                   something(output_keys_economic_emissions,
                                                                                             String[]),
-                                                                                  something(output_keys_optimise,
+                                                                                  something(output_keys_parameter_study,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params, suppress_all_output)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -144,7 +146,6 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     csv_time_unit = io_settings["csv_time_unit"]
     do_calculate_economy = sim_params["economic_parameters"]["calculate_economy"]
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
-    do_optimise = sim_params["optimisation"]["run_optimisation"]
     do_create_sankey = !suppress_all_output && io_settings["sankey_plot"] !== "nothing"
 
     # Initialize the arrays for output
@@ -155,7 +156,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
                                 1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
-    output_data_all_requested = do_create_plot_data || do_calculate_economy || do_calculate_emissions ?
+    output_data_all_requested = do_create_plot_data || do_calculate_economy || do_calculate_emissions ||
+                                collect_objective_results ?
                                 zeros(Float64, sim_params["number_of_time_steps_output"],
                                       1 + length(all_requested_output_keys)) :
                                 nothing
@@ -253,7 +255,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
             # gather output data of each component for line plot, economy and emissions
-            if do_create_plot_data || do_calculate_economy || do_calculate_emissions || do_optimise
+            if do_create_plot_data || do_calculate_economy || do_calculate_emissions || collect_objective_results
                 output_data_all_requested[output_steps, :] = gather_output_data(all_requested_output_keys,
                                                                                 sim_params["time_since_output"])
             end
@@ -281,7 +283,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     @info "-- Finished time step loop"
 
     # extract output data per category including the time step in the first column
-    # TODO replace with parse_outkeys() or use this approach in do_optimise
+    # TODO replace with parse_outkeys() or use this approach for parameter studies
     output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
     function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
         keys === nothing && return Int[]
@@ -299,15 +301,15 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         emissions_result = do_calculate_emissions ? calculate_emissions(economic_emissions_data, sim_params) : nothing
     end
 
-    if do_optimise
-        optim_results = Dict{String,Union{Array{Float64},Float64}}()
+    if collect_objective_results
+        objective_results = Dict{String,Union{Array{Float64},Float64}}()
         # create keys consistent with csv_output for return data for return Dict
         output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
         output_data = OrderedDict{String,AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
 
-        function write_optim_results!(params::Array{String},
-                                      output_data::OrderedDict{String,AbstractArray},
-                                      res::Dict{String,Union{Array{Float64},Float64}})
+        function write_objective_results!(params::Array{String},
+                                          output_data::OrderedDict{String,AbstractArray},
+                                          res::Dict{String,Union{Array{Float64},Float64}})
             for key in params
                 func = split(key, " ")[1]
                 spec = key[(length(func) + 2):end]
@@ -323,14 +325,16 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             end
         end
         # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
-        write_optim_results!(sim_params["optimisation"]["objective_params_keys"], output_data, optim_results)
+        write_objective_results!(sim_params["parameter_study"]["runtime"]["objective_params_keys"], output_data,
+                                 objective_results)
         # calculate objective from the results 
-        objective_values = [optim_results[key] for key in sim_params["optimisation"]["objective_params_keys"]]
-        optim_results["objective"] = sim_params["optimisation"]["objective_function"](objective_values)
+        objective_values = [objective_results[key]
+                            for key in sim_params["parameter_study"]["runtime"]["objective_params_keys"]]
+        objective_results["objective"] = sim_params["parameter_study"]["runtime"]["objective_function"](objective_values)
 
         # write necessary values for matrix_plot in the global result dictionary that is returned by run_simulation_loop()
         if io_settings["matrix_plot"] == "custom"
-            write_optim_results!(io_settings["matrix_plot_spec"], output_data, optim_results)
+            write_objective_results!(io_settings["matrix_plot_spec"], output_data, objective_results)
         end
     end
 
@@ -461,7 +465,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         success && @info "Utilized price and emission profiles exported as plot to $filepath"
     end
 
-    return do_optimise ? optim_results : nothing
+    return collect_objective_results ? objective_results : nothing
 end
 
 """
@@ -514,13 +518,15 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     io_settings = get_io_settings(project_config)
     sim_params = get_simulation_params(project_config, io_settings; preparation_cache=preparation_cache)
 
-    if sim_params["optimisation"]["run_optimisation"]
-        # perform multiple simulation runs
-        success, all_results = perform_optimisation(io_settings, sim_params, project_config;
-                                                    preparation_cache=preparation_cache)
+    if sim_params["parameter_study"]["runtime"]["enabled"]
+        # perform the configured parameter study
+        success, evaluated_parameter_sets = perform_parameter_study(io_settings,
+                                                                    sim_params,
+                                                                    project_config;
+                                                                    preparation_cache=preparation_cache)
 
-        if !isempty(all_results)
-            create_optimisation_diagnostic_plots(all_results, io_settings, sim_params)
+        if sim_params["parameter_study"]["runtime"]["run_primary_study"] && !isempty(evaluated_parameter_sets)
+            create_parameter_study_diagnostic_plots(evaluated_parameter_sets, io_settings, sim_params)
         end
     else
         # perform single simulation run
@@ -528,10 +534,10 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
         run_lock = ReentrantLock()
         output_lock = ReentrantLock()
         try
-            _ = run_sample(io_settings, sim_params, nothing, project_config,
-                           nothing, run_ID, run_lock, output_lock;
-                           suppress_all_output=false,
-                           preparation_cache=preparation_cache)
+            _ = run_simulation_sample(io_settings, sim_params, nothing, project_config,
+                                      nothing, run_ID, run_lock, output_lock;
+                                      suppress_all_output=false,
+                                      preparation_cache=preparation_cache)
         catch e
             if e isa InterruptException
                 @globalInfo "Simulation interrupted by user."
@@ -546,41 +552,43 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
 end
 
 """
-    run_sample(io_settings, sim_params, optim_results_path, project_config, sample_params, 
-               run_ID, run_lock, output_lock;suppress_all_output=false)
+    run_simulation_sample(io_settings, sim_params, parameter_study_results_path, project_config,
+                          parameter_set, run_ID, run_lock, output_lock; suppress_all_output=false)
 
 Run a single simulation sample with given parameters.
 
 # Arguments
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `optim_results_path::Union{String,Nothing}`: Filepath for optim_results
+- `parameter_study_results_path::Union{String,Nothing}`: File path for parameter-study results
 - `project_config::OrderedDict{String,Any}`: The project config
-- `sample_params::Dict{String, Any}`: Values and names of the sample parameters that get 
+- `parameter_set::Dict{String, Any}`: Values and names of the sample parameters that get 
                                       used for the next simulation run
 - `run_ID::UUID`: The run ID used in the run registry
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
-- `output_lock::ReentrantLock`: Lock for file at optim_results_path
+- `output_lock::ReentrantLock`: Lock for file at parameter_study_results_path
 - `suppress_all_output::Bool=false`: Bool that can be set to suppress the generation of all outputs written to hard drive.
 - `cancel_flag::Union{Nothing,Threads.Atomic{Bool}}`: Flag to pass STR+C down to all parallel runs
 # Returns
 - `OrderedDict{String,Union{Float64, Int64, String}}`: Results of the simulation run
 """
-function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
-                    optim_results_path::Union{String,Nothing}, project_config::OrderedDict{String,Any},
-                    sample_params::Union{Dict{String,Any},Nothing}, run_ID::UUID, run_lock::ReentrantLock,
-                    output_lock::ReentrantLock; suppress_all_output::Bool=false,
-                    cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
-                    preparation_cache::Union{Nothing,PreparationCache}=nothing)::OrderedDict{String,Any}
+function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
+                               parameter_study_results_path::Union{String,Nothing},
+                               project_config::OrderedDict{String,Any},
+                               parameter_set::Union{Dict{String,Any},Nothing}, run_ID::UUID,
+                               run_lock::ReentrantLock, output_lock::ReentrantLock;
+                               suppress_all_output::Bool=false,
+                               cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing,
+                               preparation_cache::Union{Nothing,PreparationCache}=nothing)::OrderedDict{String,Any}
     start = now()
-    if !isnothing(sample_params)
-        project_config = create_variant(io_settings, sim_params, project_config, sample_params)
+    if !isnothing(parameter_set)
+        project_config = create_parameter_variant(io_settings, sim_params, project_config, parameter_set)
     end
 
     results = OrderedDict{String,Any}()
 
-    if !isnothing(sample_params)
-        for (key, value) in pairs(sample_params)
+    if !isnothing(parameter_set)
+        for (key, value) in pairs(parameter_set)
             results[key] = value
         end
     end
@@ -616,12 +624,12 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
             rethrow()
         end
 
-        if !isnothing(optim_results_path) && filesize(optim_results_path) == 0
+        if !isnothing(parameter_study_results_path) && filesize(parameter_study_results_path) == 0
             throw(e)
         end
 
-        if sim_params["optimisation"]["run_optimisation"]
-            for key in sim_params["optimisation"]["objective_params_keys"]
+        if sim_params["parameter_study"]["runtime"]["enabled"]
+            for key in sim_params["parameter_study"]["runtime"]["objective_params_keys"]
                 results[key] = NaN
             end
 
@@ -653,7 +661,7 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         end
     end
 
-    if sim_params["optimisation"]["run_optimisation"] && io_settings["write_optimisation_csv_continuously"]
+    if sim_params["parameter_study"]["runtime"]["enabled"] && io_settings["write_parameter_study_csv_continuously"]
         # Write results to file after the single simulation has finished.
         row = join(collect(values(results)), ';') * "\n"
         row = replace(row, ',' => ' ')
@@ -661,13 +669,13 @@ function run_sample(io_settings::Dict{String,Any}, sim_params::Dict{String,Any},
         # Lock the file writing
         lock(output_lock) do
             # create header if file is empty
-            if filesize(optim_results_path) == 0
+            if filesize(parameter_study_results_path) == 0
                 header = join(collect(keys(results)), ';') * "\n"
-                open(optim_results_path, "w") do file_handle
+                open(parameter_study_results_path, "w") do file_handle
                     write(file_handle, header)
                 end
             end
-            open(optim_results_path, "a") do file_handle
+            open(parameter_study_results_path, "a") do file_handle
                 write(file_handle, row)
             end
         end

@@ -1,39 +1,37 @@
 {
     "io_settings": {
         "csv_output_file_path": "./output/out.csv",
-        "csv_output": "nothing",
-        "csv_output_weather": false,
+        "csv_output": "all_incl_flows",
+        "csv_output_weather": true,
         "write_csv_continuously": false,
-        "auxiliary_info": false,
+        "auxiliary_info": true,
         "auxiliary_plots": false,
-        "sankey_plot": "nothing",
-        "output_plot": "nothing",
-        "plot_weather_data": false,
-        "plot_economic_cashflows": false,
+        "sankey_plot": "default",
+        "output_plot": "all_incl_flows",
+        "plot_weather_data": true,
+        "plot_economic_cashflows": true,
         "economic_plot_cashflows_file_path": "./output/economic_results_cashflows.html",
-        "plot_economic_present_values": false,
+        "plot_economic_present_values": true,
         "economic_plot_present_values_file_path": "./output/economic_results_present_values.html",
-        "output_economic_csv": false,
+        "output_economic_csv": true,
         "economic_csv_file_path": "./output/economic_results.csv",
-        "plot_emission_results": false,
+        "plot_emission_results": true,
         "emissions_plot_file_path": "./output/emissions_plot.html",
-        "output_emissions_csv": false,
+        "output_emissions_csv": true,
         "emissions_csv_file_path": "./output/emissions_results.csv",
-        "plot_price_and_emission_profiles": false,
-        "price_and_emission_profile_file_path":  "./output/price_and_emissions_profiles.html",
-        
-        "output_optimisation_csv": true,
-        "optimisation_csv_file_path": "./output/optim_results.csv",
-        "write_optimisation_csv_continuously": true,
+        "plot_price_and_emission_profiles": true,
+        "price_and_emission_profile_file_path": "./output/price_and_emissions_profiles.html",
+        "output_parameter_study_csv": true,
+        "parameter_study_csv_file_path": "./output/optim_results.csv",
+        "write_parameter_study_csv_continuously": true,
         "matrix_plot": "default",
-        "matrix_plot_file_path": "./output/matrix_plot.html",
-        "matrix_plot_spec": {"emissions": ["total_emissions"]}
+        "parameter_study_plots_file_path": "./output/optim_plots"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.01.2024 23:45",
+        "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
-        "time_step": 60,
+        "time_step": 120,
         "time_step_unit": "minutes",
         "epsilon": 1e-06,
         "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
@@ -41,7 +39,6 @@
     "economic_parameters": {
         "calculate_economy": true,
         "observation_period_in_years": 20,
-        "interest_rate": 0.03,
         "repeat_method": "all"
     },
     "emissions_parameters": {
@@ -50,27 +47,87 @@
         "include_embodied_emissions": false,
         "repeat_method": "all"
     },
-    "optimisation_parameters": {
-        "run_optimisation": true,
-        "disable_all_simulation_outputs": false,
-        "type": "Metaheuristics",
-        "objective_params":  {"economic":  ["total_annuity"],
-                              "sum": {"Building_el_GRO": ["m_e_ac_230v:IN"]}},
-        "objective_function": "sum",
-        "algorithm": "ECA",
-        "run_sensitivity": true,
-        "max_runs": 100,
-        "optim_params": {
-            "Building_heating_BFT": {"volume": {"min": 0,
-                                                "max": 5.0,
-                                                "start": 2.0
-                                        }
+    "parameter_study": {
+        "parameters": {
+            "Building_heating_BFT": {
+                "volume": {
+                    "bounds_min": 0,
+                    "bounds_max": 3.0,
+                    "start": 2.0,
+                    "range_start": 0,
+                    "range_stop": 3,
+                    "range_length": 3
+                }
             },
-            "Building_PV": {"scale": {"min": 0,
-                                        "max": 1000,
-                                        "start": 500
-                            }
+            "Building_PV": {
+                "scale": {
+                    "bounds_min": 0,
+                    "bounds_max": 1000,
+                    "start": 500,
+                    "range_start": 0,
+                    "range_stop": 1000,
+                    "range_length": 3
+                }
+            },
+            "Building_Battery": {
+                "capacity": {
+                    "bounds_min": 0,
+                    "bounds_max": 200000,
+                    "start": 59380,
+                    "range_start": 0,
+                    "range_stop": 200000,
+                    "range_length": 3
+                }
+            },
+            "Building_HP": {
+                "power_th": {
+                    "bounds_min": 0,
+                    "bounds_max": 150000,
+                    "start": 85000,
+                    "range_start": 0,
+                    "range_stop": 150000,
+                    "range_length": 3
+                }
             }
+        },
+        "objective_params": {
+            "economic": [
+                "total_annuity"
+            ]
+        },
+        "objective_function": "linear",
+        "objective_factors": {
+            "economic total_annuity": 1.0
+        },
+        "objective_senses": {
+            "economic total_annuity": "min"
+        },
+        "disable_all_simulation_outputs": true,
+        "parameter_variation": {
+            "run_parameter_variation": false,
+            "algorithm": "product"
+        },
+        "optimisation": {
+            "run_optimisation": true,
+            "type": "Metaheuristics",
+            "algorithm": "ECA",
+            "max_runs": 200,
+            "max_time": 120.0,
+            "refinement": {
+                "type": "NLopt",
+                "algorithm": "LN_SBPLX",
+                "max_runs": 15,
+                "max_time": 180.0,
+                "x_tol_abs": 0.0001,
+                "f_tol_abs": 0.001
+            }
+        },
+        "sensitivity_analysis": {
+            "run_global_sensitivity": false,
+            "run_local_sensitivity": true,
+            "local_reference": "best_result",
+            "local_variation": 0.1,
+            "max_runs": 100
         }
     },
     "components": {
@@ -113,7 +170,6 @@
             "emissions_parameters": {
                 "constant_energy_emissions_credits": 0.0
             }
-
         },
         "Building_heating_demand": {
             "type": "Demand",
@@ -273,7 +329,7 @@
             },
             "emissions_parameters": {
                 "constant_energy_emissions": 0.0
-           }
+            }
         },
         "Building_BUS_thermal": {
             "type": "Bus",
@@ -299,7 +355,9 @@
         },
         "Building_Battery": {
             "type": "Battery",
-            "output_refs": ["Building_BUS_electricity"],
+            "output_refs": [
+                "Building_BUS_electricity"
+            ],
             "m_el_in": "m_e_ac_230v",
             "m_el_out": "m_e_ac_230v",
             "capacity": 59380,
@@ -373,7 +431,6 @@
                 "embodied_emissions_specific": "const:0.0",
                 "constant_energy_emissions_credits": 0.0
             }
-
         }
     }
 }
