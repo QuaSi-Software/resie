@@ -479,42 +479,23 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
     sensitivity_results = Vector{Dict{String,Any}}()
     parameter_keys = parameter_study["runtime"]["parameter_keys"]
 
-    # determine reference values 
+    # determine reference values
     if parameter_study["sensitivity_analysis"]["local_reference"] == "best_result"
-        best_result = best_objective_result(evaluated_parameter_sets, parameter_study)
+        best_result = best_objective_result(evaluated_parameter_sets,
+                                            parameter_study)
+
         if isnothing(best_result)
             @error "No valid optimisation result is available as reference for local sensitivity."
             return sensitivity_results
         end
+
         reference_values = Float64[best_result[key] for key in parameter_keys]
     else
         reference_values = Float64.(parameter_study["runtime"]["start_values"])
     end
 
-    reference_results_exists = !isnothing(find_evaluated_parameter_set(evaluated_parameter_sets,
-                                                                       parameter_keys,
-                                                                       reference_values))
-    if reference_results_exists
-        number_of_evaluation_points = 2 * length(parameter_keys)
-    else
-        number_of_evaluation_points = 1 + 2 * length(parameter_keys)
-    end
-    completed_points = 0
-
-    function evaluate_local_point((parameter_values::Vector{Float64}); report::Bool=true)::AbstractDict
-        result = get_or_evaluate_parameter_set!(evaluate_physical_values,
-                                                evaluated_parameter_sets,
-                                                parameter_keys,
-                                                parameter_values)
-        if report
-            completed_points += 1
-            @globalInfo "Local sensitivity status: $completed_points of $number_of_evaluation_points runs completed."
-        end
-        return result
-    end
-
-    reference_result = evaluate_local_point(reference_values; report=(!reference_results_exists))
-    reference_objective = Float64(reference_result["objective"])
+    # prepare all valid local-sensitivity points before starting parallel runs
+    parameter_points = NamedTuple[]
 
     for (i, key) in enumerate(parameter_keys)
         lower_value = parameter_study["runtime"]["sensitivity_lower_values"][i]
@@ -522,11 +503,13 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
 
         if !(isfinite(lower_value) && isfinite(upper_value))
             delta = abs(reference_values[i]) * parameter_study["sensitivity_analysis"]["local_variation"]
+
             if delta == 0.0
                 @error "Local sensitivity for parameter $key cannot use a relative variation " *
                        "because its reference value is zero. Configure sensitivity_lower and sensitivity_upper explicitly."
                 continue
             end
+
             lower_value = reference_values[i] - delta
             upper_value = reference_values[i] + delta
         end
@@ -538,11 +521,86 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
 
         lower_values = copy(reference_values)
         upper_values = copy(reference_values)
+
         lower_values[i] = lower_value
         upper_values[i] = upper_value
 
-        lower_result = evaluate_local_point(lower_values)
-        upper_result = evaluate_local_point(upper_values)
+        push!(parameter_points,
+              (key=key,
+               reference_value=reference_values[i],
+               lower_value=lower_value,
+               upper_value=upper_value,
+               lower_values=lower_values,
+               upper_values=upper_values))
+    end
+
+    if isempty(parameter_points)
+        return sensitivity_results
+    end
+
+    # determine which points still require simulation
+    simulation_points = Vector{Vector{Float64}}()
+
+    function queue_simulation_point!(parameter_values::Vector{Float64})::Nothing
+        existing_result = find_evaluated_parameter_set(evaluated_parameter_sets,
+                                                       parameter_keys,
+                                                       parameter_values)
+
+        if isnothing(existing_result)
+            push!(simulation_points, parameter_values)
+        end
+
+        return nothing
+    end
+
+    queue_simulation_point!(reference_values)
+
+    for point in parameter_points
+        queue_simulation_point!(point.lower_values)
+        queue_simulation_point!(point.upper_values)
+    end
+
+    number_of_evaluation_points = length(simulation_points)
+    completed_points = Ref(0)
+    status_lock = ReentrantLock()
+
+    # evaluate all missing points in parallel
+    Threads.@threads for run_index in eachindex(simulation_points)
+        evaluate_physical_values(simulation_points[run_index])
+
+        lock(status_lock) do
+            completed_points[] += 1
+
+            @globalInfo "Local sensitivity status: $(completed_points[]) of " *
+                        "$number_of_evaluation_points runs completed."
+        end
+    end
+
+    # all parallel evaluations have completed; result lookup is serial again
+    reference_result = find_evaluated_parameter_set(evaluated_parameter_sets,
+                                                    parameter_keys,
+                                                    reference_values)
+
+    if isnothing(reference_result)
+        @error "The local sensitivity reference result is missing."
+        return sensitivity_results
+    end
+
+    reference_objective = Float64(reference_result["objective"])
+
+    for point in parameter_points
+        lower_result = find_evaluated_parameter_set(evaluated_parameter_sets,
+                                                    parameter_keys,
+                                                    point.lower_values)
+
+        upper_result = find_evaluated_parameter_set(evaluated_parameter_sets,
+                                                    parameter_keys,
+                                                    point.upper_values)
+
+        if isnothing(lower_result) || isnothing(upper_result)
+            @error "Local sensitivity results for parameter $(point.key) are incomplete."
+            continue
+        end
 
         lower_objective = Float64(lower_result["objective"])
         upper_objective = Float64(upper_result["objective"])
@@ -553,19 +611,17 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
                                 lower_change / abs(reference_objective)
         upper_change_relative = reference_objective == 0.0 ? NaN :
                                 upper_change / abs(reference_objective)
-        gradient = (upper_objective - lower_objective) / (upper_value - lower_value)
-        elasticity = if reference_values[i] == 0.0 || reference_objective == 0.0
-            NaN
-        else
-            gradient * reference_values[i] / reference_objective
-        end
+        gradient = (upper_objective - lower_objective) / (point.upper_value - point.lower_value)
+        elasticity = point.reference_value == 0.0 || reference_objective == 0.0 ?
+                     NaN :
+                     gradient * point.reference_value / reference_objective
 
         push!(sensitivity_results,
               Dict{String,Any}(
-                  "parameter" => key,
-                  "lower_value" => lower_value,
-                  "reference_value" => reference_values[i],
-                  "upper_value" => upper_value,
+                  "parameter" => point.key,
+                  "lower_value" => point.lower_value,
+                  "reference_value" => point.reference_value,
+                  "upper_value" => point.upper_value,
                   "lower_objective" => lower_objective,
                   "reference_objective" => reference_objective,
                   "upper_objective" => upper_objective,
@@ -578,7 +634,12 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
               ))
     end
 
+    if isempty(sensitivity_results)
+        return sensitivity_results
+    end
+
     parameter_width = max(length("Parameter"), maximum(length.(parameter_keys)))
+
     header = @sprintf("%-*s  %12s  %24s  %12s  %24s  %10s",
                       parameter_width,
                       "Parameter",
@@ -607,7 +668,7 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
 
     @globalInfo("Local sensitivity results:\n" *
                 "Reference objective: $(round(reference_objective; sigdigits=8))\n\n" *
-                join(lines, "\n") * "\n")
+                join(lines, "\n") * "\n",)
 
     return sensitivity_results
 end
