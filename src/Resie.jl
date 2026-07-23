@@ -89,7 +89,7 @@ include("project_loading.jl")
 include("file_output.jl")
 include("economy.jl")
 include("emissions.jl")
-include("optimisation.jl")
+include("parameter_study.jl")
 
 using PlotlyJS
 using ColorSchemes
