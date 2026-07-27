@@ -514,7 +514,9 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     preparation_cache = PreparationCache()
 
     # set log level by operating mode
-    Resie_Logger.set_min_log_level!(logger, get_min_log_level(project_config, logger))
+    if logger !== nothing
+        Resie_Logger.set_min_log_level!(logger, get_min_log_level(project_config, logger))
+    end
     io_settings = get_io_settings(project_config)
     sim_params = get_simulation_params(project_config, io_settings; preparation_cache=preparation_cache)
 
