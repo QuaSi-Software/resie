@@ -2041,8 +2041,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         end
 
         # check, for parameters with field options, if the value is one of the options
-        if name in keys(type_def) && isdefined(type_def[name], :options) &&
-           conditionals_apply(name, extracted, type_def)
+        if name in keys(type_def) && isdefined(type_def[name], :options)
             if !any(occursin.(type_def[name].options, value))
                 throw(InputError("Given value `$value` is not in the allowed options for " *
                                  "parameter `$name` of component `$uac`. " *
