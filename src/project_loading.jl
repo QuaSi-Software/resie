@@ -1159,7 +1159,7 @@ const PARAMETER_STUDY_OPTIMISATION_DEF = Dict{String,Any}(
         unit="-"
     ),
     "type" => (
-        default=nothing,
+        default="NLopt",
         description="Selects the optimisation backend.",
         display_name="Optimisation type",
         required=true,
@@ -1170,7 +1170,7 @@ const PARAMETER_STUDY_OPTIMISATION_DEF = Dict{String,Any}(
         unit="-"
     ),
     "algorithm" => (
-        default="NelderMead",
+        default="LN_SBPLX",
         description="Algorithm used by the selected optimisation backend.",
         display_name="Optimisation algorithm",
         required=false,
