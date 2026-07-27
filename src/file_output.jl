@@ -448,6 +448,60 @@ function parse_outkeys(output_keys::AbstractDict{String,Any})::Array{String}
 end
 
 """
+    output_key_signature(output_key)
+
+Create a stable structural identifier for an `OutputKey`. The signature is used for
+internal column lookup; formatted names from `parse_outkeys` remain presentation values.
+"""
+function output_key_signature(output_key::EnergySystems.OutputKey)
+    return (String(output_key.unit.uac), output_key.medium, output_key.value_key)
+end
+
+"""
+    output_key_indexes(all_output_keys)
+
+Map each requested `OutputKey` to its zero-offset data-column index. The time column is
+not part of this mapping.
+"""
+function output_key_indexes(all_output_keys::Vector{EnergySystems.OutputKey})
+    return Dict(output_key_signature(output_key) => index
+                for (index, output_key) in pairs(all_output_keys))
+end
+
+"""
+    output_data_columns(key_indexes, selected_keys; include_time=false)
+
+Return the matrix columns corresponding to `selected_keys`. Stored output columns are
+offset by one because column one contains time.
+"""
+function output_data_columns(key_indexes::AbstractDict,
+                             selected_keys::Union{Nothing,Vector{EnergySystems.OutputKey}};
+                             include_time::Bool=false)::Vector{Int}
+    columns = selected_keys === nothing ? Int[] :
+              [1 + key_indexes[output_key_signature(output_key)]
+               for output_key in selected_keys]
+
+    return include_time ? vcat(1, columns) : columns
+end
+
+"""
+    output_data_column_map(key_indexes, selected_keys)
+
+Map the formatted names of selected output keys to their columns in the stored output
+matrix. Formatting is used only because parameter-study objective keys use the same
+external naming convention.
+"""
+function output_data_column_map(key_indexes::AbstractDict,
+                                selected_keys::Union{Nothing,Vector{EnergySystems.OutputKey}})::Dict{String,Int}
+    selected_keys === nothing && return Dict{String,Int}()
+
+    names = parse_outkeys(selected_keys)
+    return Dict(
+        name => 1 + key_indexes[output_key_signature(output_key)]
+        for (name, output_key) in zip(names, selected_keys))
+end
+
+"""
 get_output_header(output_keys, weather_data_keys, csv_time_unit)
 
 Get the output header for the given outputs to used in output file or dictionary.

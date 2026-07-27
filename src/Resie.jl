@@ -281,19 +281,12 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
     @info "-- Finished time step loop"
 
-    # extract output data per category including the time step in the first column
-    # TODO replace with parse_outkeys() or use this approach for parameter studies
-    output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
-    function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
-        keys === nothing && return Int[]
-        return 1 .+ [key_indexes[output_key_signature(k)] for k in keys]
-    end
-    time_and_subset_cols(key_indexes, keys) = vcat(1, subset_cols(key_indexes, keys))
-    key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
+    # Map each requested OutputKey to its column in output_data_all_requested.
+    key_indexes = output_key_indexes(all_requested_output_keys)
 
     if do_calculate_economy || do_calculate_emissions
-        output_data_economic_emissions = Matrix(view(output_data_all_requested, :,
-                                                     time_and_subset_cols(key_indexes, output_keys_economic_emissions)))
+        economic_emissions_columns = output_data_columns(key_indexes, output_keys_economic_emissions; include_time=true)
+        output_data_economic_emissions = Matrix(view(output_data_all_requested, :, economic_emissions_columns))
         economic_emissions_data = prepare_economic_emissions_data(components, output_keys_economic_emissions,
                                                                   output_data_economic_emissions)
         economic_result = do_calculate_economy ? calculate_economy(economic_emissions_data, sim_params) : nothing
@@ -302,20 +295,17 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     if collect_objective_results
         objective_results = Dict{String,Union{Array{Float64},Float64}}()
-        # create keys consistent with csv_output for return data for return Dict
-        output_data_header = get_output_header(all_requested_output_keys, nothing, csv_time_unit)
-        output_data = OrderedDict{String,AbstractArray}(zip(output_data_header, eachcol(output_data_all_requested)))
+        parameter_study_columns = output_data_column_map(key_indexes, output_keys_parameter_study)
 
         function write_objective_results!(params::Array{String},
-                                          output_data::OrderedDict{String,AbstractArray},
+                                          output_data::AbstractMatrix{<:Real},
+                                          output_columns::AbstractDict{String,Int},
                                           res::Dict{String,Union{Array{Float64},Float64}})
             for key in params
-                func = split(key, " ")[1]
-                spec = key[(length(func) + 2):end]
-                if func == "sum"
-                    res[key] = sum(output_data[spec])
-                elseif func == "mean"
-                    res[key] = sum(output_data[spec]) / length(output_data[spec])
+                func, spec = split(key, " "; limit=2)
+                if func == "sum" || func == "mean"
+                    values = view(output_data, :, output_columns[spec])
+                    res[key] = func == "sum" ? sum(values) : sum(values) / length(values)
                 elseif func == "economic"
                     res[key] = getfield(economic_result, Symbol(spec))
                 elseif func == "emissions"
@@ -324,7 +314,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
             end
         end
         # write objective parameters in the global result dictionary that is returned by run_simulation_loop()
-        write_objective_results!(sim_params["parameter_study"]["runtime"]["objective_params_keys"], output_data,
+        write_objective_results!(sim_params["parameter_study"]["runtime"]["objective_params_keys"],
+                                 output_data_all_requested,
+                                 parameter_study_columns,
                                  objective_results)
         # calculate objective from the results 
         objective_values = [objective_results[key]
@@ -368,8 +360,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
-        output_data_lineplot = Matrix(view(output_data_all_requested, :,
-                                           time_and_subset_cols(key_indexes, output_keys_lineplot)))
+        lineplot_columns = output_data_columns(key_indexes, output_keys_lineplot; include_time=true)
+        output_data_lineplot = Matrix(view(output_data_all_requested, :, lineplot_columns))
         create_profile_line_plots(output_data_lineplot,
                                   output_keys_lineplot,
                                   output_weather_lineplot,
