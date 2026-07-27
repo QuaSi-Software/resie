@@ -516,13 +516,21 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
 
     if sim_params["parameter_study"]["runtime"]["enabled"]
         # perform the configured parameter study
-        success, evaluated_parameter_sets = perform_parameter_study(io_settings,
-                                                                    sim_params,
-                                                                    project_config;
-                                                                    preparation_cache=preparation_cache)
+        success,
+        evaluated_parameter_sets,
+        local_evaluated_parameter_sets = perform_parameter_study(io_settings,
+                                                                 sim_params,
+                                                                 project_config;
+                                                                 preparation_cache=preparation_cache)
 
-        if sim_params["parameter_study"]["runtime"]["run_primary_study"] && !isempty(evaluated_parameter_sets)
-            create_parameter_study_diagnostic_plots(evaluated_parameter_sets, io_settings, sim_params)
+        figure_results = if sim_params["parameter_study"]["sensitivity_analysis"]["include_local_sensitivity_results_in_figures"]
+            vcat(evaluated_parameter_sets, local_evaluated_parameter_sets)
+        else
+            evaluated_parameter_sets
+        end
+
+        if sim_params["parameter_study"]["runtime"]["run_primary_study"] && !isempty(figure_results)
+            create_parameter_study_diagnostic_plots(figure_results, io_settings, sim_params)
         end
     else
         # perform single simulation run
@@ -643,7 +651,9 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
         end
     end
 
-    if sim_params["parameter_study"]["runtime"]["enabled"] && io_settings["write_parameter_study_csv_continuously"]
+    if sim_params["parameter_study"]["runtime"]["enabled"] &&
+       io_settings["write_parameter_study_csv_continuously"] &&
+       !isnothing(parameter_study_results_path)
         # Write results to file after the single simulation has finished.
         row = join(collect(values(results)), ';') * "\n"
         row = replace(row, ',' => ' ')

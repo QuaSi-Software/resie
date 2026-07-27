@@ -77,7 +77,8 @@ compatible with optimisation algorithms and sensitivity calculations.
 - `evaluated_parameter_sets::Vector{Any}`: Results of all completed parameter sets
 - `io_settings::Dict{String,Any}`: IO settings
 - `sim_params::Dict{String,Any}`: Simulation parameters
-- `parameter_study_results_path::String`: File path for parameter-study results
+- `parameter_study_results_path::Union{String,Nothing}`: File path for parameter-study results.
+  If `nothing`, the result is not written to the main parameter-study CSV.
 - `project_config::OrderedDict{String,Any}`: The project config
 - `parameter_values::Union{Array{Float64},Float64}`: Physical parameter values for the simulation run.
 - `run_lock::ReentrantLock`: Lock for writing to current_runs
@@ -88,7 +89,8 @@ compatible with optimisation algorithms and sensitivity calculations.
 - `Union{Array{Float64},Float64}`: Objective value used by the configured study
 """
 function evaluate_parameter_set!(evaluated_parameter_sets::Vector{Any}, io_settings::Dict{String,Any},
-                                 sim_params::Dict{String,Any}, parameter_study_results_path::String,
+                                 sim_params::Dict{String,Any},
+                                 parameter_study_results_path::Union{String,Nothing},
                                  project_config::OrderedDict{String,Any},
                                  parameter_values::Union{Array{Float64},Float64}, run_lock::ReentrantLock,
                                  output_lock::ReentrantLock,
@@ -581,6 +583,7 @@ function calculate_local_sensitivity!(evaluate_physical_values::Function,
                                                     parameter_keys,
                                                     reference_values)
 
+    # prepare results for output
     if isnothing(reference_result)
         @error "The local sensitivity reference result is missing."
         return sensitivity_results
@@ -938,6 +941,7 @@ function run_local_sensitivity!(evaluate_physical_values::Function,
         end
     end
 
+    # write results to file and create plots
     if !isempty(sensitivity_results)
         output_lines = String[]
 
@@ -1013,12 +1017,14 @@ reuse already completed simulation results where possible. They can also run sta
 
 # Returns
 - `Bool`: Flag if the parameter study was successful (true) or not (false).
-- `Vector{Any}`: Results of all completed parameter-study runs.
+- `Vector{Any}`: Main parameter-study results.
+- `Vector{Any}`: Results generated exclusively for local sensitivity analysis.
 """
 function perform_parameter_study(io_settings::Dict{String,Any},
                                  sim_params::Dict{String,Any},
                                  project_config::OrderedDict{String,Any};
-                                 preparation_cache::Union{Nothing,PreparationCache}=nothing)::Tuple{Bool,Vector{Any}}
+                                 preparation_cache::Union{Nothing,PreparationCache}=nothing)::Tuple{Bool,Vector{Any},
+                                                                                                    Vector{Any}}
     # establish overarching locks for parallelization
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
@@ -1040,11 +1046,12 @@ function perform_parameter_study(io_settings::Dict{String,Any},
     # handle interruption via STR+C for parallel parameter-study runs
     cancel_parameter_study = Threads.Atomic{Bool}(false)
 
-    # prepare result vector
+    # prepare result vectors
     evaluated_parameter_sets = Vector{Any}()
+    local_sensitivity_evaluated_parameter_sets = Vector{Any}()
 
-    # generic function using physical simulation parameter values. It is also used by
-    # standalone sensitivity analyses and appends every new result to evaluated_parameter_sets.
+    # Generic function using physical simulation parameter values. Results from the primary
+    # study and global sensitivity are appended to evaluated_parameter_sets.
     evaluate_physical_values = function (parameter_values)
         if cancel_parameter_study[]
             throw(InterruptException())
@@ -1109,7 +1116,7 @@ function perform_parameter_study(io_settings::Dict{String,Any},
 
             # detect and output best simulation result, independent of any backend-specific results
             report_best_objective_result(final_results, parameter_study, workflow_name)
-            return false, final_results
+            return false, final_results, local_sensitivity_evaluated_parameter_sets
         end
 
         @globalInfo "$workflow_name completed in $primary_runtime_minutes min " *
@@ -1129,31 +1136,66 @@ function perform_parameter_study(io_settings::Dict{String,Any},
                                 cancel_parameter_study,
                                 io_settings,
                                 sim_params)
-        return false, evaluated_parameter_sets
+        return false, evaluated_parameter_sets, local_sensitivity_evaluated_parameter_sets
     end
 
-    if parameter_study["sensitivity_analysis"]["run_local_sensitivity"] &&
-       !run_local_sensitivity!(evaluate_physical_values,
-                               evaluated_parameter_sets,
-                               parameter_study,
-                               cancel_parameter_study,
-                               io_settings,
-                               sim_params)
-        return false, evaluated_parameter_sets
+    if parameter_study["sensitivity_analysis"]["run_local_sensitivity"]
+        # Local sensitivity may intentionally evaluate points outside the optimisation bounds.
+        # Use a separate working vector so these points can reuse existing results without
+        # becoming part of the main parameter-study result set.
+        local_working_results = copy(evaluated_parameter_sets)
+        existing_result_count = length(local_working_results)
+
+        evaluate_local_physical_values = function (parameter_values)
+            if cancel_parameter_study[]
+                throw(InterruptException())
+            end
+
+            return evaluate_parameter_set!(local_working_results,
+                                           io_settings,
+                                           sim_params,
+                                           nothing,
+                                           project_config,
+                                           parameter_values,
+                                           run_lock,
+                                           output_lock,
+                                           results_lock;
+                                           cancel_flag=cancel_parameter_study,
+                                           preparation_cache=preparation_cache)
+        end
+
+        local_success = run_local_sensitivity!(evaluate_local_physical_values,
+                                               local_working_results,
+                                               parameter_study,
+                                               cancel_parameter_study,
+                                               io_settings,
+                                               sim_params)
+
+        local_sensitivity_evaluated_parameter_sets = lock(results_lock) do
+            if length(local_working_results) > existing_result_count
+                copy(local_working_results[(existing_result_count + 1):end])
+            else
+                Vector{Any}()
+            end
+        end
+
+        if !local_success
+            return false, evaluated_parameter_sets, local_sensitivity_evaluated_parameter_sets
+        end
     end
 
     overall_runtime_seconds = round(Int, seconds(now() - main_start_time))
     overall_runtime_minutes, overall_runtime_remaining_seconds = divrem(overall_runtime_seconds, 60)
     @globalInfo "Complete parameter study finished in $overall_runtime_minutes min " *
                 "$(lpad(overall_runtime_remaining_seconds, 2, '0')) s. " *
-                "$(length(evaluated_parameter_sets)) total runs completed."
+                "$(length(evaluated_parameter_sets) + length(local_sensitivity_evaluated_parameter_sets)) total runs completed."
 
     # write results to parameter-study result file if not written continuously
     if !io_settings["write_parameter_study_csv_continuously"] && !isempty(evaluated_parameter_sets)
         write_parameter_study_results(parameter_study_results_path, evaluated_parameter_sets)
     end
 
-    return true, evaluated_parameter_sets
+    return true, evaluated_parameter_sets, local_sensitivity_evaluated_parameter_sets
 end
 
 # Optimisation backends

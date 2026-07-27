@@ -1234,6 +1234,17 @@ const SENSITIVITY_ANALYSIS_DEF = Dict{String,Any}(
         json_type="number",
         unit="-"
     ),
+    "include_local_sensitivity_results_in_figures" => (
+        default=true,
+        description="If set to true, simulation results generated exclusively for local " *
+                    "sensitivity analysis are additionally included in the general " *
+                    "parameter-study result figures.",
+        display_name="Include local sensitivity results in figures?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
     "max_runs" => (
         default=nothing,
         description="Maximum number of (additional) simulation performed for global " *
