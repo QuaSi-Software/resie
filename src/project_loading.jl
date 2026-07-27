@@ -536,29 +536,6 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),   
-    "matrix_plot" => (
-        default="default",
-        description="Sets the mode of the matrix plot, switching between several default " *
-                    "and custom behaviour modes as well an option of not creating a plot " *
-                    "file at all.",
-        display_name="Matrix plot mode",
-        options=["custom", "default", "nothing"],
-        required=false,
-        type=String,
-        json_type="string",
-        unit="-"
-    ),
-    "matrix_plot_spec" => (
-        default=nothing,
-        description="Specification of the objective in the matrix plot in custom mode. " *
-                    "Has same structure as objective_params.",
-        display_name="Matrix plot specification",
-        required=false,
-        conditionals=[("matrix_plot", "is", "custom")],
-        type=Dict{String,Any},
-        json_type="object",
-        unit="-"
-    ),
     "output_parameter_study_plots" => (
         default=true,
         description="Toggle if plots with the parameter-study results should be created",
@@ -854,8 +831,7 @@ EMISSIONS_PARAMATERS_DEF = Dict{String,Any}(
 OUTPUT_SPECIFICATION_SETTINGS = [
     ("output_plot", "output_plot_spec"),
     ("sankey_plot", "sankey_plot_spec"),
-    ("csv_output", "csv_output_keys"),
-    ("matrix_plot", "matrix_plot_spec")
+    ("csv_output", "csv_output_keys")
 ]
 
 const OPTIMISER_LIMITS_DEF = Dict{String,Any}(

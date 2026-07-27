@@ -116,8 +116,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                              operations::OrderOfOperations;
                              suppress_all_output::Bool=false,
                              cancel_flag::Union{Nothing,Threads.Atomic{Bool}}=nothing)
-    parameter_study = sim_params["parameter_study"]
-    collect_objective_results = parameter_study["runtime"]["enabled"]
+    collect_objective_results = sim_params["parameter_study"]["runtime"]["enabled"]
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot,
     output_keys_to_CSV,
@@ -125,7 +124,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     output_keys_parameter_study = get_output_keys(io_settings,
                                                   sim_params["economic_parameters"],
                                                   sim_params["emissions_parameters"],
-                                                  parameter_study,
+                                                  sim_params["parameter_study"],
                                                   components,
                                                   suppress_all_output)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
@@ -331,11 +330,6 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         objective_values = [objective_results[key]
                             for key in sim_params["parameter_study"]["runtime"]["objective_params_keys"]]
         objective_results["objective"] = sim_params["parameter_study"]["runtime"]["objective_function"](objective_values)
-
-        # write necessary values for matrix_plot in the global result dictionary that is returned by run_simulation_loop()
-        if io_settings["matrix_plot"] == "custom"
-            write_objective_results!(io_settings["matrix_plot_spec"], output_data, objective_results)
-        end
     end
 
     # write output to CSV if not done continuously
@@ -636,20 +630,6 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
             end
 
             results["objective"] = Inf
-            if io_settings["matrix_plot"] == "custom"
-                for (func, spec) in pairs(io_settings["matrix_plot_spec"])
-                    if func == "sum" || func == "mean"
-                        keys = parse_outkeys(spec)
-                        for key in keys
-                            results["$func $key"] = NaN
-                        end
-                    elseif func == "economic" || func == "emissions"
-                        for key in spec
-                            results["$func $key"] = NaN
-                        end
-                    end
-                end
-            end
         end
 
         # save exact error message to output file

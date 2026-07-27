@@ -126,7 +126,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output", suppress_all_output)
     do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
     collect_objective_results = parameter_study["runtime"]["enabled"]
-    do_matrix_plot = io_settings["matrix_plot"] == "custom"
 
     # Decide if we need all-keys lists
     need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy_emissions
@@ -177,14 +176,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # parameter-study objective keys
     if collect_objective_results
         output_keys_parameter_study = output_keys(components, parameter_study["runtime"]["objective_output_spec"])
-        if do_matrix_plot
-            for (func, spec) in pairs(io_settings["matrix_plot_spec"])
-                if func == "sum" || func == "mean"
-                    matrix_keys = output_keys(components, spec)
-                    append!(output_keys_parameter_study, matrix_keys)
-                end
-            end
-        end
         output_keys_parameter_study = unique(output_keys_parameter_study)
     else
         output_keys_parameter_study = nothing
@@ -1863,17 +1854,6 @@ function create_matrix_plot(results::Vector{Any},
     end
 
     configured_color_key = color_key === nothing ? nothing : String(color_key)
-
-    if configured_color_key === nothing &&
-       get(io_settings, "matrix_plot", "default") == "custom"
-        func, plot_spec = first(pairs(io_settings["matrix_plot_spec"]))
-
-        if func == "sum" || func == "mean"
-            configured_color_key = func * " " * parse_outkeys(plot_spec)[1]
-        elseif func == "economic" || func == "emissions"
-            configured_color_key = func * " " * plot_spec[1]
-        end
-    end
 
     if configured_color_key === nothing ||
        !haskey(results_dict, configured_color_key) ||
@@ -7249,15 +7229,13 @@ function create_parameter_study_diagnostic_plots(results::Vector{Any},
 
     @globalInfo("Preparing parameter-study figures...")
 
-    if io_settings["matrix_plot"] != "nothing"
-        matrix = create_matrix_plot(results,
-                                    io_settings,
-                                    sim_params;
-                                    objective_keys=objective_keys,
-                                    objective_senses=objective_senses,
-                                    color_key=color_key)
-        @globalInfo "Parameter-study matrix plot created and saved to $matrix"
-    end
+    matrix = create_matrix_plot(results,
+                                io_settings,
+                                sim_params;
+                                objective_keys=objective_keys,
+                                objective_senses=objective_senses,
+                                color_key=color_key)
+    @globalInfo "Parameter-study matrix plot created and saved to $matrix"
 
     convergence = create_objective_convergence_plot(results,
                                                     io_settings,
