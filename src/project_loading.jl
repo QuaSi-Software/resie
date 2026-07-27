@@ -506,7 +506,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
     ),
     "output_parameter_study_csv" => (
         default=true,
-        description="Toggle if a CSV with the parameter-study results should be created",
+        description="Toggle if CSV file(s) with the parameter-study results should be created",
         display_name="Output parameter-study CSV?",
         required=false,
         type=Bool,
@@ -514,7 +514,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         unit="-"
     ),
     "parameter_study_csv_file_path" => (
-        default="./output/parameter_study_results.csv",
+        default="./output/parameter_study",
         description="File path to where the parameter-study results are written to CSV",
         display_name="Parameter-study CSV file path",
         required=false,
@@ -1159,10 +1159,10 @@ const PARAMETER_STUDY_OPTIMISATION_DEF = Dict{String,Any}(
         unit="-"
     ),
     "type" => (
-        default="nothing",
+        default=nothing,
         description="Selects the optimisation backend.",
         display_name="Optimisation type",
-        required=false,
+        required=true,
         conditionals=[("run_optimisation", "is", true)],
         options=["Optim", "BlackBoxOptim", "Metaheuristics", "NLopt", "NOMAD"],
         type=String,
@@ -1251,12 +1251,11 @@ const SENSITIVITY_ANALYSIS_DEF = Dict{String,Any}(
     ),
     "max_runs" => (
         default=nothing,
-        description="Maximum total number of simulation results used for global " *
-                    "sensitivity. If omitted, twice the optimisation max_runs value or " *
-                    "200 runs are used.",
+        description="Maximum number of (additional) simulation performed for global " *
+                    "sensitivity. If omitted, twice the optimisation max_runs value are used.",
         display_name="Maximum sensitivity runs",
         required=false,
-        validations=[("self", "value_gte_num_or_nothing", 1)],
+        validations=[("self", "value_gte_num_or_nothing", 0)],
         type=Int64,
         json_type="number",
         unit="-"
