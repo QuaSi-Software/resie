@@ -1270,6 +1270,554 @@ function aggregate_csv(input_path::AbstractString,
 end
 
 # ------------------------------------------------------------------------------------------
+# Sensitivity-analysis output
+# ------------------------------------------------------------------------------------------
+
+"""
+    parameter_study_csv_path(sim_params, io_settings, suffix)
+
+Create a CSV path derived from `parameter_study_csv_file_path`.
+"""
+function parameter_study_csv_path(sim_params::Dict{String,Any},
+                                  io_settings::Dict{String,Any},
+                                  suffix::String)::String
+    base_path = sim_params["run_path"](io_settings["parameter_study_csv_file_path"])
+    directory, filename = splitdir(base_path)
+    root, _ = splitext(filename)
+    return joinpath(directory, "$(root)_$(suffix).csv")
+end
+
+function sensitivity_csv_string(value)::String
+    if value isa Real
+        return replace(string(Float64(value)), "." => ",")
+    end
+    return string(value)
+end
+
+function sensitivity_csv_escape(value)::String
+    text = sensitivity_csv_string(value)
+    if occursin(';', text) || occursin('"', text) || occursin('\n', text) || occursin('\r', text)
+        return "\"" * replace(text, "\"" => "\"\"") * "\""
+    end
+    return text
+end
+
+function write_sensitivity_csv(file_path::String,
+                               header::Vector{String},
+                               rows::Vector{<:AbstractVector})::String
+    directory = dirname(file_path)
+    isempty(directory) || mkpath(directory)
+
+    open(file_path, "w") do io
+        println(io, join(sensitivity_csv_escape.(header), ';'))
+        for row in rows
+            println(io, join(sensitivity_csv_escape.(row), ';'))
+        end
+    end
+
+    return file_path
+end
+
+"""
+    write_global_sensitivity_csv(file_path, parameter_keys, bounds, S_total, S_first,
+                                 rel_rmse, r2)
+
+Write one row per parameter. `interaction_effect` is the part of the total-order Sobol index
+that is not explained by the first-order effect.
+"""
+function write_global_sensitivity_csv(file_path::String,
+                                      parameter_keys::Vector{String},
+                                      bounds::AbstractMatrix{<:Real},
+                                      S_total::Vector{Float64},
+                                      S_first::Vector{Float64},
+                                      rel_rmse::Float64,
+                                      r2::Float64)::String
+    header = ["parameter",
+              "bounds_min",
+              "bounds_max",
+              "S_first",
+              "S_total",
+              "interaction_effect",
+              "surrogate_relative_rmse",
+              "surrogate_r2"]
+
+    rows = Vector{Vector{Any}}()
+    for i in eachindex(parameter_keys)
+        push!(rows,
+              Any[parameter_keys[i],
+                  bounds[i, 1],
+                  bounds[i, 2],
+                  S_first[i],
+                  S_total[i],
+                  S_total[i] - S_first[i],
+                  rel_rmse,
+                  r2])
+    end
+
+    return write_sensitivity_csv(file_path, header, rows)
+end
+
+"""
+    write_local_sensitivity_csv(file_path, sensitivity_results)
+
+Write one row per varied parameter. Relative parameter and objective changes are written as
+percent values to make the CSV directly comparable with the local-sensitivity plots.
+"""
+function write_local_sensitivity_csv(file_path::String,
+                                     sensitivity_results::Vector{Dict{String,Any}})::String
+    header = ["parameter",
+              "lower_value",
+              "reference_value",
+              "upper_value",
+              "lower_parameter_change_percent",
+              "upper_parameter_change_percent",
+              "lower_objective",
+              "reference_objective",
+              "upper_objective",
+              "lower_objective_change",
+              "upper_objective_change",
+              "lower_objective_change_percent",
+              "upper_objective_change_percent",
+              "gradient",
+              "elasticity"]
+
+    rows = Vector{Vector{Any}}()
+    for result in sensitivity_results
+        reference_value = Float64(result["reference_value"])
+        lower_parameter_change_percent = reference_value == 0.0 ? NaN :
+                                         100.0 * (Float64(result["lower_value"]) - reference_value) /
+                                         abs(reference_value)
+        upper_parameter_change_percent = reference_value == 0.0 ? NaN :
+                                         100.0 * (Float64(result["upper_value"]) - reference_value) /
+                                         abs(reference_value)
+
+        push!(rows,
+              Any[result["parameter"],
+                  result["lower_value"],
+                  reference_value,
+                  result["upper_value"],
+                  lower_parameter_change_percent,
+                  upper_parameter_change_percent,
+                  result["lower_objective"],
+                  result["reference_objective"],
+                  result["upper_objective"],
+                  result["lower_change"],
+                  result["upper_change"],
+                  100.0 * Float64(result["lower_change_relative"]),
+                  100.0 * Float64(result["upper_change_relative"]),
+                  result["gradient"],
+                  result["elasticity"]])
+    end
+
+    return write_sensitivity_csv(file_path, header, rows)
+end
+
+# Format percentages consistently in plot labels. A decimal comma is used to keep
+# compact labels such as `+2,34 %` easy to read.
+function format_plot_percent(value::Real; signed::Bool=false)::String
+    display_value = abs(Float64(value)) < 0.005 ? 0.0 : Float64(value)
+    formatted = if signed
+        @sprintf("%+.2f %%", display_value)
+    else
+        @sprintf("%.2f %%", display_value)
+    end
+    return replace(formatted, "." => ",")
+end
+
+"""
+    create_global_sensitivity_plot(parameter_keys, S_total, S_first, rel_rmse, r2,
+                                   io_settings, sim_params)
+
+Create a vertical comparison of first-order and total-order Sobol indices. Parameters are
+ordered by their total-order index. The gap between `S_first` and `S_total` indicates
+interaction effects with other parameters.
+"""
+function create_global_sensitivity_plot(parameter_keys::Vector{String},
+                                        S_total::Vector{Float64},
+                                        S_first::Vector{Float64},
+                                        rel_rmse::Float64,
+                                        r2::Float64,
+                                        io_settings::Dict{String,Any},
+                                        sim_params::Dict{String,Any})::String
+    if isempty(parameter_keys) ||
+       length(parameter_keys) != length(S_total) ||
+       length(parameter_keys) != length(S_first)
+        @error "Cannot create global-sensitivity plot: result dimensions do not match."
+        return ""
+    end
+
+    order = sortperm(S_total; rev=true)
+    names = parameter_keys[order]
+    first_order = S_first[order]
+    total_order = S_total[order]
+
+    first_labels = [format_plot_percent(100.0 * value) for value in first_order]
+    total_labels = [format_plot_percent(100.0 * value) for value in total_order]
+
+    first_trace = bar(; x=names,
+                      y=first_order,
+                      name="First-order effect (S_first)",
+                      text=first_labels,
+                      textposition="outside",
+                      cliponaxis=false,
+                      hovertemplate="%{x}<br>S_first = %{y:.5f}<extra></extra>")
+
+    total_trace = bar(; x=names,
+                      y=total_order,
+                      name="Total effect (S_total)",
+                      text=total_labels,
+                      textposition="outside",
+                      cliponaxis=false,
+                      hovertemplate="%{x}<br>S_total = %{y:.5f}<extra></extra>")
+
+    quality_text = "Surrogate relative RMSE=$(round(rel_rmse; digits=3)), " *
+                   "R²=$(round(r2; digits=3))"
+    maximum_index = maximum(vcat(first_order, total_order))
+    y_upper = max(0.05, 1.18 * maximum_index)
+
+    layout = Layout(;
+                    title=attr(;
+                               text="Global sensitivity: Sobol indices" *
+                                    "<br><sup>The gap between S_first and S_total indicates interactions; $quality_text</sup>",
+                               x=0.5,
+                               xanchor="center"),
+                    barmode="group",
+                    xaxis=attr(; title="Parameter",
+                               tickangle=-30,
+                               automargin=true),
+                    yaxis=attr(; title="Sobol sensitivity index",
+                               zeroline=true,
+                               range=[0.0, y_upper]),
+                    legend=attr(; orientation="h",
+                                x=0.5,
+                                xanchor="center",
+                                y=1.02,
+                                yanchor="bottom"),
+                    margin=attr(; t=155,
+                                b=190,
+                                l=90,
+                                r=45),
+                    height=720,
+                    autosize=true)
+
+    plot_object = plot(GenericTrace[first_trace, total_trace], layout)
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "global_sensitivity")
+    mkpath(dirname(file_path))
+    savefig(plot_object, file_path)
+    return file_path
+end
+
+"""
+    create_local_sensitivity_response_overview_plot(sensitivity_results, io_settings, sim_params)
+
+Create a normalized dumbbell plot of the local-sensitivity response. Each parameter is shown
+on one row. The lower and upper markers show the corresponding relative objective changes,
+and the connecting line makes the response magnitude and asymmetry visible. A vertical line at
+zero marks the reference objective.
+
+The absolute three-point response panels are additionally written by
+`create_local_sensitivity_absolute_response_plot`.
+"""
+function create_local_sensitivity_response_overview_plot(sensitivity_results::Vector{Dict{String,Any}},
+                                                         io_settings::Dict{String,Any},
+                                                         sim_params::Dict{String,Any})::String
+    valid_results = filter(sensitivity_results) do result
+        values = (result["lower_value"],
+                  result["reference_value"],
+                  result["upper_value"],
+                  result["lower_objective"],
+                  result["reference_objective"],
+                  result["upper_objective"],
+                  result["lower_change_relative"],
+                  result["upper_change_relative"])
+        all(value -> value isa Real && isfinite(value), values)
+    end
+
+    if isempty(valid_results)
+        @error "Cannot create local-sensitivity response overview plot: no finite response points."
+        return ""
+    end
+
+    importance = [max(abs(Float64(result["lower_change_relative"])),
+                      abs(Float64(result["upper_change_relative"])))
+                  for result in valid_results]
+    order = sortperm(importance; rev=true)
+    ordered_results = valid_results[order]
+
+    names = String[result["parameter"] for result in ordered_results]
+    lower_changes = Float64[100.0 * result["lower_change_relative"]
+                            for result in ordered_results]
+    upper_changes = Float64[100.0 * result["upper_change_relative"]
+                            for result in ordered_results]
+    lower_values = Float64[result["lower_value"] for result in ordered_results]
+    upper_values = Float64[result["upper_value"] for result in ordered_results]
+    lower_objectives = Float64[result["lower_objective"] for result in ordered_results]
+    upper_objectives = Float64[result["upper_objective"] for result in ordered_results]
+
+    traces = GenericTrace[]
+
+    # One connector per parameter keeps the relationship between lower and upper
+    # responses explicit without introducing another scale.
+    for i in eachindex(names)
+        push!(traces,
+              scatter(; x=[lower_changes[i], upper_changes[i]],
+                      y=[names[i], names[i]],
+                      mode="lines",
+                      line=attr(; width=3,
+                                color="rgba(120,120,120,0.55)"),
+                      hoverinfo="skip",
+                      showlegend=false))
+    end
+
+    lower_labels = [format_plot_percent(value; signed=true) for value in lower_changes]
+    upper_labels = [format_plot_percent(value; signed=true) for value in upper_changes]
+
+    # Position labels relative to the actual left-to-right order of the two
+    # response points. This keeps labels outside the connector even when the
+    # lower and upper responses switch sides. Points that are close on the
+    # common x-axis scale are separated vertically to prevent label overlap.
+    all_changes = vcat(lower_changes, upper_changes, [0.0])
+    change_minimum = minimum(all_changes)
+    change_maximum = maximum(all_changes)
+    change_span = max(change_maximum - change_minimum,
+                      maximum(abs.(all_changes)),
+                      1.0)
+
+    lower_label_positions = String[]
+    upper_label_positions = String[]
+
+    for i in eachindex(names)
+        if lower_changes[i] <= upper_changes[i]
+            push!(lower_label_positions, "middle left")
+            push!(upper_label_positions, "middle right")
+        else
+            push!(lower_label_positions, "middle right")
+            push!(upper_label_positions, "middle left")
+        end
+    end
+
+    lower_hover = ["$(names[i])<br>" *
+                   "Point: Lower<br>" *
+                   "Parameter value: $(lower_values[i])<br>" *
+                   "Objective: $(lower_objectives[i])<br>" *
+                   "Objective change: $(round(lower_changes[i]; digits=4)) %"
+                   for i in eachindex(names)]
+
+    upper_hover = ["$(names[i])<br>" *
+                   "Point: Upper<br>" *
+                   "Parameter value: $(upper_values[i])<br>" *
+                   "Objective: $(upper_objectives[i])<br>" *
+                   "Objective change: $(round(upper_changes[i]; digits=4)) %"
+                   for i in eachindex(names)]
+
+    push!(traces,
+          scatter(; x=lower_changes,
+                  y=names,
+                  mode="markers+text",
+                  name="Lower parameter value",
+                  marker=attr(; size=11,
+                              symbol="circle"),
+                  text=lower_labels,
+                  textposition=lower_label_positions,
+                  cliponaxis=false,
+                  hovertext=lower_hover,
+                  hovertemplate="%{hovertext}<extra></extra>"))
+
+    push!(traces,
+          scatter(; x=upper_changes,
+                  y=names,
+                  mode="markers+text",
+                  name="Upper parameter value",
+                  marker=attr(; size=11,
+                              symbol="diamond"),
+                  text=upper_labels,
+                  textposition=upper_label_positions,
+                  cliponaxis=false,
+                  hovertext=upper_hover,
+                  hovertemplate="%{hovertext}<extra></extra>"))
+
+    x_padding = 0.25 * change_span
+
+    reference_objective = Float64(first(ordered_results)["reference_objective"])
+    layout = Layout(;
+                    title=attr(;
+                               text="Local sensitivity responses overview" *
+                                    "<br><sup>Relative objective change from the reference " *
+                                    "($(round(reference_objective; sigdigits=8))).",
+                               x=0.5,
+                               xanchor="center"),
+                    xaxis=attr(; title="Objective change [%]",
+                               zeroline=true,
+                               zerolinewidth=2,
+                               range=[change_minimum - x_padding,
+                                      change_maximum + x_padding]),
+                    yaxis=attr(; title="Parameter",
+                               autorange="reversed",
+                               automargin=true),
+                    legend=attr(; orientation="h",
+                                x=0.5,
+                                xanchor="center",
+                                y=1.02,
+                                yanchor="bottom"),
+                    margin=attr(; t=150,
+                                b=90,
+                                l=230,
+                                r=80),
+                    height=max(560, 72 * length(names) + 230),
+                    autosize=true,
+                    hovermode="closest")
+
+    plot_object = plot(traces, layout)
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "local_sensitivity_response_overview")
+    mkpath(dirname(file_path))
+    savefig(plot_object, file_path)
+
+    return file_path
+end
+
+"""
+    create_local_sensitivity_response_trends_plot(sensitivity_results, io_settings, sim_params)
+
+Create one vertically stacked three-point absolute response plot for every parameter. Each
+panel uses the parameter value on the x-axis and the absolute objective value on the y-axis.
+Separate y-axis ranges prevent large responses from hiding smaller effects.
+"""
+function create_local_sensitivity_response_trends_plot(sensitivity_results::Vector{Dict{String,Any}},
+                                                       io_settings::Dict{String,Any},
+                                                       sim_params::Dict{String,Any})::String
+    valid_results = filter(sensitivity_results) do result
+        values = (result["lower_value"],
+                  result["reference_value"],
+                  result["upper_value"],
+                  result["lower_objective"],
+                  result["reference_objective"],
+                  result["upper_objective"])
+        all(value -> value isa Real && isfinite(value), values)
+    end
+
+    if isempty(valid_results)
+        @error "Cannot create absolute local-sensitivity response trend plot: no finite response points."
+        return ""
+    end
+
+    n_parameters = length(valid_results)
+    vertical_spacing = n_parameters > 1 ? min(0.045, 0.16 / (n_parameters - 1)) : 0.0
+    panel_height = (1.0 - (n_parameters - 1) * vertical_spacing) / n_parameters
+
+    traces = GenericTrace[]
+    shapes = Any[]
+    layout_values = Dict{Symbol,Any}()
+
+    for (i, result) in enumerate(valid_results)
+        parameter = String(result["parameter"])
+        parameter_values = Float64[result["lower_value"],
+                                   result["reference_value"],
+                                   result["upper_value"]]
+        objective_values = Float64[result["lower_objective"],
+                                   result["reference_objective"],
+                                   result["upper_objective"]]
+        point_names = ["Lower", "Reference", "Upper"]
+        objective_changes = Float64[100.0 * result["lower_change_relative"],
+                                    0.0,
+                                    100.0 * result["upper_change_relative"]]
+        hover_text = ["$parameter<br>" *
+                      "Point: $(point_names[j])<br>" *
+                      "Parameter value: $(parameter_values[j])<br>" *
+                      "Objective: $(objective_values[j])<br>" *
+                      "Objective change: $(round(objective_changes[j]; digits=4)) %"
+                      for j in eachindex(point_names)]
+        point_labels = [format_plot_percent(objective_changes[1]; signed=true),
+                        "",
+                        format_plot_percent(objective_changes[3]; signed=true)]
+        label_positions = [objective_changes[1] >= 0.0 ? "top center" : "bottom center",
+                           "top center",
+                           objective_changes[3] >= 0.0 ? "top center" : "bottom center"]
+
+        objective_minimum = minimum(objective_values)
+        objective_maximum = maximum(objective_values)
+        objective_span = objective_maximum - objective_minimum
+        objective_padding = objective_span > eps(Float64) ?
+                            0.18 * objective_span :
+                            max(0.01 * abs(objective_values[2]), 1.0)
+
+        x_reference = i == 1 ? "x" : "x$i"
+        y_reference = i == 1 ? "y" : "y$i"
+        x_layout_key = i == 1 ? :xaxis : Symbol("xaxis$i")
+        y_layout_key = i == 1 ? :yaxis : Symbol("yaxis$i")
+
+        domain_end = 1.0 - (i - 1) * (panel_height + vertical_spacing)
+        domain_start = domain_end - panel_height
+
+        push!(traces,
+              scatter(; x=parameter_values,
+                      y=objective_values,
+                      mode="lines+markers+text",
+                      line=attr(; width=3),
+                      marker=attr(; size=10),
+                      text=point_labels,
+                      textposition=label_positions,
+                      textfont=attr(; size=12),
+                      cliponaxis=false,
+                      hovertext=hover_text,
+                      hovertemplate="%{hovertext}<extra></extra>",
+                      xaxis=x_reference,
+                      yaxis=y_reference,
+                      showlegend=false))
+
+        push!(shapes,
+              attr(; type="line",
+                   xref=x_reference,
+                   yref=y_reference,
+                   x0=minimum(parameter_values),
+                   x1=maximum(parameter_values),
+                   y0=objective_values[2],
+                   y1=objective_values[2],
+                   line=attr(; width=1,
+                             dash="dot")))
+
+        layout_values[x_layout_key] = attr(; domain=[0.0, 1.0],
+                                           anchor=y_reference,
+                                           title=parameter,
+                                           automargin=true,
+                                           tickformat=".7g")
+        layout_values[y_layout_key] = attr(; domain=[domain_start, domain_end],
+                                           anchor=x_reference,
+                                           title="Objective",
+                                           automargin=true,
+                                           tickformat=".7g",
+                                           range=[objective_minimum - objective_padding,
+                                                  objective_maximum + objective_padding])
+    end
+
+    layout_values[:title] = attr(;
+                                 text="Trend of local sensitivity responses" *
+                                      "<br><sup>The dotted line marks the reference objective.</sup>",
+                                 x=0.5,
+                                 xanchor="center")
+    layout_values[:shapes] = shapes
+    layout_values[:showlegend] = false
+    layout_values[:hovermode] = "closest"
+    layout_values[:margin] = attr(; t=105,
+                                  b=80,
+                                  l=115,
+                                  r=55)
+    layout_values[:height] = max(650, 340 * n_parameters)
+    layout_values[:autosize] = true
+
+    plot_object = plot(traces, Layout(; layout_values...))
+    file_path = parameter_study_plot_path(sim_params,
+                                          io_settings,
+                                          "local_sensitivity_response_trends")
+    mkpath(dirname(file_path))
+    savefig(plot_object, file_path)
+    return file_path
+end
+
+# ------------------------------------------------------------------------------------------
 # Parameter-study plotting
 # ------------------------------------------------------------------------------------------
 

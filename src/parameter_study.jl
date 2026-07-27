@@ -316,7 +316,7 @@ function calculate_global_sensitivity!(evaluate_physical_values::Union{Nothing,F
         if length(y) < minimum_fit_samples && maximum_sensitivity_runs < minimum_fit_samples
             @error "Global sensitivity requires at least $minimum_fit_samples runs for " *
                    "$(length(parameter_keys)) parameters, but max_runs is $maximum_sensitivity_runs."
-            return [0.0], [0.0], 0.0, 0.0
+            return Float64[], Float64[], 0.0, 0.0
         end
         status_lock = ReentrantLock()
         try
@@ -389,7 +389,7 @@ function calculate_global_sensitivity!(evaluate_physical_values::Union{Nothing,F
     if total_var <= eps(Float64)
         @error "Global sensitivity cannot be calculated because the surrogate objective " *
                "has no variance."
-        return [0.0], [0.0], 0.0, 0.0
+        return Float64[], Float64[], 0.0, 0.0
     end
 
     S_first = zeros(d)
@@ -828,23 +828,69 @@ Run the configured global sensitivity analysis and report its runtime.
 function run_global_sensitivity!(evaluate_physical_values::Function,
                                  evaluated_parameter_sets::Vector{Any},
                                  parameter_study::Dict{String,Any},
-                                 cancel_parameter_study::Threads.Atomic{Bool})::Bool
+                                 cancel_parameter_study::Threads.Atomic{Bool},
+                                 io_settings::Dict{String,Any},
+                                 sim_params::Dict{String,Any})::Bool
     sensitivity_start_time = now()
     results_before_sensitivity = length(evaluated_parameter_sets)
+    S_total = Float64[]
+    S_first = Float64[]
+    rel_rmse = NaN
+    r2 = NaN
+    calculation_completed = false
 
     try
-        calculate_global_sensitivity!(evaluate_physical_values,
-                                      parameter_study["runtime"]["parameter_bounds"][:, 1:2],
-                                      evaluated_parameter_sets,
-                                      parameter_study["runtime"]["parameter_keys"],
-                                      parameter_study,
-                                      cancel_parameter_study)
+        S_total, S_first, rel_rmse, r2 = calculate_global_sensitivity!(evaluate_physical_values,
+                                                                       parameter_study["runtime"]["parameter_bounds"][:,
+                                                                                                                      1:2],
+                                                                       evaluated_parameter_sets,
+                                                                       parameter_study["runtime"]["parameter_keys"],
+                                                                       parameter_study,
+                                                                       cancel_parameter_study)
+        calculation_completed = true
     catch e
         if e isa InterruptException
             cancel_parameter_study[] = true
         else
             rethrow()
         end
+    end
+
+    parameter_keys = parameter_study["runtime"]["parameter_keys"]
+    bounds = parameter_study["runtime"]["parameter_bounds"][:, 1:2]
+    if calculation_completed &&
+       length(S_total) == length(parameter_keys) &&
+       length(S_first) == length(parameter_keys)
+        output_lines = String[]
+
+        if io_settings["output_parameter_study_csv"]
+            csv_path = parameter_study_csv_path(sim_params,
+                                                io_settings,
+                                                "global_sensitivity")
+            write_global_sensitivity_csv(csv_path,
+                                         parameter_keys,
+                                         bounds,
+                                         S_total,
+                                         S_first,
+                                         rel_rmse,
+                                         r2)
+            push!(output_lines, "  CSV: $csv_path")
+        end
+
+        plot_path = create_global_sensitivity_plot(parameter_keys,
+                                                   S_total,
+                                                   S_first,
+                                                   rel_rmse,
+                                                   r2,
+                                                   io_settings,
+                                                   sim_params)
+        isempty(plot_path) || push!(output_lines, "  Plot: $plot_path")
+
+        if !isempty(output_lines)
+            @globalInfo "Global sensitivity outputs:\n" * join(output_lines, "\n")
+        end
+    elseif calculation_completed
+        @error "Global sensitivity outputs were not created because the result dimensions do not match the parameters."
     end
 
     sensitivity_runtime_seconds = round(Int, seconds(now() - sensitivity_start_time))
@@ -873,19 +919,49 @@ Run the configured local sensitivity analysis and report its runtime.
 function run_local_sensitivity!(evaluate_physical_values::Function,
                                 evaluated_parameter_sets::Vector{Any},
                                 parameter_study::Dict{String,Any},
-                                cancel_parameter_study::Threads.Atomic{Bool})::Bool
+                                cancel_parameter_study::Threads.Atomic{Bool},
+                                io_settings::Dict{String,Any},
+                                sim_params::Dict{String,Any})::Bool
     sensitivity_start_time = now()
     results_before_sensitivity = length(evaluated_parameter_sets)
+    sensitivity_results = Vector{Dict{String,Any}}()
 
     try
-        calculate_local_sensitivity!(evaluate_physical_values,
-                                     evaluated_parameter_sets,
-                                     parameter_study)
+        sensitivity_results = calculate_local_sensitivity!(evaluate_physical_values,
+                                                           evaluated_parameter_sets,
+                                                           parameter_study)
     catch e
         if e isa InterruptException
             cancel_parameter_study[] = true
         else
             rethrow()
+        end
+    end
+
+    if !isempty(sensitivity_results)
+        output_lines = String[]
+
+        if io_settings["output_parameter_study_csv"]
+            csv_path = parameter_study_csv_path(sim_params,
+                                                io_settings,
+                                                "local_sensitivity")
+            write_local_sensitivity_csv(csv_path,
+                                        sensitivity_results)
+            push!(output_lines, "  CSV: $csv_path")
+        end
+
+        response_plot_path = create_local_sensitivity_response_overview_plot(sensitivity_results,
+                                                                             io_settings,
+                                                                             sim_params)
+        isempty(response_plot_path) || push!(output_lines, "  Response overview plot: $response_plot_path")
+
+        response_trends_plot_path = create_local_sensitivity_response_trends_plot(sensitivity_results,
+                                                                                  io_settings,
+                                                                                  sim_params)
+        isempty(response_trends_plot_path) || push!(output_lines, "  Response trends plot: $response_trends_plot_path")
+
+        if !isempty(output_lines)
+            @globalInfo "Local sensitivity outputs:\n" * join(output_lines, "\n")
         end
     end
 
@@ -948,7 +1024,7 @@ function perform_parameter_study(io_settings::Dict{String,Any},
     output_lock = ReentrantLock()
     results_lock = ReentrantLock()
 
-    parameter_study_results_path = sim_params["run_path"](io_settings["parameter_study_csv_file_path"])
+    parameter_study_results_path = parameter_study_csv_path(sim_params, io_settings, "all_results")
     open(parameter_study_results_path, "w") do file_handle
     end
 
@@ -1050,7 +1126,9 @@ function perform_parameter_study(io_settings::Dict{String,Any},
        !run_global_sensitivity!(evaluate_physical_values,
                                 evaluated_parameter_sets,
                                 parameter_study,
-                                cancel_parameter_study)
+                                cancel_parameter_study,
+                                io_settings,
+                                sim_params)
         return false, evaluated_parameter_sets
     end
 
@@ -1058,7 +1136,9 @@ function perform_parameter_study(io_settings::Dict{String,Any},
        !run_local_sensitivity!(evaluate_physical_values,
                                evaluated_parameter_sets,
                                parameter_study,
-                               cancel_parameter_study)
+                               cancel_parameter_study,
+                               io_settings,
+                               sim_params)
         return false, evaluated_parameter_sets
     end
 
