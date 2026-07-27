@@ -1276,12 +1276,12 @@ end
 """
     parameter_study_csv_path(sim_params, io_settings, suffix)
 
-Create a CSV path derived from `parameter_study_csv_file_path`.
+Create a CSV path derived from `parameter_study_csv_path`.
 """
 function parameter_study_csv_path(sim_params::Dict{String,Any},
                                   io_settings::Dict{String,Any},
                                   suffix::String)::String
-    base_path = sim_params["run_path"](io_settings["parameter_study_csv_file_path"])
+    base_path = sim_params["run_path"](io_settings["parameter_study_csv_path"])
     directory, filename = splitdir(base_path)
     root, _ = splitext(filename)
     return joinpath(directory, "$(root)_$(suffix).csv")
@@ -2804,12 +2804,12 @@ is_finite_number(value)::Bool = value isa Real && isfinite(Float64(value))
 """
     parameter_study_plot_path(sim_params, io_settings, suffix)
 
-Create a plot path derived from `parameter_study_plots_file_path`.
+Create a plot path derived from `parameter_study_plots_path`.
 """
 function parameter_study_plot_path(sim_params::Dict{String,Any},
                                    io_settings::Dict{String,Any},
                                    suffix::String)::String
-    base_path = sim_params["run_path"](io_settings["parameter_study_plots_file_path"])
+    base_path = sim_params["run_path"](io_settings["parameter_study_plots_path"])
     dir, filename = splitdir(base_path)
     root, _ = splitext(filename)
     ext = ".html"
@@ -7242,6 +7242,11 @@ function create_parameter_study_diagnostic_plots(results::Vector{Any},
                                                  objective_keys=nothing,
                                                  objective_senses=nothing,
                                                  color_key=nothing)
+    if !io_settings["output_parameter_study_plots"]
+        @globalInfo("Generation of parameter-study plots is deactivated. Set `output_parameter_study_plots` to true.")
+        return
+    end
+
     @globalInfo("Preparing parameter-study figures...")
 
     if io_settings["matrix_plot"] != "nothing"

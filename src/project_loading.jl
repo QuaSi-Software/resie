@@ -513,10 +513,10 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="boolean",
         unit="-"
     ),
-    "parameter_study_csv_file_path" => (
+    "parameter_study_csv_path" => (
         default="./output/parameter_study",
-        description="File path to where the parameter-study results are written to CSV",
-        display_name="Parameter-study CSV file path",
+        description="Directory path to where the parameter-study CSV result files are written to",
+        display_name="Parameter-study CSV directory path",
         required=false,
         type=String,
         json_type="string",
@@ -559,10 +559,19 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         json_type="object",
         unit="-"
     ),
-    "parameter_study_plots_file_path" => (
+    "output_parameter_study_plots" => (
+        default=true,
+        description="Toggle if plots with the parameter-study results should be created",
+        display_name="Output parameter-study plots?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "parameter_study_plots_path" => (
         default="./output/parameter_study_plots",
-        description="File path to where the parameter-study result plots will be written",
-        display_name="Parameter-study plots file path",
+        description="Directory path to where the parameter-study result plots will be written",
+        display_name="Parameter-study plots directory path",
         required=false,
         type=String,
         json_type="string",
