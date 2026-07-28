@@ -4767,6 +4767,7 @@ function create_parallel_coordinates_plot(results::Vector{Any},
                       labelfont=attr(; size=11),
                       line=attr(; color=color_values,
                                 colorscale=objective_colorscale(color_sense),
+                                reversescale=false,
                                 cmin=cmin,
                                 cmax=cmax,
                                 showscale=true,
@@ -4975,8 +4976,60 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
         );
         const originalColorscale =
             gd.data[traceIndex].line.colorscale;
-        const originalReversescale =
-            gd.data[traceIndex].line.reversescale === true;
+
+        function copyColorscale(colorscale) {
+            return Array.isArray(colorscale)
+                ? colorscale.map(stop =>
+                    Array.isArray(stop) ? stop.slice() : stop
+                )
+                : colorscale;
+        }
+
+        function reverseColorscale(colorscale) {
+            if (!Array.isArray(colorscale)) {
+                return colorscale;
+            }
+
+            return colorscale
+                .slice()
+                .reverse()
+                .map(stop => [1.0 - Number(stop[0]), stop[1]]);
+        }
+
+        // Encode the objective direction directly in the colourscale.
+        // Plotly's built-in "Reset axes" action can restore reversescale
+        // independently of a colourscale changed with Plotly.restyle.
+        // Keeping reversescale false prevents the colour direction from
+        // changing when axes are reset.
+        const initialColorSense =
+            objectiveKeySet.has(initialColorKey) &&
+            Object.prototype.hasOwnProperty.call(
+                objectiveSenses,
+                initialColorKey
+            )
+                ? objectiveSenses[initialColorKey]
+                : "min";
+
+        // Keep one canonical scale whose low end is yellow and whose high
+        // end is purple. Derive it once from the initial Plotly trace, then
+        // copy it for every update so Plotly cannot mutate the stored scale.
+        const lowValuesYellowColorscale =
+            initialColorSense === "min"
+                ? copyColorscale(originalColorscale)
+                : reverseColorscale(originalColorscale);
+
+        function colorscaleForSense(sense) {
+            return sense === "max"
+                ? reverseColorscale(lowValuesYellowColorscale)
+                : copyColorscale(lowValuesYellowColorscale);
+        }
+
+        function colorscaleRestyleValue(sense) {
+            // Plotly.restyle treats array-valued attributes as per-trace
+            // values. The extra array level assigns the complete colorscale
+            // to this one trace instead of unpacking its colour stops.
+            return [colorscaleForSense(sense)];
+        }
 
         let currentColorKey = initialColorKey;
         let currentColorValues = originalColorValues.slice();
@@ -5822,6 +5875,23 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
             return "min";
         }
 
+        function enforceCurrentColorDirection() {
+            const sense = colorSenseForKey(currentColorKey);
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.colorscale": colorscaleRestyleValue(sense),
+                    "line.reversescale": false
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            });
+        }
+
         function applyColorSource() {
             const dimensionIndex = Number(colorSelect.value);
             const dimension =
@@ -5861,8 +5931,8 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                 gd,
                 {
                     "line.color": [values],
-                    "line.colorscale": "Viridis",
-                    "line.reversescale": sense === "min",
+                    "line.colorscale": colorscaleRestyleValue(sense),
+                    "line.reversescale": false,
                     "line.cmin": bounds[0],
                     "line.cmax": bounds[1],
                     "line.colorbar.title.text": key
@@ -6074,8 +6144,8 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                 [traceIndex]
             ).then(function () {
                 updateInputValues();
-                return updateVisibleColorBounds();
-            });
+                return enforceCurrentColorDirection();
+            }).then(updateVisibleColorBounds);
         });
 
         resetAllButton.addEventListener("click", function () {
@@ -6120,8 +6190,10 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                     "unselected.line.opacity":
                         originalUnselectedOpacity,
                     "line.color": [originalColorValues],
-                    "line.colorscale": originalColorscale,
-                    "line.reversescale": originalReversescale,
+                    "line.colorscale": colorscaleRestyleValue(
+                        colorSenseForKey(initialColorKey)
+                    ),
+                    "line.reversescale": false,
                     "line.cmin": originalCmin,
                     "line.cmax": originalCmax,
                     "line.colorbar.title.text":
@@ -6154,8 +6226,17 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                     key.startsWith("dimensions[")
             );
 
-            if (dimensionsChanged) {
-                scheduleVisibleColorUpdate();
+            const colorDirectionChanged = keys.some(
+                key =>
+                    key === "line.colorscale" ||
+                    key === "line.reversescale"
+            );
+
+            if (dimensionsChanged || colorDirectionChanged) {
+                window.setTimeout(function () {
+                    enforceCurrentColorDirection()
+                        .then(updateVisibleColorBounds);
+                }, 0);
             }
         });
 
