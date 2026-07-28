@@ -1,9 +1,13 @@
-# ------------------------------------------------------------------------------------------
-# Sensitivity-analysis output
-# ------------------------------------------------------------------------------------------
+# this file contains functionality for writing output and creating plots of the parameter-study results
+# including parameter variation, optimisation and sensitivity analysis.
 
 const PARAMETER_STUDY_PLOT_INSERTIONS_PATH = joinpath(@__DIR__, "parameter_study_plots_insertions")
 
+"""
+    render_parameter_study_plot_insertion(file_name, replacements)
+
+Takes a separate html insertion file for interactive plots and processes it.
+"""
 function render_parameter_study_plot_insertion(file_name::String,
                                                replacements::Pair{String,String}...)::String
     insertion_path = joinpath(PARAMETER_STUDY_PLOT_INSERTIONS_PATH, file_name)
@@ -70,8 +74,7 @@ function write_sensitivity_csv(file_path::String,
 end
 
 """
-    write_global_sensitivity_csv(file_path, parameter_keys, bounds, S_total, S_first,
-                                 rel_rmse, r2)
+    write_global_sensitivity_csv(file_path, parameter_keys, bounds, S_total, S_first, rel_rmse, r2)
 
 Write one row per parameter. `interaction_effect` is the part of the total-order Sobol index
 that is not explained by the first-order effect.
@@ -567,10 +570,6 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
     savefig(plot_object, file_path)
     return file_path
 end
-
-# ------------------------------------------------------------------------------------------
-# Parameter-study plotting
-# ------------------------------------------------------------------------------------------
 
 """
     create_matrix_plot(results, io_settings, sim_params; ...)
@@ -1777,6 +1776,7 @@ function inject_convergence_objective_controls!(file_path::String,
 
     return file_path
 end
+
 """
     create_objective_parameter_plots(results, io_settings, sim_params; ...)
 
