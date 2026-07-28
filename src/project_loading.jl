@@ -857,23 +857,27 @@ const OPTIMISER_LIMITS_DEF = Dict{String,Any}(
     ),
     "x_tol_abs" => (
         default=nothing,
-        description="Absolute tolerance for normalised optimisation parameters in the " *
-                    "range [0, 1].",
-        display_name="Absolute parameter tolerance",
+        description="Tolerance for normalised optimisation parameters in the range " *
+                    "[0, 1]. It is translated to the closest backend-specific stopping " *
+                    "criterion, which may be absolute or relative; support depends on " *
+                    "the selected algorithm.",
+        display_name="Parameter tolerance",
         required=false,
         conditionals=[("type", "is_one_of", ("Optim", "NLopt", "NOMAD"))],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        validations=[("self", "value_gt_num_or_nothing", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
     ),
     "f_tol_abs" => (
         default=nothing,
-        description="Absolute tolerance for the objective function.",
-        display_name="Absolute objective tolerance",
+        description="Tolerance for changes or spread in the objective function. It is " *
+                    "translated to the closest backend-specific stopping criterion; " *
+                    "support depends on the selected algorithm.",
+        display_name="Objective tolerance",
         required=false,
-        conditionals=[("type", "is_one_of", ("Optim", "NLopt"))],
-        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        conditionals=[("type", "is_one_of", ("Optim", "BlackBoxOptim", "NLopt"))],
+        validations=[("self", "value_gt_num_or_nothing", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -2431,6 +2435,20 @@ function get_refinement_optimiser_config(config::Union{Nothing,AbstractDict},
 end
 
 function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
+    optim_kwargs = something(get(optimiser_config, "optim_kwargs", nothing), Dict{String,Any}())
+
+    # A configured zero disables or prevents convergence in the supported backends.
+    function reject_duplicate_tolerance(common_name::String,
+                                        backend_name::String,
+                                        backend::String)::Nothing
+        if !isnothing(get(optimiser_config, common_name, nothing)) && haskey(optim_kwargs, backend_name)
+            @error "$backend option '$backend_name' cannot be set in optim_kwargs together " *
+                   "with the corresponding common setting '$common_name'."
+            throw(InputError())
+        end
+        return nothing
+    end
+
     if optimiser_config["type"] == "Optim"
         if optimiser["objective_function_name"] == "multi-objective"
             @error "Objective function multi-objective not supported for algorithms from " *
@@ -2442,14 +2460,34 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         #TODO most Optim algorithms ignore bounds which can be supposedly added with wrapper 
         # Optim.Fminbox() but it doesn't work
         if optimiser_config["algorithm"] == "NelderMead"
+            if !isnothing(optimiser_config["x_tol_abs"])
+                @error "x_tol_abs is not supported by Optim.NelderMead. " *
+                       "Use max_runs or max_time instead."
+                throw(InputError())
+            end
+            reject_duplicate_tolerance("f_tol_abs", "g_abstol", "Optim")
             alg = Optim.NelderMead()
 
         elseif optimiser_config["algorithm"] == "SAMIN"
-            alg = Optim.SAMIN()
+            samin_kwargs = Dict{Symbol,Any}()
+            if !isnothing(optimiser_config["x_tol_abs"])
+                samin_kwargs[:x_tol] = optimiser_config["x_tol_abs"]
+            end
+            if !isnothing(optimiser_config["f_tol_abs"])
+                samin_kwargs[:f_tol] = optimiser_config["f_tol_abs"]
+            end
+            alg = Optim.SAMIN(; samin_kwargs...)
             push!(optimiser["args"], normalised_bounds[:, 1])
             push!(optimiser["args"], normalised_bounds[:, 2])
 
         elseif optimiser_config["algorithm"] == "ParticleSwarm"
+            if !isnothing(optimiser_config["x_tol_abs"]) ||
+               !isnothing(optimiser_config["f_tol_abs"])
+                @error "x_tol_abs and f_tol_abs are not supported by " *
+                       "Optim.ParticleSwarm because this algorithm does not assess " *
+                       "convergence. Use max_runs or max_time instead."
+                throw(InputError())
+            end
             alg = Optim.ParticleSwarm(; upper=normalised_bounds[:, 2], lower=normalised_bounds[:, 1])
         else
             @error "For optimisation type 'Optim' the algorithm has to be one of " *
@@ -2462,10 +2500,8 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
 
         optimiser["kwargs"] = Dict{Symbol,Any}()
         optimiser["kwargs"][:show_trace] = true
-        if haskey(optimiser_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
-                optimiser["kwargs"][Symbol(keyword)] = val
-            end
+        for (keyword, val) in pairs(optim_kwargs)
+            optimiser["kwargs"][Symbol(keyword)] = val
         end
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:f_calls_limit] = optimiser_config["max_runs"]
@@ -2473,16 +2509,22 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         if !isnothing(optimiser_config["max_time"])
             optimiser["kwargs"][:time_limit] = optimiser_config["max_time"]
         end
-        if !isnothing(optimiser_config["x_tol_abs"])
-            optimiser["kwargs"][:x_abstol] = optimiser_config["x_tol_abs"]
-        end
-        if !isnothing(optimiser_config["f_tol_abs"])
-            optimiser["kwargs"][:f_abstol] = optimiser_config["f_tol_abs"]
+        if optimiser_config["algorithm"] == "NelderMead" && !isnothing(optimiser_config["f_tol_abs"])
+            # Nelder-Mead uses the spread of objective values at the simplex vertices
+            # as its convergence criterion, exposed through Optim.Options.g_abstol.
+            optimiser["kwargs"][:g_abstol] = optimiser_config["f_tol_abs"]
         end
 
         push!(optimiser["args"], Optim.Options(; optimiser["kwargs"]...))
 
     elseif optimiser_config["type"] == "BlackBoxOptim"
+        if !isnothing(optimiser_config["x_tol_abs"])
+            @error "x_tol_abs is not supported by BlackBoxOptim. " *
+                   "Use max_runs or max_time instead."
+            throw(InputError())
+        end
+        reject_duplicate_tolerance("f_tol_abs", "MinDeltaFitnessTolerance", "BlackBoxOptim")
+
         alg = Symbol(optimiser_config["algorithm"])
 
         optimiser["args"] = [normalised_bounds[:, 3]]
@@ -2493,6 +2535,10 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
                 @error "Optimisation algorithm '$(optimiser_config["algorithm"])' doesn't " *
                        "support multi-objective optimisation. Choose a different " *
                        "objective_function or algorithm 'borg_moea'."
+                throw(InputError())
+            end
+            if !isnothing(optimiser_config["f_tol_abs"])
+                @error "f_tol_abs is not supported for multi-objective BlackBoxOptim."
                 throw(InputError())
             end
             optimiser["kwargs"][:FitnessScheme] = BlackBoxOptim.ParetoFitnessScheme{optimiser["N_obj"]}(;
@@ -2513,13 +2559,24 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         if !isnothing(optimiser_config["max_time"])
             optimiser["kwargs"][:MaxTime] = optimiser_config["max_time"]
         end
-        if haskey(optimiser_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
-                optimiser["kwargs"][Symbol(keyword)] = val
-            end
+        for (keyword, val) in pairs(optim_kwargs)
+            optimiser["kwargs"][Symbol(keyword)] = val
+        end
+        if !isnothing(optimiser_config["f_tol_abs"])
+            # Stop when two consecutive best-fitness improvements differ by less
+            # than the configured objective tolerance.
+            optimiser["kwargs"][:MinDeltaFitnessTolerance] = optimiser_config["f_tol_abs"]
         end
 
     elseif optimiser_config["type"] == "Metaheuristics"
+        if !isnothing(optimiser_config["x_tol_abs"]) || !isnothing(optimiser_config["f_tol_abs"])
+            @error "x_tol_abs and f_tol_abs are not currently supported for " *
+                   "Metaheuristics algorithms. Metaheuristics combines its parameter and " *
+                   "objective tolerances with additional mandatory population-convergence " *
+                   "conditions, so they cannot be translated to independent stopping " *
+                   "criteria. Use max_runs or max_time instead."
+            throw(InputError())
+        end
         m_obj_algs = ["MOEAD_DE", "NSGA2", "NSGA3", "SMS_EMOA", "SPEA2", "CCMO"]
         if optimiser["objective_function_name"] == "multi-objective" &&
            !(optimiser_config["algorithm"] in m_obj_algs)
@@ -2536,8 +2593,6 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         args_alg = Any[]
         kwargs_general = Dict{Symbol,Any}()
         kwargs_alg = Dict{Symbol,Any}()
-
-        optim_kwargs = get(optimiser_config, "optim_kwargs", Dict{String,Any}())
 
         if optimiser_config["algorithm"] == "MOEAD_DE"
             if optimiser["N_obj"] == 1
@@ -2591,15 +2646,17 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         end
 
     elseif optimiser_config["type"] == "NLopt"
-        if occursin(r"LD_.*", optimiser_config["algorithm"])
-            @error "The chosen algorithm `$(optimiser_config["algorithm"])` needs a " *
-                   "gradient which is not supported in ReSiE"
+        configured_algorithm = optimiser_config["algorithm"]
+        algorithm = startswith(configured_algorithm, "NLOPT_") ? configured_algorithm[7:end] : configured_algorithm
+
+        if startswith(algorithm, "LD_") || startswith(algorithm, "GD_")
+            @error "The chosen algorithm `$configured_algorithm` needs a gradient which " *
+                   "is not supported in ReSiE"
             throw(InputError())
         end
-        algorithm = optimiser_config["algorithm"]
-        if startswith(algorithm, "NLOPT_")
-            algorithm = split(algorithm, "NLOPT_")[2]
-        end
+
+        reject_duplicate_tolerance("x_tol_abs", "xtol_abs", "NLopt")
+        reject_duplicate_tolerance("f_tol_abs", "ftol_abs", "NLopt")
 
         n_dim_opt = length(normalised_bounds[:, 1])
         alg = NLopt.Opt(Symbol(algorithm), n_dim_opt)
@@ -2620,13 +2677,11 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             optimiser["kwargs"][:ftol_abs] = optimiser_config["f_tol_abs"]
         end
 
-        if haskey(optimiser_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
-                if Symbol(keyword) in propertynames(alg)
-                    optimiser["kwargs"][Symbol(keyword)] = val
-                elseif NLopt.nlopt_has_param(alg, keyword)
-                    NLopt.nlopt_set_param(alg, keyword, val)
-                end
+        for (keyword, val) in pairs(optim_kwargs)
+            if Symbol(keyword) in propertynames(alg)
+                optimiser["kwargs"][Symbol(keyword)] = val
+            elseif NLopt.nlopt_has_param(alg, keyword)
+                NLopt.nlopt_set_param(alg, keyword, val)
             end
         end
 
@@ -2636,6 +2691,12 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         optimiser["args"] = [alg, normalised_bounds[:, 3]]
 
     elseif optimiser_config["type"] == "NOMAD"
+        if !isnothing(optimiser_config["f_tol_abs"])
+            @error "f_tol_abs is not supported by NOMAD. " *
+                   "Use max_runs or max_time instead."
+            throw(InputError())
+        end
+
         optimiser["kwargs"] = Dict{Symbol,Any}()
         optimiser["kwargs"][:lower_bound] = normalised_bounds[:, 1]
         optimiser["kwargs"][:upper_bound] = normalised_bounds[:, 2]
@@ -2652,11 +2713,9 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             kwargs_general[:max_time] = optimiser_config["max_time"]
         end
 
-        if haskey(optimiser_config, "optim_kwargs")
-            for (keyword, val) in pairs(optimiser_config["optim_kwargs"])
-                if Symbol(keyword) in fieldnames(NOMAD.NomadOptions)
-                    kwargs_general[Symbol(keyword)] = val
-                end
+        for (keyword, val) in pairs(optim_kwargs)
+            if Symbol(keyword) in fieldnames(NOMAD.NomadOptions)
+                kwargs_general[Symbol(keyword)] = val
             end
         end
 
