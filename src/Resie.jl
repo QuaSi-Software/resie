@@ -86,7 +86,8 @@ include("resie_logger.jl")
 using .Resie_Logger
 
 include("project_loading.jl")
-include("file_output.jl")
+include("simulation_output.jl")
+include("parameter_study_output.jl")
 include("economy.jl")
 include("emissions.jl")
 include("parameter_study.jl")

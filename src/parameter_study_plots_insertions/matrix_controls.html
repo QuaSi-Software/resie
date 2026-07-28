@@ -1,0 +1,324 @@
+<style id="resie-matrix-controls-style">
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+body {
+    min-width: 0;
+    min-height: 0;
+}
+
+.plotly-graph-div {
+    width: 100% !important;
+    min-width: 0;
+    min-height: 0;
+}
+</style>
+<script id="resie-matrix-controls-script">
+(function () {
+    const colorData = {{COLOR_DATA_JSON}};
+    const parameterKeys = {{PARAMETER_KEYS_JSON}};
+    const objectiveKeys = {{OBJECTIVE_KEYS_JSON}};
+    const highlightMask = {{HIGHLIGHT_MASK_JSON}};
+    const colorSenses = {{COLOR_SENSES_JSON}};
+    const initialColor = {{INITIAL_COLOR_JSON}};
+
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll('.js-plotly-plot');
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function colorBounds(values, sense) {
+        const sorted = values.filter(isFiniteNumber).slice().sort(function (a, b) {
+            return a - b;
+        });
+
+        if (sorted.length === 0) {
+            return [0.0, 1.0];
+        }
+
+        const numberOfBestValues = Math.max(1, Math.ceil(sorted.length / 4));
+        let minimum;
+        let maximum;
+
+        if (sense === 'max') {
+            minimum = sorted[sorted.length - numberOfBestValues];
+            maximum = sorted[sorted.length - 1];
+        } else {
+            minimum = sorted[0];
+            maximum = sorted[numberOfBestValues - 1];
+        }
+
+        if (!Number.isFinite(minimum) ||
+            !Number.isFinite(maximum) ||
+            !(maximum > minimum)) {
+            minimum = sorted[0];
+            maximum = sorted[sorted.length - 1];
+        }
+
+        if (!(maximum > minimum)) {
+            const delta = Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+            minimum -= delta;
+            maximum += delta;
+        }
+
+        return [minimum, maximum];
+    }
+
+    function setupMatrixControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupMatrixControls, 200);
+            return;
+        }
+
+        if (document.getElementById('parameter-study-matrix-controls')) {
+            return;
+        }
+
+        const controls = document.createElement('div');
+        controls.id = 'parameter-study-matrix-controls';
+        controls.style.fontFamily = 'Arial, sans-serif';
+        controls.style.fontSize = '13px';
+        controls.style.margin = '8px 0 4px 0';
+        controls.style.padding = '10px';
+        controls.style.border = '1px solid #ccc';
+        controls.style.borderRadius = '5px';
+        controls.style.display = 'flex';
+        controls.style.flexDirection = 'column';
+        controls.style.alignItems = 'stretch';
+        controls.style.gap = '8px';
+        controls.style.overflowX = 'auto';
+
+        function createControlRow() {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.flexWrap = 'nowrap';
+            row.style.gap = '10px';
+            row.style.minWidth = 'max-content';
+            controls.appendChild(row);
+            return row;
+        }
+
+        function appendOptionGroup(select, label, values) {
+            if (!Array.isArray(values) || values.length === 0) {
+                return;
+            }
+
+            const group = document.createElement('optgroup');
+            group.label = label;
+
+            values.forEach(function (value) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                group.appendChild(option);
+            });
+
+            select.appendChild(group);
+        }
+
+        const selectionRow = createControlRow();
+
+        const colorContainer = document.createElement('label');
+        colorContainer.style.display = 'flex';
+        colorContainer.style.alignItems = 'center';
+        colorContainer.style.gap = '5px';
+
+        const colorLabel = document.createElement('span');
+        colorLabel.textContent = 'Color:';
+
+        const colorSelect = document.createElement('select');
+        colorSelect.style.maxWidth = '320px';
+
+        appendOptionGroup(
+            colorSelect,
+            'Parameter-study parameters',
+            parameterKeys
+        );
+        appendOptionGroup(
+            colorSelect,
+            'Objectives',
+            objectiveKeys
+        );
+
+        colorSelect.value = initialColor;
+
+        colorContainer.appendChild(colorLabel);
+        colorContainer.appendChild(colorSelect);
+        selectionRow.appendChild(colorContainer);
+
+        const resetSelectionButton = document.createElement('button');
+        resetSelectionButton.textContent = 'Reset selection';
+        selectionRow.appendChild(resetSelectionButton);
+
+        gd.parentNode.insertBefore(controls, gd);
+
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height = '100%';
+        document.body.style.height = '100%';
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+
+        plotParent.style.width = '100%';
+        plotParent.style.display = 'flex';
+        plotParent.style.flexDirection = 'column';
+        plotParent.style.overflow = 'hidden';
+
+        controls.style.flex = '0 0 auto';
+        gd.style.flex = '1 1 auto';
+        gd.style.minHeight = '0';
+        gd.style.width = '100%';
+
+        function viewportSize() {
+            const viewport = window.visualViewport;
+
+            return {
+                width: Math.max(
+                    320,
+                    Math.floor(
+                        viewport ?
+                        viewport.width :
+                        (document.documentElement.clientWidth || window.innerWidth || 320)
+                    )
+                ),
+                height: Math.max(
+                    320,
+                    Math.floor(
+                        viewport ?
+                        viewport.height :
+                        (document.documentElement.clientHeight || window.innerHeight || 320)
+                    )
+                )
+            };
+        }
+
+        function resizePlotToViewport() {
+            const size = viewportSize();
+            const parentTop = plotParent.getBoundingClientRect().top;
+
+            plotParent.style.height = Math.max(320, size.height - parentTop) + 'px';
+
+            const controlsHeight = controls.getBoundingClientRect().height;
+            const availableHeight = Math.max(
+                320,
+                size.height - parentTop - controlsHeight - 8
+            );
+
+            gd.style.height = availableHeight + 'px';
+            gd.style.width = size.width + 'px';
+
+            return Plotly.relayout(gd, {
+                width: size.width,
+                height: availableHeight,
+                autosize: false
+            }).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        function applyColorSelection() {
+            const selectedKey = colorSelect.value;
+            const selectedValues = colorData[selectedKey];
+
+            if (!Array.isArray(selectedValues)) {
+                return;
+            }
+
+            const selectedSense = colorSenses[selectedKey] || 'min';
+            const bounds = colorBounds(selectedValues, selectedSense);
+            const highlightedValues = selectedValues.filter(function (_, index) {
+                return highlightMask[index] === true;
+            });
+
+            const traceIndices = [];
+            const traceColors = [];
+
+            gd.data.forEach(function (trace, traceIndex) {
+                if (trace.meta === 'matrix-colour-runs') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push(selectedValues);
+                } else if (trace.meta === 'matrix-colour-highlight') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push(highlightedValues);
+                } else if (trace.meta === 'matrix-colour-dummy') {
+                    traceIndices.push(traceIndex);
+                    traceColors.push([selectedValues[0]]);
+                }
+            });
+
+            const restylePromise = traceIndices.length > 0 ?
+                Plotly.restyle(
+                    gd,
+                    {'marker.color': traceColors},
+                    traceIndices
+                ) :
+                Promise.resolve();
+
+            return restylePromise.then(function () {
+                return Plotly.relayout(gd, {
+                    'coloraxis.cmin': bounds[0],
+                    'coloraxis.cmax': bounds[1],
+                    'coloraxis.reversescale': selectedSense !== 'max',
+                    'coloraxis.colorbar.title.text': selectedKey
+                });
+            });
+        }
+
+        colorSelect.addEventListener('change', function () {
+            applyColorSelection();
+        });
+
+        resetSelectionButton.addEventListener('click', function () {
+            colorSelect.value = initialColor;
+            applyColorSelection();
+        });
+
+        let resizeFrame = null;
+
+        function scheduleMatrixResize() {
+            if (resizeFrame !== null) {
+                cancelAnimationFrame(resizeFrame);
+            }
+
+            resizeFrame = requestAnimationFrame(function () {
+                resizeFrame = null;
+                resizePlotToViewport();
+            });
+        }
+
+        window.addEventListener('resize', scheduleMatrixResize);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener(
+                'resize',
+                scheduleMatrixResize
+            );
+        }
+
+        applyColorSelection();
+        scheduleMatrixResize();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener(
+            'DOMContentLoaded',
+            setupMatrixControls
+        );
+    } else {
+        setupMatrixControls();
+    }
+})();
+</script>

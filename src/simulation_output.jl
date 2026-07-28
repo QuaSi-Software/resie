@@ -1,0 +1,1315 @@
+# this file contains functionality for writing output of the simulation to files.
+using Dates
+using Random
+using CSV
+
+"""
+    get_output_keys(io_settings, economic_parameters, emissions_parameters, parameter_study,
+                    components, suppress_all_output)
+
+Determines output keys for:
+  - lineplot
+  - csv export
+  - economic and emissions calculations
+  - parameter-study objective evaluation
+
+For each output channel:
+  - if not requested, returns `nothing`
+  - if requested, returns either:
+      - all possible keys (in-/excluding flows), or
+      - only requested keys from input file
+"""
+function get_output_keys(io_settings::AbstractDict{String,Any},
+                         economic_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         emissions_parameters::Union{Nothing,AbstractDict{String,Any}},
+                         parameter_study::AbstractDict{String,Any},
+                         components::Grouping,
+                         suppress_all_output::Bool)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                           Union{Nothing,Vector{EnergySystems.OutputKey}}}
+    function parse_all_mode(io_settings, setting_name::String, suppress_all_output::Bool)
+        if suppress_all_output
+            return false, false, false
+        end
+        do_create = false
+        do_all_excl = false
+        do_all_incl = false
+
+        if haskey(io_settings, setting_name)
+            do_create = true
+            v = io_settings[setting_name]
+            if v == "all_excl_flows"
+                do_all_excl = true
+            elseif v == "all_incl_flows"
+                do_all_incl = true
+            elseif v == "nothing"
+                do_create = false
+            elseif v == "all"
+                @error "For \"$(setting_name)\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
+                throw(InputError())
+            end
+        end
+
+        return do_create, do_all_excl, do_all_incl
+    end
+
+    # Sorting the keys
+    function sort_by(output_key)
+        any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
+        # flows after others: primary = medium (always present), secondary
+        lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
+        # default: primary = unit.uac, secondary = medium (if present), tertiary
+        lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
+    end
+
+    # Build "all outputs" once per include/exclude flows
+    function collect_all_output_keys(components::Grouping; include_flows::Bool)::Vector{EnergySystems.OutputKey}
+        all_keys = Vector{EnergySystems.OutputKey}()
+
+        for unit in components
+            output_vals = output_values(unit[2])
+            temp_dict = Dict{String,Any}()
+
+            for output_val in output_vals
+                if startswith(output_val, "TemperatureFlow")
+                    # do nothing, temperature are added in output_keys()
+                    continue
+                end
+
+                if startswith(output_val, "EnergyFlow")
+                    if !include_flows
+                        continue
+                    end
+
+                    # handle secondary interfaces
+                    if startswith(output_val, create_secondary_name("EnergyFlow"))
+                        key = adjust_name_if_secondary(String(unit[2].medium), true)
+                        nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
+                    else
+                        key = String(unit[2].medium)
+                        nr_skip = 12
+                    end
+
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val[nr_skip:end])
+                    else
+                        temp_dict[key] = [output_val[nr_skip:end]]
+                    end
+                else
+                    # Non-flow output => keyed by unit.uac
+                    key = unit[2].uac
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val)
+                    else
+                        temp_dict[key] = [output_val]
+                    end
+                end
+            end
+            append!(all_keys, output_keys(components, temp_dict))
+        end
+
+        sort!(all_keys; by=sort_by)
+        return all_keys
+    end
+
+    # Economy and emissions filter
+    function is_economic_emissions_key(ok::EnergySystems.OutputKey)
+        occursin("OUT", ok.value_key) ||
+            occursin("IN", ok.value_key) ||
+            occursin("Supply", ok.value_key) ||
+            occursin("Demand", ok.value_key)
+    end
+
+    # get requirements
+    do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot", suppress_all_output)
+    do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output", suppress_all_output)
+    do_economy_emissions = economic_parameters["calculate_economy"] || emissions_parameters["calculate_emissions"]
+    collect_objective_results = parameter_study["runtime"]["enabled"]
+
+    # Decide if we need all-keys lists
+    need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy_emissions
+    need_all_incl = do_plot_all_incl || do_csv_all_incl
+
+    all_output_keys_excl_flows = need_all_excl ? collect_all_output_keys(components; include_flows=false) : nothing
+    all_output_keys_incl_flows = need_all_incl ? collect_all_output_keys(components; include_flows=true) : nothing
+
+    # Lineplot keys
+    if do_create_plot
+        if do_plot_all_incl
+            output_keys_lineplot = all_output_keys_incl_flows
+        elseif do_plot_all_excl
+            output_keys_lineplot = all_output_keys_excl_flows
+        else
+            output_keys_lineplot = Vector{EnergySystems.OutputKey}()
+            for (_, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                append!(output_keys_lineplot, output_keys(components, plot["key"]))
+            end
+        end
+    else
+        output_keys_lineplot = nothing
+    end
+
+    # CSV keys
+    if do_write_CSV
+        if do_csv_all_incl
+            output_keys_to_csv = all_output_keys_incl_flows
+        elseif do_csv_all_excl
+            output_keys_to_csv = all_output_keys_excl_flows
+        else
+            output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
+        end
+    else
+        output_keys_to_csv = nothing
+    end
+
+    # Economy or emissions keys
+    if do_economy_emissions
+        # Use excl_flows "all" as base
+        output_keys_economic_emissions = copy(all_output_keys_excl_flows)
+        filter!(is_economic_emissions_key, output_keys_economic_emissions)
+        # keep stable ordering (all_output_keys_excl_flows is already sorted)
+    else
+        output_keys_economic_emissions = nothing
+    end
+
+    # parameter-study objective keys
+    if collect_objective_results
+        output_keys_parameter_study = output_keys(components, parameter_study["runtime"]["objective_output_spec"])
+        output_keys_parameter_study = unique(output_keys_parameter_study)
+    else
+        output_keys_parameter_study = nothing
+    end
+
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economic_emissions, output_keys_parameter_study
+end
+
+"""
+get_interface_information(components)
+
+
+Function to gather information for the sankey diagram.
+Determines 
+- the total number of present system interfaces [int]
+- the corresponding medium in each interface [medium]
+- the source component of each interface and [unit]
+- the target component of each interface [unit]
+
+The information is returned as single vectors with the indices matching together.
+"""
+function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any},Vector{Any},Vector{Any}}
+    nr_of_interfaces = 0
+    medium_of_interfaces = []
+    output_sourcenames_sankey = []
+    output_targetnames_sankey = []
+    for each_component in components
+        for each_outputinterface in each_component[2].output_interfaces
+            medium = nothing  # reset medium
+            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
+                medium = each_outputinterface[1] # then, the medium is stored separately
+                each_outputinterface = each_outputinterface[2]
+            end
+
+            if (isdefined(each_outputinterface, :target) &&
+                !startswith(each_outputinterface.target.uac, "Proxy") &&
+                !startswith(each_outputinterface.source.uac, "Proxy"))
+
+                # count interface
+                nr_of_interfaces += 1
+
+                #get name of source and sink
+                push!(output_sourcenames_sankey, each_outputinterface.source.uac)
+                push!(output_targetnames_sankey, each_outputinterface.target.uac)
+
+                # get name of medium
+                if !(medium === nothing)
+                    push!(medium_of_interfaces, medium)
+                elseif isdefined(each_outputinterface.target, :medium)
+                    push!(medium_of_interfaces, each_outputinterface.target.medium)
+                elseif isdefined(each_outputinterface.source, :medium)
+                    push!(medium_of_interfaces, each_outputinterface.source.medium)
+                else
+                    @warn "The name of the medium was not detected. This may lead to wrong colouring in Sankey plot."
+                end
+
+                # add "real" demands and sources
+                if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
+                    push!(output_sourcenames_sankey, string(each_outputinterface.source.uac, "_total_supply"))
+                    push!(output_targetnames_sankey, each_outputinterface.source.uac)
+                    push!(medium_of_interfaces, "hide_medium")
+                    nr_of_interfaces += 1
+                end
+                if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
+                    push!(output_sourcenames_sankey, each_outputinterface.target.uac)
+                    push!(output_targetnames_sankey, string(each_outputinterface.target.uac, "_total_demand"))
+                    push!(medium_of_interfaces, "hide_medium")
+                    nr_of_interfaces += 1
+                end
+            end
+        end
+
+        # add losses
+        if "LossesGains" in output_values(each_component[2])
+            push!(output_sourcenames_sankey, each_component[2].uac)
+            push!(output_targetnames_sankey, "LossesGains")
+            push!(medium_of_interfaces, "LossesGains")
+            nr_of_interfaces += 1
+        end
+    end
+    if length(medium_of_interfaces) !== nr_of_interfaces
+        @error "Error in extracting information from input file for sankey plot."
+    end
+
+    return nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey
+end
+
+"""
+collect_interface_energies(components, nr_of_interfaces)
+
+Collects and returns the energy that was transported through every interface.
+If the balance of an interface was not zero, the actual energy that was flowing
+is written to the outputs.
+Attention: This can lead to overfilling of demands which is currently not visible
+in the sankey diagram!
+"""
+function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
+    n = 1
+    energies = zeros(Float64, nr_of_interfaces)
+    for each_component in components
+        for each_outputinterface in each_component[2].output_interfaces
+            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
+                each_outputinterface = each_outputinterface[2]
+            end
+            if (isdefined(each_outputinterface, :target)
+                && !startswith(each_outputinterface.target.uac, "Proxy")
+                && !startswith(each_outputinterface.source.uac, "Proxy"))
+                # end of condition
+                energies[n] = calculate_energy_flow(each_outputinterface)
+                n += 1
+
+                # If source or target is fixed source or sink, gather also demand and supply
+                if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
+                    energies[n] = each_outputinterface.source.supply
+                    n += 1
+                end
+
+                if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
+                    energies[n] = each_outputinterface.target.demand
+                    n += 1
+                end
+            end
+        end
+
+        # add losses
+        if "LossesGains" in output_values(each_component[2])
+            energies[n] = output_value(each_component[2],
+                                       EnergySystems.OutputKey(; unit=each_component[2],
+                                                               medium=nothing,
+                                                               value_key="LossesGains"))
+            n += 1
+        end
+    end
+    return energies
+end
+
+"""
+output_keys(components, from_config)
+
+Transform the output keys definition in the project config file into a list of OutputKey
+items. This is done to speed up selection of values for the output in each time step,
+as this transformation has to be done only once at the beginning.
+"""
+function output_keys(components::Grouping, from_config::AbstractDict{String,Any})::Vector{EnergySystems.OutputKey}
+    outputs = Vector{EnergySystems.OutputKey}()
+
+    all_current_media = []
+    for component in values(components)
+        if component.sys_function === EnergySystems.sf_bus
+            push!(all_current_media, String(component.medium))
+            for inface in component.input_interfaces
+                if inface.is_secondary_interface
+                    push!(all_current_media, adjust_name_if_secondary(String(component.medium), true))
+                end
+            end
+        end
+    end
+    all_current_media = unique(all_current_media)
+
+    for (key, _) in sort(collect(from_config); by=k -> k[1])
+        if key in keys(components)
+            unit_key = key
+            unit = components[unit_key]
+
+            for entry in sort(from_config[unit_key])
+                splitted = split(String(entry), ":")
+                if length(splitted) > 1
+                    medium_key = splitted[1]
+                    medium = Symbol(String(medium_key))
+                    unit_fields = fieldnames(typeof(unit))
+                    unit_media = [getfield(unit, f)
+                                  for f in unit_fields if startswith(String(f), "m_") || String(f) == "medium"]
+                    if medium in unit_media
+                        value_key = splitted[2]
+                    else
+                        @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
+                               "output key. Make sure that the medium \"$(String(medium_key))\" exists in the current " *
+                               "component and that you have used \":\" as separator without any extra spaces."
+                        throw(InputError())
+                    end
+                else
+                    medium = nothing
+                    value_key = splitted[1]
+                end
+
+                push!(outputs, EnergySystems.OutputKey(; unit=unit,
+                                                       medium=medium,
+                                                       value_key=value_key))
+            end
+        elseif key in all_current_media
+            media_key = key
+            medium = Symbol(String(media_key))
+            for value_key in sort(from_config[media_key])
+                success = false
+                in_uac, out_uac = split(value_key, "->")
+                for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
+                    # consider only proxy busses or busses without proxies and busses with correct media
+                    medium_trimmed, _ = trim_secondary_medium(medium)
+                    if bus.proxy === nothing && bus.medium == medium_trimmed
+                        # check if input and output exists
+                        if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="EnergyFlow " * value_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="TemperatureFlow " * value_key))
+                            success = true
+                            break
+                        end
+                    end
+                end
+                if !success
+                    @error "The requested energy flow between components \"$(value_key)\" for medium \"$(media_key)\" could not " *
+                           "be found for the CSV output or the plot output. Note that only connections between " *
+                           "components with one or more busses but without any other component in between can be exported!"
+                    throw(InputError())
+                end
+            end
+        else
+            @error "The key \"$(key)\" in the provided output keys for CSV output or plot output could not be found. " *
+                   "It either has to be a medium or a component used in the current energy system."
+            throw(InputError())
+        end
+    end
+
+    return outputs
+end
+
+function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})::Array{String}
+    keys = Array{String}(undef, length(output_keys))
+    for (idx, outkey) in enumerate(output_keys)
+        if outkey.medium === nothing
+            keys[idx] = "$(outkey.unit.uac) $(outkey.value_key)"
+        else
+            if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                keys[idx] = "$(outkey.medium) $(outkey.value_key)"
+            else
+                keys[idx] = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+            end
+        end
+    end
+    return keys
+end
+
+function parse_outkeys(output_keys::AbstractDict{String,Any})::Array{String}
+    keys = Array{String}(undef, 0)
+    for (uac, values) in pairs(output_keys)
+        for entry in values
+            splitted = split(String(entry), ":")
+            if length(splitted) > 1
+                medium = splitted[1]
+                value_key = splitted[2]
+                if startswith(value_key, "EnergyFlow") || startswith(value_key, "TemperatureFlow")
+                    push!(keys, "$medium $value_key")
+                else
+                    push!(keys, "$uac $medium $value_key")
+                end
+            else
+                medium = nothing
+                value_key = splitted[1]
+                push!(keys, "$uac $value_key")
+            end
+        end
+    end
+
+    return keys
+end
+
+"""
+    output_key_signature(output_key)
+
+Create a stable structural identifier for an `OutputKey`. The signature is used for
+internal column lookup; formatted names from `parse_outkeys` remain presentation values.
+"""
+function output_key_signature(output_key::EnergySystems.OutputKey)
+    return (String(output_key.unit.uac), output_key.medium, output_key.value_key)
+end
+
+"""
+    output_key_indexes(all_output_keys)
+
+Map each requested `OutputKey` to its zero-offset data-column index. The time column is
+not part of this mapping.
+"""
+function output_key_indexes(all_output_keys::Vector{EnergySystems.OutputKey})
+    return Dict(output_key_signature(output_key) => index
+                for (index, output_key) in pairs(all_output_keys))
+end
+
+"""
+    output_data_columns(key_indexes, selected_keys; include_time=false)
+
+Return the matrix columns corresponding to `selected_keys`. Stored output columns are
+offset by one because column one contains time.
+"""
+function output_data_columns(key_indexes::AbstractDict,
+                             selected_keys::Union{Nothing,Vector{EnergySystems.OutputKey}};
+                             include_time::Bool=false)::Vector{Int}
+    columns = selected_keys === nothing ? Int[] :
+              [1 + key_indexes[output_key_signature(output_key)]
+               for output_key in selected_keys]
+
+    return include_time ? vcat(1, columns) : columns
+end
+
+"""
+    output_data_column_map(key_indexes, selected_keys)
+
+Map the formatted names of selected output keys to their columns in the stored output
+matrix. Formatting is used only because parameter-study objective keys use the same
+external naming convention.
+"""
+function output_data_column_map(key_indexes::AbstractDict,
+                                selected_keys::Union{Nothing,Vector{EnergySystems.OutputKey}})::Dict{String,Int}
+    selected_keys === nothing && return Dict{String,Int}()
+
+    names = parse_outkeys(selected_keys)
+    return Dict(
+        name => 1 + key_indexes[output_key_signature(output_key)]
+        for (name, output_key) in zip(names, selected_keys))
+end
+
+"""
+get_output_header(output_keys, weather_data_keys, csv_time_unit)
+
+Get the output header for the given outputs to used in output file or dictionary.
+"""
+function get_output_header(output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           csv_time_unit::String)
+    header = Array{String}(undef, 0)
+    if csv_time_unit !== nothing
+        if csv_time_unit == "seconds"
+            time_unit = "[s]"
+        elseif csv_time_unit == "minutes"
+            time_unit = "[min]"
+        elseif csv_time_unit == "hours"
+            time_unit = "[h]"
+        elseif csv_time_unit == "date"
+            time_unit = "[dd.mm.yyyy HH:MM:SS]"
+        end
+
+        push!(header, "Time $time_unit")
+    end
+
+    if output_keys !== nothing
+        output_keys_names = parse_outkeys(output_keys)
+        header = vcat(header, output_keys_names)
+    end
+
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            push!(header, "Weather $key")
+        end
+    end
+
+    return header
+end
+
+"""
+get_output_row(output_keys, weather_data_keys, sim_params, csv_time_unit)
+
+Create a row with values for given outputs to be written to file or dictionary.
+"""
+function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                        weather_data_keys::Union{Nothing,Vector{String}},
+                        sim_params::Dict{String,Any},
+                        csv_time_unit::String,
+                        io_settings::Dict{String,Any})
+    row = Array{Union{Float64,String}}(undef, 0)
+    if csv_time_unit == "seconds"
+        time = sim_params["time_since_output"]
+    elseif csv_time_unit == "minutes"
+        time = sim_params["time_since_output"] / 60
+    elseif csv_time_unit == "hours"
+        time = sim_params["time_since_output"] / 60 / 60
+    elseif csv_time_unit == "date"
+        time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+    end
+
+    push!(row, string(time))
+
+    interpolator = v -> "$v"
+    if io_settings["fixed_output_precision"] > 0
+        interpolator = v -> "$(round(v; sigdigits=io_settings["fixed_output_precision"]))"
+    end
+
+    if output_keys !== nothing
+        for outkey in output_keys
+            value = output_value(outkey.unit, outkey)
+            push!(row, interpolator(value))
+        end
+    end
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
+            push!(row, interpolator(value))
+        end
+    end
+
+    return row
+end
+
+"""
+    listify_operations(operations)
+
+Turns the given order of operations into a list with entries surrounded in quotation marks
+and seperated by a comma and line feed.
+
+Args:
+-`operations::OrderOfOperations`: The operations to listify
+Returns:
+-`String`: The listified operations
+"""
+function listify_operations(operations::OrderOfOperations)::String
+    list = ""
+    for entry in operations
+        comma = ","
+        if entry == last(operations)
+            comma = ""
+        end
+        list = list * "\"$(entry[1]):$(entry[2])\"$(comma)\n"
+    end
+    return list
+end
+
+"""
+    dump_auxiliary_outputs(io_settings, components, order_of_operations, sim_params)
+
+Dump a bunch of information to file that might be useful to explain the result of a run.
+
+This is mostly used for debugging and development purposes, but might prove useful in
+general to find out why the energy system behaves in the simulation as it does.
+"""
+function dump_auxiliary_outputs(io_settings::Dict{String,Any},
+                                components::Grouping,
+                                order_of_operations::OrderOfOperations,
+                                sim_params::Dict{String,Any},
+                                suppress_all_output::Bool)
+    if suppress_all_output
+        return
+    end
+    # export order of operations
+    if io_settings["auxiliary_info"]
+        aux_info_file_path = io_settings["auxiliary_info_file"]
+        open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
+            # write base order (from input or calculated)
+            write(file_handle, "# Order of operations\n")
+            write(file_handle, listify_operations(order_of_operations))
+
+            # look for any control modules that modify it and print the modified one
+            for component in values(components)
+                if component.sys_function == EnergySystems.sf_bus
+                    for control_module in component.controller.modules
+                        # this is very specific for the current implementation of this exact
+                        # control module. @TODO make this more generalized once more control
+                        # modules also modify the order of operations
+                        if control_module.name == "economic_control"
+                            for (state_id, order) in pairs(control_module.ooo_by_state)
+                                write(file_handle, "\n# Order of operations $(component.uac) state #$(state_id)\n")
+                                write(file_handle, listify_operations(order))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        @info "Auxiliary info dumped to file $(sim_params["run_path"](aux_info_file_path))"
+    end
+
+    # plot additional figures potentially available from components after initialisation
+    if io_settings["auxiliary_plots"]
+        aux_plots_output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        aux_plots_formats = io_settings["auxiliary_plots_formats"]
+        aux_plots_formats = Vector{String}(aux_plots_formats)
+        component_list = []
+        for component in components
+            if plot_optional_figures_begin(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
+                push!(component_list, component[2].uac)
+            end
+        end
+        if length(component_list) > 0
+            @info "Auxiliary plots are saved to folder $(aux_plots_output_path) for the following components: $(join(component_list, ", "))"
+        end
+    end
+end
+
+"""
+gather_output_data(output_keys, time)
+
+returns a vector with the requested data in output_keys
+"""
+function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
+    return_values = zeros(Union{Int,Float64}, length(output_keys) + 1)
+    return_values[1] = time
+
+    for (idx, outkey) in enumerate(output_keys)
+        return_values[idx + 1] = output_value(outkey.unit, outkey)
+    end
+
+    return return_values
+end
+
+"""
+    create_profile_line_plots(data, keys, weather_data, weather_keys, io_settings, sim_params)
+
+Creates the line plots for the given output configuration.
+"""
+function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float64}},
+                                   outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                   outputs_plot_weather::Union{Nothing,Matrix{Float64}},
+                                   outputs_plot_weather_keys::Union{Nothing,Vector{String}},
+                                   io_settings::Dict{String,Any},
+                                   sim_params::Dict{String,Any})
+    plot_all = isa(io_settings["output_plot"], String) &&
+               io_settings["output_plot"][1:3] == "all"
+    plot_data = outputs_plot_data !== nothing
+    plot_weather = outputs_plot_weather !== nothing
+
+    # set Axis, unit and scale factor if given
+    if plot_all  # plot all outputs. Here no units or scaling factors are available.
+        labels = parse_outkeys(outputs_plot_keys)
+        if plot_weather
+            for outkey in outputs_plot_weather_keys
+                push!(labels, string("Weather $(outkey)"))
+            end
+        end
+    else # plot only defined outputs. Here units and scaling factors are available.
+        axis = String[]
+        unit = String[]
+        scale_fact = Float64[]
+        if plot_data
+            for (nr, plot) in sort(collect(io_settings["output_plot_spec"]); by=p -> parse(Int, p[1]))
+                if occursin("->", first(plot["key"])[2][1])
+                    # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
+                    # temperature should be plotted
+                    if !isa(plot["axis"], AbstractVector) || length(plot["axis"]) !== 2 ||
+                       !isa(plot["unit"], AbstractVector) || length(plot["unit"]) !== 2 ||
+                       !isa(plot["scale_factor"], AbstractVector) || length(plot["scale_factor"]) !== 2
+                        # only one set of meta information given. Use the given one both for energy and temperature flow
+                        push!(axis, isa(plot["axis"], AbstractVector) ? plot["axis"][1] : plot["axis"])
+                        push!(unit, isa(plot["unit"], AbstractVector) ? plot["unit"][1] : plot["unit"])
+                        push!(scale_fact,
+                              isa(plot["scale_factor"], AbstractVector) ? plot["scale_factor"][1] :
+                              plot["scale_factor"])
+
+                        push!(axis, "nothing")
+                        push!(unit, "nothing")
+                        push!(scale_fact, NaN)
+                        @info "For the generation of the output plot, the meta information for entry $nr " *
+                              "do not contain two values. Therefore, only energy values will be output. If you want " *
+                              "to output also a corresponding temperature, provide two meta information: " *
+                              "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
+                    else
+                        push!(axis, string(plot["axis"][1]))
+                        push!(unit, string(plot["unit"][1]))
+                        push!(scale_fact, plot["scale_factor"][1])
+
+                        push!(axis, string(plot["axis"][2]))
+                        push!(unit, string(plot["unit"][2]))
+                        push!(scale_fact, plot["scale_factor"][2])
+                    end
+                else
+                    push!(axis, string(plot["axis"]))
+                    push!(unit, string(plot["unit"]))
+                    push!(scale_fact, plot["scale_factor"])
+                end
+            end
+        end
+        if plot_weather
+            for _ in outputs_plot_weather_keys
+                push!(axis, "left")
+                push!(scale_fact, 1.0)
+            end
+        end
+
+        # create legend entries
+        labels = String[]
+        if plot_data
+            labels = parse_outkeys(outputs_plot_keys) .* " [" .* unit .* "] (" .*
+                     axis[1:length(outputs_plot_keys)] .* ")"
+        end
+        if plot_weather
+            for outkey in outputs_plot_weather_keys
+                push!(labels, string("Weather $(outkey) [($(axis[end]))"))
+            end
+        end
+    end
+
+    # create plot
+    if plot_data
+        time_x = outputs_plot_data[:, 1]
+    else
+        time_x = outputs_plot_weather[:, 1]
+    end
+    # filter NaN values
+    if plot_data
+        idxs_to_remove = Int[]
+        for col in axes(outputs_plot_data, 2)
+            if col == 1 # never remove date
+                continue
+            elseif all(isnan, outputs_plot_data[:, col])
+                push!(idxs_to_remove, col)
+            end
+        end
+        if !plot_all
+            for (idx, ax) in enumerate(axis)
+                if ax == "nothing"
+                    push!(idxs_to_remove, idx + 1)
+                end
+            end
+            idxs_to_remove = unique(idxs_to_remove)
+        end
+        if !isempty(idxs_to_remove)
+            outputs_plot_data = outputs_plot_data[:, setdiff(axes(outputs_plot_data, 2), idxs_to_remove)]
+            labels = labels[setdiff(1:length(labels), idxs_to_remove .- 1)]
+            if !plot_all
+                axis = axis[setdiff(1:length(axis), idxs_to_remove .- 1)]
+                scale_fact = scale_fact[setdiff(1:length(scale_fact), idxs_to_remove .- 1)]
+            end
+        end
+    end
+    output_plot_time_unit = io_settings["output_plot_time_unit"]
+    if output_plot_time_unit == "seconds"
+        x = time_x
+    elseif output_plot_time_unit == "minutes"
+        x = time_x / 60
+    elseif output_plot_time_unit == "hours"
+        x = time_x / 60 / 60
+    else
+        if sim_params["start_date"] === nothing
+            start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
+            @info ("Date of first data point in output line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
+        else
+            start_date = sim_params["start_date_output"]
+        end
+        x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in time_x]
+    end
+
+    y = hcat(plot_data ? outputs_plot_data[:, 2:end] : zeros(Float64, size(outputs_plot_weather, 1), 0),
+             plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
+
+    if io_settings["fixed_output_precision"] > 0
+        y = round.(y; sigdigits=io_settings["fixed_output_precision"])
+    end
+
+    traces = GenericTrace[]
+    for i in axes(y, 2)
+        if plot_all
+            trace = scatter(; x=x, y=y[:, i], mode="lines", name=labels[i])
+        else
+            trace = scatter(; x=x, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+            if axis[i] == "right"
+                trace.yaxis = "y2"
+            else  # default is left axis
+                trace.yaxis = "y1"
+            end
+        end
+        push!(traces, trace)
+    end
+
+    if output_plot_time_unit == "date"
+        leap_days_str = string.([Date(year, 2, 29)
+                                 for year in
+                                     Dates.value(Year(sim_params["start_date_output"])):Dates.value(Year(sim_params["end_date"]))
+                                 if isleapyear(year)])
+
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"),
+                        xaxis=attr(; type="date",
+                                   rangebreaks=[Dict("values" => leap_days_str)]))
+    else
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"))
+    end
+
+    p = plot(traces, layout)
+    file_path = sim_params["run_path"](io_settings["output_plot_file_path"])
+    savefig(p, file_path)
+end
+
+"""
+    create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values,
+                  medium_of_interfaces, nr_of_interfaces, io_settings, sim_params)
+
+create a sankey plot. 
+Inputs:
+output_all_sourcenames and *sinknames are vectors with names of the source and sink of each interface
+output_all_values are logs with data from each timestep in the shape [timestep,interface].
+medium_of_interface is a vector of the medium corresponding to each interface
+nr_of_interfaces is the total number of interfaces in the current energy system
+"""
+function create_sankey(output_all_sourcenames::Vector{Any},
+                       output_all_targetnames::Vector{Any},
+                       output_all_values::Matrix{Float64},
+                       medium_of_interfaces::Vector{Any},
+                       nr_of_interfaces::Int64,
+                       io_settings::Dict{String,Any},
+                       sim_params::Dict{String,Any})
+
+    # sum up data of each interface
+    output_all_value_sum = zeros(Float64, nr_of_interfaces)
+    for interface in 1:nr_of_interfaces
+        output_all_value_sum[interface] = sum(output_all_values[:, interface])
+    end
+
+    # convert Losses into Gains if they are negative
+    for idx in 1:nr_of_interfaces
+        if medium_of_interfaces[idx] == "LossesGains"
+            if output_all_value_sum[idx] < 0.0  # Losses
+                medium_of_interfaces[idx] = "Losses"
+                output_all_value_sum[idx] = -output_all_value_sum[idx]
+                output_all_targetnames[idx] = "Losses"
+            else # Gains
+                medium_of_interfaces[idx] = "Gains"
+                output_all_targetnames[idx] = output_all_sourcenames[idx]
+                output_all_sourcenames[idx] = "Gains"
+            end
+        end
+    end
+
+    # remove data that should not be plotted in Sankey
+    interface_new = 1
+    for _ in 1:nr_of_interfaces
+        if (
+            # remove oxygen from data as the energy of oxygen is considered to be zero
+            medium_of_interfaces[interface_new] == :m_c_g_o2
+            # remove real sinks and sources if they match the delivered energy
+            # to enable this to work, the "real" demand/supply needs to be always one entry
+            # below the delivered/requested one in the array!
+            ||
+            (medium_of_interfaces[interface_new] == "hide_medium"
+             &&
+             (abs(output_all_value_sum[interface_new] - output_all_value_sum[interface_new - 1])) <
+             sim_params["epsilon"]))
+            # end of condition 
+            deleteat!(output_all_sourcenames, interface_new)
+            deleteat!(output_all_targetnames, interface_new)
+            deleteat!(output_all_value_sum, interface_new)
+            deleteat!(medium_of_interfaces, interface_new)
+            interface_new -= 1
+            nr_of_interfaces -= 1
+        end
+        interface_new += 1
+    end
+    interface_new -= 1
+
+    # apply fixed precision before adding for non-zero as it may otherwise be rounded to zero again
+    if io_settings["fixed_output_precision"] > 0
+        output_all_value_sum = round.(output_all_value_sum; sigdigits=io_settings["fixed_output_precision"])
+    end
+
+    # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
+    output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
+
+    # prepare data for sankey diagram and create sankey
+    # set label of blocks
+    block_labels = union(output_all_sourcenames, output_all_targetnames)
+    block_labels_unique = Dict(blockname => i for (i, blockname) in enumerate(block_labels))
+    output_all_source_num = [block_labels_unique[blockname] for blockname in output_all_sourcenames]
+    output_all_target_num = [block_labels_unique[blockname] for blockname in output_all_targetnames]
+
+    # set label and colour of interfaces
+    medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
+    unique_medium_labels = unique(medium_labels)
+
+    if io_settings["sankey_plot"] == "default" || io_settings["sankey_plot"] == "custom"
+        # in both cases of "default" or "custom", the setting sankey_plot_spec already
+        # contains a color map definition, but it may not cover all media, thus we randomly
+        # assign colors to the missing media
+        color_map = Dict{String,Any}()
+        for label in unique_medium_labels
+            color = RGB(0, 0, 0)
+            try
+                if haskey(io_settings["sankey_plot_spec"], label)
+                    color_entry = Colors.color_names[io_settings["sankey_plot_spec"][label]]
+                    color = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
+                else
+                    # use deterministic random color based on label hash. colors are drawn
+                    # from the roma color scheme
+                    rng = Random.MersenneTwister(hash(label))
+                    color = get(ColorSchemes.roma, rand(rng))
+                end
+            catch
+                @error "The given color '$(io_settings["sankey_plot_spec"][label])' of " *
+                       "medium '$label' for the sankey plot is not one of the available " *
+                       "colors in `Colors.color_names`"
+                throw(InputError())
+            end
+            color_map[label] = color
+        end
+
+        for medium in unique_medium_labels
+            if medium in keys(color_map)
+                continue
+            elseif medium == "hide_medium"
+                color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                @error "The color for the medium '$medium' for the sankey could not be " *
+                       "found in the input file. Please add the medium and its color in " *
+                       "IO setting 'sankey_plot_spec'."
+                throw(InputError())
+            end
+        end
+    end
+    colors_for_medium = map(x -> color_map[x], medium_labels)
+
+    do_hide_real_demands = true
+    if do_hide_real_demands
+        # hide sf_fixed_sink and sf_fixed_source interfaces
+        colors_for_medium_RGBA = Array{Any}(nothing, interface_new)
+        for (idx, medium) in pairs(medium_labels)
+            if medium == "hide_medium"
+                colors_for_medium_RGBA[idx] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                colors_for_medium_RGBA[idx] = colors_for_medium[idx]
+            end
+        end
+
+        # hide blocks and set position of sf_fixed_sink and sf_fixed_source blocks
+        block_colors = Array{Any}(nothing, length(block_labels))
+        for (idx, block) in pairs(block_labels)
+            if last(block, 12) == "total_demand" || last(block, 12) == "total_supply"
+                block_labels[idx] = ""
+                block_colors[idx] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                block_colors[idx] = "blue"
+            end
+        end
+    else
+        colors_for_medium_RGBA = colors_for_medium
+    end
+
+    # create plot
+    p = plot(sankey(;
+                    node=attr(; pad=25,
+                              thickness=20,
+                              line=do_hide_real_demands ? attr(; color="white", width=0.0) : nothing,
+                              label=block_labels,
+                              color=do_hide_real_demands ? block_colors : "blue"),
+                    link=attr(; source=output_all_source_num .- 1, # indices correspond to block_labels starting from index 0
+                              target=output_all_target_num .- 1, # indices correspond to block_labels starting from index 0
+                              value=output_all_value_sum,
+                              label=medium_labels,
+                              color=colors_for_medium_RGBA)),
+             Layout(; title_text="Sankey diagram of system topology and energy flows",
+                    font_size=14))
+
+    # save plot
+    file_path = sim_params["run_path"](io_settings["sankey_plot_file_path"])
+    savefig(p, file_path)
+end
+
+"""
+    aggregate_csv(input_path, output_path, output_keys, weather_data_keys,
+                  energy_terms, cumulative_terms, zero_as_missing_terms,
+                  time_columns, separator, threshold, fixed_output_precision)
+
+Create a summary CSV from a time-series CSV result file.
+
+The input CSV is expected to contain one header row and one column per logged
+parameter. Time columns are ignored. The classification of component and flow
+outputs is based on the corresponding `OutputKey.value_key` entries in
+`output_keys`, not on the CSV column names. This avoids incorrect classifications
+caused by component names, media names or user-defined UACs.
+
+Columns matching `cumulative_terms` are treated as cumulative time series and
+represented by their last valid value. Columns matching `energy_terms` are
+summed. Weather data and all other numeric columns are treated as intensive
+quantities and averaged.
+
+Empty values, non-numeric values, `NaN` and infinite values are ignored. For
+columns matching `zero_as_missing_terms`, zero values are ignored as well, e.g.
+for COP-like quantities where zero means inactive or undefined.
+
+Returns `true` if the summary CSV was created successfully and `false` otherwise.
+"""
+function aggregate_csv(input_path::AbstractString,
+                       output_path::AbstractString,
+                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                       weather_data_keys::Union{Nothing,Vector{String}},
+                       energy_terms::Vector{String},
+                       cumulative_terms::Vector{String},
+                       zero_as_missing_terms::Vector{String},
+                       time_columns::Vector{String},
+                       separator::Char,
+                       threshold::Float64,
+                       fixed_output_precision::Int)::Bool
+    if !isfile(input_path)
+        @info "No summary CSV could be created, as the CSV result file could not be found at: $(input_path)"
+        return false
+    end
+
+    # identify columns that should not be aggregated
+    function is_time_column(output_key::AbstractString)::Bool
+        col = strip(output_key)
+        return col in time_columns || startswith(lowercase(col), "time")
+    end
+
+    # identify cumulative time series for which the last value is used
+    function is_cumulative_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), cumulative_terms)
+    end
+
+    # identify extensive energy-related quantities that should be summed
+    function is_energy_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), energy_terms)
+    end
+
+    # identify intensive quantities where zero represents an invalid value
+    function is_zero_as_missing_column(output_key::AbstractString)::Bool
+        return any(term -> occursin(term, output_key), zero_as_missing_terms)
+    end
+
+    # identify weather quantities that should be summed
+    function is_weather_energy_column(weather_key::AbstractString)::Bool
+        # hardcoded at this point as they will probably not change...
+        weather_energy_terms = ["beamHorIrr",
+                                "difHorIrr",
+                                "globHorIrr",
+                                "longWaveIrr"]
+        return any(term -> occursin(term, weather_key), weather_energy_terms)
+    end
+
+    # parse numbers with German decimal comma and tolerate simple thousands separators
+    function parse_decimal_number(value::AbstractString)::Union{Float64,Missing}
+        s = strip(value)
+
+        if isempty(s)
+            return missing
+        end
+
+        s = replace(s, "\ufeff" => "")
+        s = replace(s, "\u00a0" => "")
+        s = replace(s, " " => "")
+
+        x = tryparse(Float64, replace(s, "," => "."))
+        if x !== nothing
+            return x
+        end
+
+        if occursin(",", s)
+            s2 = replace(s, "." => "")
+            s2 = replace(s2, "," => ".")
+
+            x = tryparse(Float64, s2)
+            if x !== nothing
+                return x
+            end
+        end
+
+        return missing
+    end
+
+    # avoid very small numerical residuals in the summary output
+    function clean_small_value(value::Float64)::Float64
+        return abs(value) < threshold ? 0.0 : value
+    end
+
+    # write numbers with decimal comma for consistency with the ReSiE CSV format
+    function decimal_string(value::Real)::String
+        # apply fixed precision to the summary output
+        if fixed_output_precision > 0
+            s = string(round(Float64(value); sigdigits=fixed_output_precision))
+        else
+            s = string(Float64(value))
+        end
+        return replace(s, "." => ",")
+    end
+
+    # escape fields only if required by the CSV format
+    function csv_escape(value::AbstractString)::String
+        s = String(value)
+
+        if occursin(string(separator), s) || occursin("\"", s) ||
+           occursin("\n", s) || occursin("\r", s)
+            return "\"" * replace(s, "\"" => "\"\"") * "\""
+        end
+
+        return s
+    end
+
+    function write_csv_row(io, row::AbstractVector{<:AbstractString})::Nothing
+        println(io, join(csv_escape.(row), string(separator)))
+        return nothing
+    end
+
+    csv = CSV.File(input_path;
+                   delim=separator,
+                   header=1,
+                   normalizenames=false,
+                   stringtype=String,
+                   types=String)
+
+    if length(csv) < 1
+        @info "No summary CSV could be created, as the CSV result file contains no data rows: $(input_path)"
+        return false
+    end
+
+    # Get column names in CSV order.
+    csv_column_names = collect(propertynames(first(csv)))
+
+    # Clean header names for output and time-column checks.
+    headers = [String(strip(replace(String(name), "\ufeff" => "")))
+               for name in csv_column_names]
+
+    # create classification keys in the same order as the CSV columns
+    classification_keys = String["Time"]
+
+    if output_keys !== nothing
+        append!(classification_keys, [outkey.value_key for outkey in output_keys])
+    end
+
+    if weather_data_keys !== nothing
+        append!(classification_keys, ["Weather " * key for key in weather_data_keys])
+    end
+
+    if length(classification_keys) != length(headers)
+        @info "No summary CSV could be created, as the number of output keys does not match the number of CSV columns."
+        return false
+    end
+
+    # ignore time columns and process all remaining columns alphabetically
+    data_indices = [j for j in eachindex(headers)
+                    if !is_time_column(headers[j])]
+
+    sort!(data_indices; by=j -> lowercase(headers[j]))
+
+    open(output_path, "w") do io
+        write_csv_row(io,
+                      ["Parameter",
+                       "Type",
+                       "Aggregation",
+                       "Values used",
+                       "Value",
+                       "Min",
+                       "Max",
+                       "Value kWh",
+                       "Value MWh"])
+
+        for j in data_indices
+            column_name = headers[j]
+            values = Float64[]
+            classification_key = classification_keys[j]
+
+            column = csv[csv_column_names[j]]
+
+            for raw_value in column
+                if raw_value === missing
+                    continue
+                end
+
+                parsed = parse_decimal_number(String(raw_value))
+
+                if parsed !== missing && isfinite(parsed)
+                    if is_zero_as_missing_column(classification_key) && parsed == 0.0
+                        continue
+                    end
+
+                    push!(values, parsed)
+                end
+            end
+            if isempty(values)
+                continue
+            end
+
+            n = length(values)
+
+            if is_cumulative_column(classification_key)
+                # cumulative columns are already integrated over time
+                value_wh = clean_small_value(values[end])
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "cumulative",
+                               "last",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            elseif is_energy_column(classification_key) || is_weather_energy_column(classification_key)
+                # energy columns contain timestep values and are therefore summed
+                value_wh = clean_small_value(sum(values))
+                min_value = clean_small_value(minimum(values))
+                max_value = clean_small_value(maximum(values))
+
+                write_csv_row(io,
+                              [column_name,
+                               "energy",
+                               "sum",
+                               string(n),
+                               decimal_string(value_wh),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               decimal_string(value_wh / 1_000),
+                               decimal_string(value_wh / 1_000_000)])
+
+            else
+                # remaining numeric columns are interpreted as intensive quantities
+                mean_value = sum(values) / n
+                min_value = minimum(values)
+                max_value = maximum(values)
+                aggregation = is_zero_as_missing_column(classification_key) ? "mean_excluding_zero" : "mean"
+
+                write_csv_row(io,
+                              [column_name,
+                               "intensive",
+                               aggregation,
+                               string(n),
+                               decimal_string(mean_value),
+                               decimal_string(min_value),
+                               decimal_string(max_value),
+                               "",
+                               ""])
+            end
+        end
+    end
+
+    return true
+end
