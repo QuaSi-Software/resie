@@ -24,7 +24,7 @@ function load_order_of_operation()
             "scale" => 6000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),

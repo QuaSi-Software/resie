@@ -443,7 +443,7 @@
             }
         },
         "Central_el_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Central_electricity_Bus"
             },
@@ -461,7 +461,7 @@
             }
         },
         "Central_el_GRO": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": {},
             "medium": "m_e_ac_230v",
             "is_source": false,
@@ -638,7 +638,7 @@
             }
         },
         "Grid_NaturalGas": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Gasboiler"
             },

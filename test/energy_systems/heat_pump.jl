@@ -25,7 +25,7 @@ function get_config_heat_pump_1S1D()
             "scale" => 6000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -234,7 +234,7 @@ end
 function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
     base_dict = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -259,7 +259,7 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
                 "constant_temperature" => 60,
             ),
             "TST_SRC_01" => Dict{String,Any}(
-                "type" => "GridInput",
+                "type" => "GridSupply",
                 "medium" => "m_h_w_lt1",
                 "output_refs" => ["TST_HP_01"],
             ),
@@ -269,7 +269,7 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
 
         extended = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
-                "type" => "GridOutput",
+                "type" => "GridSink",
                 "medium" => "m_h_w_ht1",
                 "output_refs" => [],
             ),
@@ -560,7 +560,7 @@ function get_config_heat_pump_2S2D()
             ),
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),

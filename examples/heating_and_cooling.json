@@ -118,14 +118,14 @@
             "heat_losses_factor": 1.0
         },
         "TST_EL_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_EL_BUS_01"
             ]
         },
         "TST_TH_GRO_01": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "medium": "m_h_w_lt2",
             "output_refs": []
         }

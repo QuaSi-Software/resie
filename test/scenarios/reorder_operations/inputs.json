@@ -151,7 +151,7 @@
             "constant_power": 1e8
         },
         "Grid_OUT": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": [],
             "medium": "m_power"
         },

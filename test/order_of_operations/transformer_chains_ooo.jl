@@ -93,7 +93,7 @@ function test_base_order()
             "discharge_efficiency" => 1.0,
         ),
         "TST_01_HZG_01_GRI" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_01_HZG_01_CHP"],
         ),
@@ -106,12 +106,12 @@ function test_base_order()
             "scale" => 25000,
         ),
         "TST_01_ELT_01_GRI" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELT_01_BUS"],
         ),
         "TST_01_ELT_01_GRO" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "output_refs" => [],
         ),
@@ -209,7 +209,7 @@ function test_ooo_middle_bus()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -407,7 +407,7 @@ function test_ooo_middle_bus_different_order()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -589,7 +589,7 @@ function test_ooo_middle_transformer()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
@@ -601,7 +601,7 @@ function test_ooo_middle_transformer()
             "constant_temperature" => 20,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -740,7 +740,7 @@ function test_ooo_parallels()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -892,7 +892,7 @@ function test_ooo_parallels_different_order()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -1052,12 +1052,12 @@ function test_ooo_parallels_in_chain()
             "scale" => 500,
         ),
         "TST_GRI_H2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_h2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
@@ -1070,12 +1070,12 @@ function test_ooo_parallels_in_chain()
             "scale" => 1000,
         ),
         "TST_GRI_00" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -1086,17 +1086,17 @@ function test_ooo_parallels_in_chain()
             "constant_power" => 400,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_02"],
         ),
         "TST_GRI_03" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_03"],
         ),
         "TST_GRI_04" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_04"],
         ),
@@ -1272,7 +1272,7 @@ function test_ooo_parallels_in_a_row()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -1503,7 +1503,7 @@ function test_ooo_connected_middle_busses()
             "scale" => 1000,
         ),
         "TST_GRI_EL" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
@@ -1753,22 +1753,22 @@ function test_ooo_connected_middle_transformer()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_NG" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_h2",
             "output_refs" => ["TST_CHP_01"],
         ),
@@ -1933,17 +1933,17 @@ function test_ooo_connected_middle_transformer_variant()
             "scale" => 500,
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
@@ -1955,7 +1955,7 @@ function test_ooo_connected_middle_transformer_variant()
             "constant_power" => 100000,
         ),
         "TST_GRI_NG" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_h2",
             "output_refs" => ["TST_CHP_01"],
         ),
@@ -2132,7 +2132,7 @@ function test_ooo_connected_middle_transformer_variant()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_ooo_circle_grid_input_denied()
+function test_ooo_circle_grid_supply_denied()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -2150,17 +2150,17 @@ function test_ooo_circle_grid_input_denied()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
         ),
@@ -2248,7 +2248,7 @@ function test_ooo_circle_grid_input_denied()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_ooo_circle_grid_input_allowed()
+function test_ooo_circle_grid_supply_allowed()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -2266,17 +2266,17 @@ function test_ooo_circle_grid_input_allowed()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
         ),
@@ -2382,17 +2382,17 @@ function test_ooo_circle_middle_transformer_input()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
         ),
@@ -2510,22 +2510,22 @@ function test_ooo_circle_variant()
             "constant_temperature" => 5,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_natgas_1" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
         ),
         "TST_GRI_natgas_2" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_02"],
         ),
@@ -2659,17 +2659,17 @@ function test_ooo_circle_middle_transformer_interconnections()
             "constant_temperature" => 20,
         ),
         "TST_GRI_natgas" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_natgas",
             "output_refs" => ["TST_CHP_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_EL"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_e_ac_230v",
             "input_refs" => ["TST_BUS_EL"],
         ),
@@ -2811,8 +2811,8 @@ end
     test_ooo_connected_middle_busses()
     test_ooo_connected_middle_transformer()
     test_ooo_connected_middle_transformer_variant()
-    test_ooo_circle_grid_input_allowed()
-    test_ooo_circle_grid_input_denied()
+    test_ooo_circle_grid_supply_allowed()
+    test_ooo_circle_grid_supply_denied()
     test_ooo_circle_middle_transformer_input()
     test_ooo_circle_variant()
     test_ooo_circle_middle_transformer_interconnections()

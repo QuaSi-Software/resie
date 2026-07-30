@@ -140,7 +140,7 @@
             }
         },
         "GRI_Power_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "BUS_Power_Houses"
             ],
@@ -235,14 +235,14 @@
             "nr_optimisation_passes": 10
         },
         "GRI_Power_02": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
             "medium": "electricity"
         },
         "GRI_Air": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
@@ -321,7 +321,7 @@
             "scale": 350
         },
         "GRO_Power": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": [],
             "medium": "electricity"
         }

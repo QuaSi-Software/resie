@@ -128,21 +128,21 @@
             "efficiency_fuel_in": "const:1.0"
         },
         "TST_01_HZG_01_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_c_g_natgas",
             "output_refs": [
                 "TST_01_HZG_01_GBO"
             ]
         },
         "TST_01_ELT_01_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_01_ELT_01_BUS"
             ]
         },
         "TST_01_O2_DEM": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "medium": "m_c_g_o2",
             "output_refs": []
         }

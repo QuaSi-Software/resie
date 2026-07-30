@@ -9,12 +9,12 @@ include("../test_util.jl")
 function test_primary_producer_can_load_storage()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_01"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_02"],
         ),

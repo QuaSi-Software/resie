@@ -144,7 +144,7 @@
             "scale": 200000.0
         },
         "TST_GRO_01": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": [],
             "medium": "m_e_ac_230v"
         },
@@ -175,7 +175,7 @@
             "nr_optimisation_passes": 10
         },
         "TST_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "TST_BUS_02"
             ],

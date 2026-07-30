@@ -34,7 +34,7 @@ Base.@kwdef mutable struct EconomicResult
 end
 
 # Components that are only modeled by their energy flow and not with capex
-ConnectionComponent = Union{GridInput,GridOutput,PVPlant,FixedSink,FixedSupply,
+ConnectionComponent = Union{GridSupply,GridSink,PVPlant,FixedSink,FixedSupply,
                             FlexibleSink,FlexibleSupply,GenericHeatSource}
 
 function prepare_economic_emissions_data(components::Grouping,

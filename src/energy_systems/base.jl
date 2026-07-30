@@ -2670,8 +2670,8 @@ include("general/fixed_supply.jl")
 include("general/flexible_supply.jl")
 include("general/flexible_sink.jl")
 include("general/storage.jl")
-include("connections/grid_input.jl")
-include("connections/grid_output.jl")
+include("connections/grid_supply.jl")
+include("connections/grid_sink.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
 include("storage/buffer_tank.jl")
@@ -3315,7 +3315,7 @@ dictionaries. An example in JSON notation might look like this:
 function all_component_parameters()::Dict{String,Any}
     types = [Battery, BufferTank, Bus, CHPP, Electrolyser, FixedSink, FixedSupply, FlexibleSink,
              FlexibleSupply, FuelBoiler, GenericHeatSource, GeothermalHeatCollector,
-             GeothermalProbes, GridInput, GridOutput, HeatPump, PVPlant, SeasonalThermalStorage,
+             GeothermalProbes, GridSupply, GridSink, HeatPump, PVPlant, SeasonalThermalStorage,
              SolarthermalCollector, Storage, ThermalBooster, UTIR]
 
     all_parameters = Dict{String,Any}(

@@ -9,7 +9,7 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
         ),
@@ -313,7 +313,7 @@ end
 function energy_system_linear_classic()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
         ),
@@ -523,7 +523,7 @@ end
 function energy_system_linear_time_preserving()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
         ),

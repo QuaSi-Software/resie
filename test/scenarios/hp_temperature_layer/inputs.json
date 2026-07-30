@@ -62,7 +62,7 @@
             "constant_temperature": 26
         },
         "TST_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"

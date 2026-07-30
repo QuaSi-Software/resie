@@ -192,7 +192,7 @@ function test_find_chains()
             ),
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HTP_01"],
         ),
@@ -256,12 +256,12 @@ function test_find_indirect_chains()
             "scale" => 500,
         ),
         "TST_GRI_H2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_h2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
@@ -274,12 +274,12 @@ function test_find_indirect_chains()
             "scale" => 1000,
         ),
         "TST_GRI_00" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -290,17 +290,17 @@ function test_find_indirect_chains()
             "constant_power" => 400,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_02"],
         ),
         "TST_GRI_03" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_03"],
         ),
         "TST_GRI_04" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_04"],
         ),
@@ -450,12 +450,12 @@ function test_find_indirect_chains_denied()
             "scale" => 500,
         ),
         "TST_GRI_H2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_h2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
@@ -468,12 +468,12 @@ function test_find_indirect_chains_denied()
             "scale" => 1000,
         ),
         "TST_GRI_00" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -484,17 +484,17 @@ function test_find_indirect_chains_denied()
             "constant_power" => 400,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_02"],
         ),
         "TST_GRI_03" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_03"],
         ),
         "TST_GRI_04" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_04"],
         ),
@@ -646,12 +646,12 @@ function test_find_indirect_chains_denied2()
             "scale" => 500,
         ),
         "TST_GRI_H2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_h2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_O2" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "input_refs" => ["TST_01_ELY_01"],
         ),
@@ -664,12 +664,12 @@ function test_find_indirect_chains_denied2()
             "scale" => 1000,
         ),
         "TST_GRI_00" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_01_ELY_01"],
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -680,17 +680,17 @@ function test_find_indirect_chains_denied2()
             "constant_power" => 400,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_02"],
         ),
         "TST_GRI_03" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_03"],
         ),
         "TST_GRI_04" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_04"],
         ),

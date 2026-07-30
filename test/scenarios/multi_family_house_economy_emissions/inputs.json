@@ -233,7 +233,7 @@
             }
         },
         "Ambient_heat": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Building_HP"
             },
@@ -314,7 +314,7 @@
             }
         },
         "Building_el_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Building_BUS_electricity"
             },
@@ -332,7 +332,7 @@
             }
         },
         "Building_el_GRO": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": {},
             "medium": "m_e_ac_230v",
             "is_source": false,
