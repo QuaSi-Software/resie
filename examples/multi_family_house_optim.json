@@ -22,16 +22,16 @@
         "plot_price_and_emission_profiles": true,
         "price_and_emission_profile_file_path": "./output/price_and_emissions_profiles.html",
         "output_parameter_study_csv": true,
-        "parameter_study_csv_file_path": "./output/optim_results.csv",
+        "parameter_study_csv_path": "./output/parameter_study",
         "write_parameter_study_csv_continuously": true,
-        "matrix_plot": "default",
-        "parameter_study_plots_file_path": "./output/optim_plots"
+        "output_parameter_study_plots": true,
+        "parameter_study_plots_path": "./output/parameter_study_plots"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
         "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
-        "time_step": 120,
+        "time_step": 60,
         "time_step_unit": "minutes",
         "epsilon": 1e-06,
         "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
@@ -56,7 +56,7 @@
                     "start": 2.0,
                     "range_start": 0,
                     "range_stop": 3,
-                    "range_length": 3
+                    "range_length": 4
                 }
             },
             "Building_PV": {
@@ -66,7 +66,7 @@
                     "start": 500,
                     "range_start": 0,
                     "range_stop": 1000,
-                    "range_length": 3
+                    "range_length": 4
                 }
             },
             "Building_Battery": {
@@ -76,7 +76,7 @@
                     "start": 59380,
                     "range_start": 0,
                     "range_stop": 200000,
-                    "range_length": 3
+                    "range_length": 4
                 }
             },
             "Building_HP": {
@@ -86,21 +86,16 @@
                     "start": 85000,
                     "range_start": 0,
                     "range_stop": 150000,
-                    "range_length": 3
+                    "range_length": 4
                 }
             }
         },
         "objective_params": {
-            "economic": [
-                "total_annuity"
-            ]
+            "economic": ["total_annuity"]
         },
         "objective_function": "linear",
         "objective_factors": {
             "economic total_annuity": 1.0
-        },
-        "objective_senses": {
-            "economic total_annuity": "min"
         },
         "disable_all_simulation_outputs": true,
         "parameter_variation": {
@@ -111,23 +106,21 @@
             "run_optimisation": true,
             "type": "Metaheuristics",
             "algorithm": "ECA",
-            "max_runs": 200,
-            "max_time": 120.0,
+            "max_runs": 300,
             "refinement": {
                 "type": "NLopt",
-                "algorithm": "LN_SBPLX",
-                "max_runs": 15,
-                "max_time": 180.0,
-                "x_tol_abs": 0.0001,
-                "f_tol_abs": 0.001
+                "algorithm": "LN_NELDERMEAD",
+                "max_runs": 50
+
             }
         },
         "sensitivity_analysis": {
-            "run_global_sensitivity": false,
+            "run_global_sensitivity": true,
+            "max_runs": 100,
             "run_local_sensitivity": true,
             "local_reference": "best_result",
             "local_variation": 0.1,
-            "max_runs": 100
+            "include_local_sensitivity_results_in_figures": false
         }
     },
     "components": {
