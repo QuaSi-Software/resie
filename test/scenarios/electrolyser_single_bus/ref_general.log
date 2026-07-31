@@ -2,6 +2,7 @@ ReSiE general log file of simulation started at: 2000-01-01 00:00:00
 This log file contains general warnings, errors and information written by ReSiE
 ---------------------------------
 [Info] Logging set up
+[GlobalInfo] Loading weather data... (.\src\resie_logger.jl:82)
 [Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
 [Info] The timestamp of the profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
 [Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
@@ -19,29 +20,30 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\electrolyser_single_bus\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/672 in 10.066 s. ETA: 194.9144 s
-[Info] Progress: 66/672 in 0.166 s. ETA: 3.0484 s
-[Info] Progress: 99/672 in 0.169 s. ETA: 2.9345 s
-[Info] Progress: 132/672 in 0.192 s. ETA: 3.1418 s
-[Info] Progress: 165/672 in 0.282 s. ETA: 4.3325 s
-[Info] Progress: 198/672 in 0.13 s. ETA: 1.8673 s
-[Info] Progress: 231/672 in 0.126 s. ETA: 1.6838 s
-[Info] Progress: 264/672 in 0.167 s. ETA: 2.0647 s
-[Info] Progress: 297/672 in 0.166 s. ETA: 1.8864 s
-[Info] Progress: 330/672 in 0.234 s. ETA: 2.4251 s
-[Info] Progress: 363/672 in 0.15 s. ETA: 1.4045 s
-[Info] Progress: 396/672 in 0.141 s. ETA: 1.1793 s
-[Info] Progress: 429/672 in 0.147 s. ETA: 1.0825 s
-[Info] Progress: 462/672 in 0.197 s. ETA: 1.2536 s
-[Info] Progress: 495/672 in 0.138 s. ETA: 0.7402 s
-[Info] Progress: 528/672 in 0.183 s. ETA: 0.7985 s
-[Info] Progress: 561/672 in 0.208 s. ETA: 0.6996 s
-[Info] Progress: 594/672 in 0.154 s. ETA: 0.3640 s
-[Info] Progress: 627/672 in 0.201 s. ETA: 0.2741 s
-[Info] Progress: 660/672 in 0.205 s. ETA: 0.0745 s
+[Info] Progress: 33/672 in 3.707 s. ETA: 71.7810 s
+[Info] Progress: 66/672 in 0.048 s. ETA: 0.8815 s
+[Info] Progress: 99/672 in 0.049 s. ETA: 0.8508 s
+[Info] Progress: 132/672 in 0.036 s. ETA: 0.5891 s
+[Info] Progress: 165/672 in 0.05 s. ETA: 0.7682 s
+[Info] Progress: 198/672 in 0.053 s. ETA: 0.7613 s
+[Info] Progress: 231/672 in 0.044 s. ETA: 0.5880 s
+[Info] Progress: 264/672 in 0.155 s. ETA: 1.9164 s
+[Info] Progress: 297/672 in 0.049 s. ETA: 0.5568 s
+[Info] Progress: 330/672 in 0.034 s. ETA: 0.3524 s
+[Info] Progress: 363/672 in 0.057 s. ETA: 0.5337 s
+[Info] Progress: 396/672 in 0.045 s. ETA: 0.3764 s
+[Info] Progress: 429/672 in 0.047 s. ETA: 0.3461 s
+[Info] Progress: 462/672 in 0.032 s. ETA: 0.2036 s
+[Info] Progress: 495/672 in 0.053 s. ETA: 0.2843 s
+[Info] Progress: 528/672 in 0.065 s. ETA: 0.2749 s
+[Info] Progress: 561/672 in 0.113 s. ETA: 0.3801 s
+[Info] Progress: 594/672 in 0.042 s. ETA: 0.0993 s
+[Info] Progress: 627/672 in 0.029 s. ETA: 0.0395 s
+[Info] Progress: 660/672 in 0.048 s. ETA: 0.0175 s
 [Info] -- Finished time step loop
 [Info] CSV-file with outputs written to .\test\scenarios\electrolyser_single_bus\out.csv
 [Info] Summary CSV-file with outputs created and written to .\test\scenarios\electrolyser_single_bus\out_aggregated.csv
 [Info] Line plot created and saved to .\test\scenarios\electrolyser_single_bus\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\electrolyser_single_bus\sankey_plot.html
 [Info] general log saved to .\test\scenarios\electrolyser_single_bus\general.log
+[Info] balanceWarn log saved to .\test\scenarios\electrolyser_single_bus\balanceWarn.log
