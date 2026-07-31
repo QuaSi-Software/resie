@@ -409,12 +409,11 @@ function calculate_global_sensitivity!(evaluate_physical_values::Union{Nothing,F
     S_total ./= total_var
 
     parameter_width = max(length("Parameter"), maximum(length.(parameter_keys)))
-    header = @sprintf("%-*s  %24s", parameter_width, "Parameter", "S_first (S_total)",)
+    header = @sprintf("%-*s  %12s  %12s", parameter_width, "Parameter", "S_first", "S_total",)
     lines = [header, repeat("-", length(header))]
 
     for (key, first_order, total_order) in zip(parameter_keys, S_first, S_total)
-        indices = @sprintf("%.3f (%.3f)", first_order, total_order,)
-        push!(lines, @sprintf("%-*s  %24s", parameter_width, key, indices,))
+        push!(lines, @sprintf("%-*s  %12.3f  %12.3f", parameter_width, key, first_order, total_order,))
     end
 
     @globalInfo("Global sensitivity results:\n\n" *
@@ -791,6 +790,7 @@ function run_optimisation!(evaluate_physical_values::Function,
 
     # run main optimisation
     try
+        @globalInfo "Starting simulations for optimisation..."
         run_optimiser_backend!(parameter_study, evaluate_with_progress, cancel_parameter_study)
     catch e
         if e isa InterruptException
@@ -1070,6 +1070,9 @@ function perform_parameter_study(io_settings::Dict{String,Any},
                                        preparation_cache=preparation_cache)
     end
 
+    @globalInfo "---- Simulation setup completed. ----"
+    @globalInfo "---- Starting simulations on $(Threads.nthreads()) Threads. ----"
+
     main_start_time = now()
     local_reference_values = nothing
 
@@ -1084,12 +1087,12 @@ function perform_parameter_study(io_settings::Dict{String,Any},
                   "To be safe, set `disable_all_simulation_outputs` to `true`, or run the study with a single thread."
         end
 
-        @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
         primary_start_time = now()
         workflow_name = parameter_study["parameter_variation"]["run_parameter_variation"] ?
                         "Parameter variation" : "Optimisation"
 
         if parameter_study["parameter_variation"]["run_parameter_variation"]
+            @globalInfo "Starting simulations for parameter variation study..."
             run_parameter_variation!(evaluate_physical_values,
                                      parameter_study,
                                      cancel_parameter_study)
@@ -1186,9 +1189,9 @@ function perform_parameter_study(io_settings::Dict{String,Any},
 
     overall_runtime_seconds = round(Int, seconds(now() - main_start_time))
     overall_runtime_minutes, overall_runtime_remaining_seconds = divrem(overall_runtime_seconds, 60)
-    @globalInfo "Complete parameter study finished in $overall_runtime_minutes min " *
+    @globalInfo "---- Parameter study finished in $overall_runtime_minutes min " *
                 "$(lpad(overall_runtime_remaining_seconds, 2, '0')) s. " *
-                "$(length(evaluated_parameter_sets) + length(local_sensitivity_evaluated_parameter_sets)) total runs completed."
+                "$(length(evaluated_parameter_sets) + length(local_sensitivity_evaluated_parameter_sets)) total runs completed. ----"
 
     # write results to parameter-study result file if not written continuously
     if !io_settings["write_parameter_study_csv_continuously"] && !isempty(evaluated_parameter_sets)

@@ -471,8 +471,8 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     start = now()
     success = true
     @globalInfo "---- Simulation setup ----"
-    @globalInfo "-- Starting simulation at $(start)"
-    @globalInfo "-- Now reading project config"
+    @globalInfo "Starting simulation at $(start)"
+    @globalInfo "Now reading project config"
 
     project_config = nothing
 
@@ -497,7 +497,7 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
         return false
     end
 
-    @globalInfo "-- Now preparing inputs"
+    @globalInfo "Now preparing inputs"
     preparation_cache = PreparationCache()
 
     # set log level by operating mode
