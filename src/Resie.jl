@@ -340,7 +340,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         end
     end
 
-    if do_write_summary_CSV
+    if do_write_CSV && do_write_summary_CSV
         output_path = sim_params["run_path"](replace(csv_file_path, r"\.csv$"i => "_aggregated.csv"))
 
         success = aggregate_csv(csv_file_path,
