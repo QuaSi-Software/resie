@@ -522,7 +522,7 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
             evaluated_parameter_sets
         end
 
-        if sim_params["parameter_study"]["runtime"]["run_primary_study"] && !isempty(figure_results)
+        if !isempty(figure_results)
             create_parameter_study_diagnostic_plots(figure_results, io_settings, sim_params)
         end
     else
