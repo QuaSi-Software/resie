@@ -44,11 +44,9 @@ function create_parameter_variant(io_settings::Dict{String,Any}, sim_params::Dic
     run_name = ""
     for (key, value) in pairs(parameter_set)
         uac, param_key = split(key, " ")
-        if uac in keys(cfg["components"])
-            cfg["components"][uac][param_key] = value
-        else
-            cfg[uac][param_key] = value
-        end
+        parameter_config = haskey(cfg["components"], uac) ? cfg["components"][uac] : cfg[uac]
+        container, leaf_key = resolve_parameter_path(parameter_config, param_key)
+        container[leaf_key] = value
         run_name *= uac * "_" * param_key * "_" * compact_value(value) * "_"
     end
 
