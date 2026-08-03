@@ -152,6 +152,7 @@ function rename_paths_and_dates(subdir::String)
         content = replace(content, r"(?<=completed in )\d+\s+min\s+\d+\s+s\." => "XX s.")
         content = replace(content, r"(?<=finished in )\d+\s+min\s+\d+\s+s\." => "XX s.")
         content = replace(content, r"(?<=complete in )\d+\s+min\s+\d+\s+s\." => "XX s.")
+        content = replace(content, r"ETA: (?:\d+ h )?(?:\d+ min )?\d+ s" => "ETA: XX")
 
         # replace IDs of plots
         id_match = match(r"id=([0-9a-f-]+)\s", content)
