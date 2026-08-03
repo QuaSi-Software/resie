@@ -268,8 +268,9 @@ end
 
 Create a normalized dumbbell plot of the local-sensitivity response. Each parameter is shown
 on one row. The lower and upper markers show the corresponding relative objective changes,
-and the connecting line makes the response magnitude and asymmetry visible. A vertical line at
-zero marks the reference objective.
+and the connecting line makes the response magnitude and asymmetry visible. Hover information
+also shows the absolute parameter value and its relative change from the reference. A vertical
+line at zero marks the reference objective.
 
 The absolute three-point response panels are additionally written by
 `create_local_sensitivity_absolute_response_plot`.
@@ -306,6 +307,7 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
     upper_changes = Float64[100.0 * result["upper_change_relative"]
                             for result in ordered_results]
     lower_values = Float64[result["lower_value"] for result in ordered_results]
+    reference_values = Float64[result["reference_value"] for result in ordered_results]
     upper_values = Float64[result["upper_value"] for result in ordered_results]
     lower_objectives = Float64[result["lower_objective"] for result in ordered_results]
     upper_objectives = Float64[result["upper_objective"] for result in ordered_results]
@@ -325,8 +327,32 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
                       showlegend=false))
     end
 
-    lower_labels = [format_plot_percent(value; signed=true) for value in lower_changes]
-    upper_labels = [format_plot_percent(value; signed=true) for value in upper_changes]
+    lower_parameter_changes = [reference_values[i] == 0.0 ?
+                               nothing :
+                               100.0 * (lower_values[i] - reference_values[i]) /
+                               abs(reference_values[i])
+                               for i in eachindex(names)]
+    upper_parameter_changes = [reference_values[i] == 0.0 ?
+                               nothing :
+                               100.0 * (upper_values[i] - reference_values[i]) /
+                               abs(reference_values[i])
+                               for i in eachindex(names)]
+
+    # Keep visible labels compact. Each two-line block is centred vertically on
+    # its marker and distinguishes parameter change (Δp) from objective change
+    # (Δo). Hover text retains the more precise values.
+    function compact_signed_percent(value)::String
+        value === nothing && return "n/a"
+        display_value = abs(Float64(value)) < 0.05 ? 0.0 : Float64(value)
+        return replace(@sprintf("%+.1f %%", display_value), "." => ",")
+    end
+
+    lower_labels = ["Δp $(compact_signed_percent(lower_parameter_changes[i]))<br>" *
+                    "Δo $(compact_signed_percent(lower_changes[i]))"
+                    for i in eachindex(names)]
+    upper_labels = ["Δp $(compact_signed_percent(upper_parameter_changes[i]))<br>" *
+                    "Δo $(compact_signed_percent(upper_changes[i]))"
+                    for i in eachindex(names)]
 
     # Position labels relative to the actual left-to-right order of the two
     # response points. This keeps labels outside the connector even when the
@@ -352,9 +378,19 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
         end
     end
 
+    lower_parameter_change_text = [lower_parameter_changes[i] === nothing ?
+                                   "undefined (reference = 0)" :
+                                   format_plot_percent(lower_parameter_changes[i]; signed=true)
+                                   for i in eachindex(names)]
+    upper_parameter_change_text = [upper_parameter_changes[i] === nothing ?
+                                   "undefined (reference = 0)" :
+                                   format_plot_percent(upper_parameter_changes[i]; signed=true)
+                                   for i in eachindex(names)]
+
     lower_hover = ["$(names[i])<br>" *
                    "Point: Lower<br>" *
                    "Parameter value: $(lower_values[i])<br>" *
+                   "Parameter change: $(lower_parameter_change_text[i])<br>" *
                    "Objective: $(lower_objectives[i])<br>" *
                    "Objective change: $(round(lower_changes[i]; digits=4)) %"
                    for i in eachindex(names)]
@@ -362,6 +398,7 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
     upper_hover = ["$(names[i])<br>" *
                    "Point: Upper<br>" *
                    "Parameter value: $(upper_values[i])<br>" *
+                   "Parameter change: $(upper_parameter_change_text[i])<br>" *
                    "Objective: $(upper_objectives[i])<br>" *
                    "Objective change: $(round(upper_changes[i]; digits=4)) %"
                    for i in eachindex(names)]
@@ -375,6 +412,7 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
                               symbol="circle"),
                   text=lower_labels,
                   textposition=lower_label_positions,
+                  textfont=attr(; size=11),
                   cliponaxis=false,
                   hovertext=lower_hover,
                   hovertemplate="%{hovertext}<extra></extra>"))
@@ -388,6 +426,7 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
                               symbol="diamond"),
                   text=upper_labels,
                   textposition=upper_label_positions,
+                  textfont=attr(; size=11),
                   cliponaxis=false,
                   hovertext=upper_hover,
                   hovertemplate="%{hovertext}<extra></extra>"))
@@ -398,8 +437,9 @@ function create_local_sensitivity_response_overview_plot(sensitivity_results::Ve
     layout = Layout(;
                     title=attr(;
                                text="Local sensitivity responses overview" *
-                                    "<br><sup>Relative objective change from the reference " *
-                                    "($(round(reference_objective; sigdigits=8))).",
+                                    "<br><sup>Δp = parameter change; Δo = objective change. " *
+                                    "Objective reference: " *
+                                    "$(round(reference_objective; sigdigits=8)).</sup>",
                                x=0.5,
                                xanchor="center"),
                     xaxis=attr(; title="Objective change [%]",
@@ -436,9 +476,15 @@ end
 """
     create_local_sensitivity_response_trends_plot(sensitivity_results, io_settings, sim_params)
 
-Create one vertically stacked three-point absolute response plot for every parameter. Each
-panel uses the parameter value on the x-axis and the absolute objective value on the y-axis.
-Separate y-axis ranges prevent large responses from hiding smaller effects.
+Create one vertically stacked three-point response plot for every parameter. For parameters
+with a nonzero reference value, the x-axis shows the relative parameter change and all panels
+use the same symmetric percentage range. This aligns equal relative changes across parameters,
+including asymmetric user-defined lower and upper values.
+
+Absolute parameter values remain visible in the x-axis tick labels and hover information. Each
+parameter name is shown inside its panel so it cannot be mistaken for the following panel. The
+y-axis shows the absolute objective value and uses a separate range in every panel. Parameters
+with a zero reference value use an absolute x-axis because a relative change is undefined.
 """
 function create_local_sensitivity_response_trends_plot(sensitivity_results::Vector{Dict{String,Any}},
                                                        io_settings::Dict{String,Any},
@@ -454,9 +500,45 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
     end
 
     if isempty(valid_results)
-        @error "Cannot create absolute local-sensitivity response trend plot: no finite response points."
+        @error "Cannot create local-sensitivity response trend plot: no finite response points."
         return ""
     end
+
+    parameter_changes = Vector{Union{Nothing,Vector{Float64}}}(undef,
+                                                               length(valid_results))
+    relative_changes = Float64[]
+    zero_reference_parameters = String[]
+
+    for (i, result) in enumerate(valid_results)
+        reference_value = Float64(result["reference_value"])
+
+        if reference_value == 0.0
+            parameter_changes[i] = nothing
+            push!(zero_reference_parameters,
+                  String(result["parameter"]))
+            continue
+        end
+
+        changes = 100.0 .* (Float64[result["lower_value"],
+                                    reference_value,
+                                    result["upper_value"]] .-
+                            reference_value) ./ abs(reference_value)
+        parameter_changes[i] = changes
+        append!(relative_changes,
+                changes)
+    end
+
+    if !isempty(zero_reference_parameters)
+        @warn "Relative parameter changes are undefined for parameters with a zero reference value. " *
+              "Their local-sensitivity trend panels use an absolute x-axis instead." *
+              " Parameters: $(join(zero_reference_parameters, ", "))"
+    end
+
+    maximum_relative_change = isempty(relative_changes) ?
+                              1.0 :
+                              max(maximum(abs.(relative_changes)), 1.0)
+    relative_axis_limit = 1.12 * maximum_relative_change
+    common_relative_range = [-relative_axis_limit, relative_axis_limit]
 
     n_parameters = length(valid_results)
     vertical_spacing = n_parameters > 1 ? min(0.045, 0.16 / (n_parameters - 1)) : 0.0
@@ -464,6 +546,7 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
 
     traces = GenericTrace[]
     shapes = Any[]
+    annotations = Any[]
     layout_values = Dict{Symbol,Any}()
 
     for (i, result) in enumerate(valid_results)
@@ -478,12 +561,29 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
         objective_changes = Float64[100.0 * result["lower_change_relative"],
                                     0.0,
                                     100.0 * result["upper_change_relative"]]
+
+        uses_relative_axis = parameter_changes[i] !== nothing
+        x_values = uses_relative_axis ?
+                   something(parameter_changes[i]) :
+                   parameter_values
+
+        parameter_change_text = if uses_relative_axis
+            [j == 2 ?
+             format_plot_percent(x_values[j]) :
+             format_plot_percent(x_values[j]; signed=true)
+             for j in eachindex(x_values)]
+        else
+            fill("undefined (reference = 0)", 3)
+        end
+
         hover_text = ["$parameter<br>" *
                       "Point: $(point_names[j])<br>" *
                       "Parameter value: $(parameter_values[j])<br>" *
+                      "Parameter change: $(parameter_change_text[j])<br>" *
                       "Objective: $(objective_values[j])<br>" *
                       "Objective change: $(round(objective_changes[j]; digits=4)) %"
                       for j in eachindex(point_names)]
+
         point_labels = [format_plot_percent(objective_changes[1]; signed=true),
                         "",
                         format_plot_percent(objective_changes[3]; signed=true)]
@@ -507,7 +607,7 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
         domain_start = domain_end - panel_height
 
         push!(traces,
-              scatter(; x=parameter_values,
+              scatter(; x=x_values,
                       y=objective_values,
                       mode="lines+markers+text",
                       line=attr(; width=3),
@@ -522,22 +622,72 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
                       yaxis=y_reference,
                       showlegend=false))
 
+        if uses_relative_axis
+            x_range = common_relative_range
+            absolute_value_text = [@sprintf("%.7g", value)
+                                   for value in parameter_values]
+            tick_text = ["$(parameter_change_text[j])<br>$(absolute_value_text[j])"
+                         for j in eachindex(x_values)]
+
+            layout_values[x_layout_key] = attr(; domain=[0.0, 1.0],
+                                               anchor=y_reference,
+                                               automargin=true,
+                                               range=x_range,
+                                               tickmode="array",
+                                               tickvals=x_values,
+                                               ticktext=tick_text,
+                                               zeroline=true,
+                                               zerolinewidth=2)
+        else
+            parameter_minimum = minimum(parameter_values)
+            parameter_maximum = maximum(parameter_values)
+            parameter_span = parameter_maximum - parameter_minimum
+            parameter_padding = parameter_span > eps(Float64) ?
+                                0.12 * parameter_span :
+                                max(0.01 * abs(parameter_values[2]), 1.0)
+            x_range = [parameter_minimum - parameter_padding,
+                       parameter_maximum + parameter_padding]
+
+            layout_values[x_layout_key] = attr(; domain=[0.0, 1.0],
+                                               anchor=y_reference,
+                                               automargin=true,
+                                               range=x_range,
+                                               tickformat=".7g",
+                                               zeroline=true,
+                                               zerolinewidth=2)
+        end
+
+        panel_label = if uses_relative_axis
+            "<b>$parameter</b>"
+        else
+            "<b>$parameter</b><br><span style=\"font-size:11px\">Absolute x-axis; reference = 0</span>"
+        end
+
+        push!(annotations,
+              attr(; text=panel_label,
+                   x=0.5,
+                   y=domain_end - 0.012,
+                   xref="paper",
+                   yref="paper",
+                   showarrow=false,
+                   xanchor="center",
+                   yanchor="top",
+                   align="center",
+                   bgcolor="rgba(255,255,255,0.78)",
+                   borderpad=2,
+                   font=attr(; size=12)))
+
         push!(shapes,
               attr(; type="line",
                    xref=x_reference,
                    yref=y_reference,
-                   x0=minimum(parameter_values),
-                   x1=maximum(parameter_values),
+                   x0=x_range[1],
+                   x1=x_range[2],
                    y0=objective_values[2],
                    y1=objective_values[2],
                    line=attr(; width=1,
                              dash="dot")))
 
-        layout_values[x_layout_key] = attr(; domain=[0.0, 1.0],
-                                           anchor=y_reference,
-                                           title=parameter,
-                                           automargin=true,
-                                           tickformat=".7g")
         layout_values[y_layout_key] = attr(; domain=[domain_start, domain_end],
                                            anchor=x_reference,
                                            title="Objective",
@@ -549,14 +699,17 @@ function create_local_sensitivity_response_trends_plot(sensitivity_results::Vect
 
     layout_values[:title] = attr(;
                                  text="Trend of local sensitivity responses" *
-                                      "<br><sup>The dotted line marks the reference objective.</sup>",
+                                      "<br><sup>Parameter changes share one percentage scale; " *
+                                      "tick labels show parameter change and absolute value. " *
+                                      "The dotted line marks the reference objective.</sup>",
                                  x=0.5,
                                  xanchor="center")
     layout_values[:shapes] = shapes
+    layout_values[:annotations] = annotations
     layout_values[:showlegend] = false
     layout_values[:hovermode] = "closest"
-    layout_values[:margin] = attr(; t=105,
-                                  b=80,
+    layout_values[:margin] = attr(; t=120,
+                                  b=95,
                                   l=115,
                                   r=55)
     layout_values[:height] = max(650, 340 * n_parameters)
