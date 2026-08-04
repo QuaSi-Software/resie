@@ -457,9 +457,9 @@ end
 
 function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.medium],
-                          unload_storages(unit.controller, unit.medium))
+                          unload_storages(unit.controller, unit.medium), unit.uac, unit.medium)
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     # calculate volume and capacity
     if unit.capacity === nothing && unit.volume === nothing

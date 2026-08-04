@@ -224,9 +224,9 @@ end
 
 function initialise!(unit::UTIR, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
-                          unload_storages(unit.controller, unit.m_el_in))
+                          unload_storages(unit.controller, unit.m_el_in), unit.uac, unit.m_el_in)
     set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
-                          load_storages(unit.controller, unit.m_el_out))
+                          load_storages(unit.controller, unit.m_el_out), unit.uac, unit.m_el_out)
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end

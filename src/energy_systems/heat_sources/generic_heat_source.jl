@@ -301,7 +301,7 @@ end
 
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     if unit.temperature_reduction_model == "lmtd"
         if unit.min_source_in_temperature === nothing && unit.temperature_profile !== nothing

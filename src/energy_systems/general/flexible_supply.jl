@@ -231,7 +231,7 @@ end
 
 function initialise!(unit::FlexibleSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 end
 
 function control(unit::FlexibleSupply,

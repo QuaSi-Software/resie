@@ -279,7 +279,7 @@ end
 
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium))
+                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 
     if unit.treat_profile_as_volume_flow_in_qm_per_hour
         if unit.rho_medium === nothing

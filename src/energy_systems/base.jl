@@ -219,8 +219,21 @@ Sets the flag to decide over storage potential transfer to the given boolean val
 that if the flag is already set to false, no further changes will set it back to true. This
 is to prevent components overwriting the values of others.
 """
-function set_storage_transfer!(interface::SystemInterface, flag::Bool)
+function set_storage_transfer!(interface::SystemInterface, flag::Bool, uac::String, medium::Symbol)
     interface.do_storage_transfer = interface.do_storage_transfer && flag
+end
+
+"""
+    set_storage_transfer!(Nothing, value)
+
+Sets the flag to decide over storage potential transfer to the given boolean value. Note
+that if the flag is already set to false, no further changes will set it back to true. This
+is to prevent components overwriting the values of others.
+"""
+function set_storage_transfer!(interface::Nothing, flag::Bool, uac::String, medium::Symbol)
+    @error "In unit `$uac`, an error in the connections occurred for medium `$(String(medium))`. " *
+           "Check the consistency of the media names across the connected components."
+    throw(InputError())
 end
 
 """
@@ -294,7 +307,13 @@ function _weighted_mean(values::Union{Floathing,Vector{<:Floathing}},
     end
 
     valid_weights = filter(!isnothing, weights)
-    normalized_weights = valid_weights ./ _sum(valid_weights)
+    valid_weights_sum = _sum(valid_weights)
+
+    if valid_weights_sum == 0.0 || valid_weights_sum === nothing
+        return 0.0
+    end
+
+    normalized_weights = valid_weights ./ valid_weights_sum
     valid_values = filter(!isnothing, values)
 
     if length(valid_values) != length(normalized_weights)
