@@ -1112,7 +1112,12 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         checked_size_product([output_steps, nz, nr];
                              limit=MAX_STORED_VALUES,
                              label="Seasonal storage ground-temperature output")
-        unit.soil_temperature_field_output = zeros(Float64, output_steps, nz, nr)
+        if sim_params["auxiliary_plots"]
+            # only allocate if required
+            unit.soil_temperature_field_output = zeros(Float64, output_steps, nz, nr)
+        else
+            unit.soil_temperature_field_output = Array{Float64}(undef, 0, nz, nr)
+        end
         # get soil properties per row
         unit.row_k = zeros(Float64, nz)
         unit.row_rho = zeros(Float64, nz)
@@ -1660,7 +1665,7 @@ function control(unit::SeasonalThermalStorage,
         update_ground_fvm_unified_and_set_Teff!(unit, sim_params)
 
         # save unified FVM soil field for output
-        if sim_params["current_date"] >= sim_params["start_date_output"]
+        if sim_params["current_date"] >= sim_params["start_date_output"] && sim_params["auxiliary_plots"]
             sidx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
             if size(unit.soil_temperature_field_output, 1) >= sidx
                 unit.soil_temperature_field_output[sidx, :, :] = vis_field_with_tank(unit)

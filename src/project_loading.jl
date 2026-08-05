@@ -1498,6 +1498,7 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
                            "step_info_interval" => default(io_settings, "step_info_interval",
                                                            Integer(floor(nr_of_steps / 20))),
                            "show_detailed_errors" => io_settings["show_detailed_errors"],
+                           "auxiliary_plots" => io_settings["auxiliary_plots"],
                        ))
 
     if preparation_cache !== nothing
