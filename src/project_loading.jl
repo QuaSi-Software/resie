@@ -299,6 +299,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         display_name="Auxiliary plots formats",
         required=false,
         type=Vector{String},
+        options=["html", "pdf", "png", "ps", "svg"],
         json_type="list",
         unit="-"
     ),
