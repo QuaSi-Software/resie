@@ -951,11 +951,13 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
     g_func_vals = Float64[]
     ln_time_normalized = Float64[]
     reading_data = false
-    file_path = sim_params["run_path"](unit.g_function_file_path)
+    file_path = sim_params["input_path"](unit.g_function_file_path; max_bytes=64 * 1024 * 1024)
 
     try
         open(file_path, "r") do file
-            for line in eachline(file)
+            for (line_number, line) in enumerate(eachline(file))
+                line_number <= 200_000 || throw(InputError("G-function file contains too many lines."))
+                ncodeunits(line) <= 1_048_576 || throw(InputError("G-function file contains an excessively long line."))
                 line = strip(line)
                 if occursin("number_of_probes:", line)
                     num_probes = try
@@ -979,8 +981,15 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
                     if !isempty(line)
                         try
                             values = split(line, ";")
-                            push!(ln_time_normalized, parse(Float64, strip(values[1])))
-                            push!(g_func_vals, parse(Float64, strip(values[2])))
+                            length(values) == 2 || throw(InputError("G-function rows must contain exactly two values."))
+                            length(g_func_vals) < 100_000 ||
+                                throw(InputError("G-function file contains too many data rows."))
+                            time_value = parse(Float64, strip(values[1]))
+                            g_value = parse(Float64, strip(values[2]))
+                            isfinite(time_value) && isfinite(g_value) ||
+                                throw(InputError("G-function file contains a non-finite value."))
+                            push!(ln_time_normalized, time_value)
+                            push!(g_func_vals, g_value)
                         catch e
                             @error "Invalid data line \"$line\" in the file with given g-function values for the " *
                                    "\"$(unit.uac)\" at $(file_path). The following error occurred: $e. " *

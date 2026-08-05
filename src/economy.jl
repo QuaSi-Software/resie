@@ -714,7 +714,7 @@ function write_economic_results_to_CSV(economic_result::EconomicResult, filepath
         for (uac, component_results) in sort(collect(economic_result.breakdown); by=first)
             for (variable_name, entry) in sort(collect(component_results); by=first)
                 if entry isa AbstractVector{<:Real}
-                    write(file_handle, "$(uac) - $(variable_name):;")
+                    write(file_handle, csv_cell("$(uac) - $(variable_name):") * ";")
                     write(file_handle, replace(join((@sprintf("%.2f", x) for x in entry), ";") * "\n", "." => ","))
                 end
             end
@@ -726,7 +726,7 @@ function write_economic_results_to_CSV(economic_result::EconomicResult, filepath
         for (uac, component_results) in sort(collect(economic_result.breakdown); by=first)
             for (variable_name, entry) in sort(collect(component_results); by=first)
                 if entry isa Float64
-                    write(file_handle, "$(uac) - $(variable_name):;")
+                    write(file_handle, csv_cell("$(uac) - $(variable_name):") * ";")
                     write(file_handle, replace(@sprintf("%.2f;€\n", entry), "." => ","))
                 end
             end

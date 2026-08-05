@@ -47,7 +47,8 @@ function create_parameter_variant(io_settings::Dict{String,Any}, sim_params::Dic
         parameter_config = haskey(cfg["components"], uac) ? cfg["components"][uac] : cfg[uac]
         container, leaf_key = resolve_parameter_path(parameter_config, param_key)
         container[leaf_key] = value
-        run_name *= uac * "_" * param_key * "_" * compact_value(value) * "_"
+        run_name *= safe_filename(uac) * "_" * safe_filename(param_key) * "_" *
+                    safe_filename(compact_value(value)) * "_"
     end
 
     # rename outputs to clarify parameter values if outputfiles for each simulation should be generated
@@ -55,7 +56,9 @@ function create_parameter_variant(io_settings::Dict{String,Any}, sim_params::Dic
         if endswith(key, "file_path") && io_settings[key] != "nothing"
             dir, filename = splitdir(value)
             root, ext = splitext(filename)
-            new_path = joinpath(dir, run_name * "_" * root * ext)
+            new_path = joinpath(dir,
+                                safe_filename(run_name; fallback="run") * "_" *
+                                safe_filename(root; fallback="output") * ext)
             cfg["io_settings"][key] = new_path
         end
     end
@@ -691,13 +694,14 @@ function run_parameter_variation!(evaluate_physical_values::Function,
         worker_count = min(Threads.nthreads(), max_runs)
 
         # run parameter sets on multi threads
-        @threads for parameter_values in collect(parameter_study["runtime"]["iterator"])
+        @threads for run_index in parameter_study["runtime"]["iterator"]
             if cancel_parameter_study[]
                 continue
             end
 
             try
                 run_start_time = now()
+                parameter_values = parameter_study["runtime"]["parameter_value_at"](run_index)
                 float_parameter_values = parameter_values isa Real ? Float64(parameter_values) :
                                          Float64.(collect(parameter_values))
                 evaluate_physical_values(float_parameter_values)
@@ -988,13 +992,12 @@ function write_parameter_study_results(parameter_study_results_path::String,
                                        evaluated_parameter_sets::Vector{Any})
     open(parameter_study_results_path, "w") do file_handle
         # write header
-        header = join(collect(keys(evaluated_parameter_sets[1])), ';') * "\n"
+        header = join((csv_cell(key) for key in keys(evaluated_parameter_sets[1])), ';') * "\n"
         write(file_handle, header)
 
         # write results
         for results in evaluated_parameter_sets
-            row = join(collect(values(results)), ';') * "\n"
-            row = replace(row, '.' => ',')
+            row = join((csv_cell(value; decimal_comma=true) for value in values(results)), ';') * "\n"
             write(file_handle, row)
         end
     end
@@ -1038,7 +1041,13 @@ function perform_parameter_study(io_settings::Dict{String,Any},
     if preparation_cache !== nothing
         @globalInfo "Preparing reusable data for repeated simulation runs..."
         warmup_run_ID = uuid4()
-        prepare_inputs(project_config, warmup_run_ID; preparation_cache=preparation_cache)
+        prepare_inputs(project_config, warmup_run_ID;
+                       preparation_cache=preparation_cache,
+                       path_mode=io_settings["path_mode"],
+                       input_root=io_settings["input_root"],
+                       output_root=io_settings["path_mode"] == :confined ? io_settings["output_path"] : nothing,
+                       base_path_override=io_settings["base_path"],
+                       output_path_override=io_settings["output_path"])
     end
 
     # handle interruption via STR+C for parallel parameter-study runs

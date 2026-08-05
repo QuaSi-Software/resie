@@ -9,17 +9,17 @@ include("../test_util.jl")
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => ["TST_DEM_01"],
+                                         "type" => "GridInput",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => ["TST_DEM_01"],
         ),
         "TST_DEM_01" => Dict{String,Any}(
-            "type" => "Demand",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/heating_demand_short.prf",
-            "temperature_profile_file_path" => "./profiles/tests/temperature_short.prf",
-            "scale" => 1,
+                                         "type" => "Demand",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => [],
+                                         "energy_profile_file_path" => "./profiles/tests/heating_demand_short.prf",
+                                         "temperature_profile_file_path" => "./profiles/tests/temperature_short.prf",
+                                         "scale" => 1,
         ),
     )
 end
@@ -44,9 +44,10 @@ function test_profile_aggregation_two()
         "wh_to_watts" => function (w)
             return w * 2.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -92,9 +93,10 @@ function test_profile_aggregation_four()
         "wh_to_watts" => function (w)
             return w * 1.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -136,9 +138,10 @@ function test_profile_segmentation_half()
         "wh_to_watts" => function (w)
             return w * 8.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -221,9 +224,10 @@ function test_profile_segmentation_third()
         "wh_to_watts" => function (w)
             return w * 12.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -313,17 +317,17 @@ end
 function energy_system_linear_classic()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => ["TST_DEM_01"],
+                                         "type" => "GridInput",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => ["TST_DEM_01"],
         ),
         "TST_DEM_01" => Dict{String,Any}(
-            "type" => "Demand",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/heating_demand_short_linear.prf",
-            "temperature_profile_file_path" => "./profiles/tests/temperature_short_linear.prf",
-            "scale" => 1,
+                                         "type" => "Demand",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => [],
+                                         "energy_profile_file_path" => "./profiles/tests/heating_demand_short_linear.prf",
+                                         "temperature_profile_file_path" => "./profiles/tests/temperature_short_linear.prf",
+                                         "scale" => 1,
         ),
     )
 end
@@ -348,9 +352,10 @@ function test_profile_segmentation_half_linear_classic()
         "wh_to_watts" => function (w)
             return w * 8.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -433,9 +438,10 @@ function test_profile_segmentation_third_linear_classic()
         "wh_to_watts" => function (w)
             return w * 12.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -523,17 +529,17 @@ end
 function energy_system_linear_time_preserving()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => ["TST_DEM_01"],
+                                         "type" => "GridInput",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => ["TST_DEM_01"],
         ),
         "TST_DEM_01" => Dict{String,Any}(
-            "type" => "Demand",
-            "medium" => "m_h_w_ht1",
-            "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/heating_demand_short_linear_time_preserving.prf",
-            "temperature_profile_file_path" => "./profiles/tests/temperature_short_linear_time_preserving.prf",
-            "scale" => 1,
+                                         "type" => "Demand",
+                                         "medium" => "m_h_w_ht1",
+                                         "output_refs" => [],
+                                         "energy_profile_file_path" => "./profiles/tests/heating_demand_short_linear_time_preserving.prf",
+                                         "temperature_profile_file_path" => "./profiles/tests/temperature_short_linear_time_preserving.prf",
+                                         "scale" => 1,
         ),
     )
 end
@@ -558,9 +564,10 @@ function test_profile_segmentation_half_linear_time_preserving()
         "wh_to_watts" => function (w)
             return w * 8.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )
@@ -643,9 +650,10 @@ function test_profile_segmentation_third_linear_time_preserving()
         "wh_to_watts" => function (w)
             return w * 12.0
         end,
-        "run_path" => function (path)
+        "input_path" => function (path; max_bytes::Integer=typemax(Int))
             return path
         end,
+        "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
     )

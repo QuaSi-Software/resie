@@ -126,7 +126,10 @@ const SEASONAL_THERMAL_STORAGE_COMPONENT_PARAMETERS = Dict(
         description="Total number of layers in STES",
         display_name="Total layers",
         required=false,
-        validations=[("self", "value_gte_num", 1.0)],
+        validations=[
+            ("self", "value_gte_num", 1.0),
+            ("self", "value_lte_num", 1_000.0)
+        ],
         type=Int,
         json_type="number",
         unit="-"
@@ -1036,10 +1039,13 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     end
 
     # vector to hold the results of the temperatures for each layer in each simulation time step
-    unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps_output"],
-                                          unit.number_of_layer_total)
+    output_steps = Int(sim_params["number_of_time_steps_output"])
+    checked_size_product([output_steps, unit.number_of_layer_total + 2];
+                         limit=MAX_STORED_VALUES,
+                         label="Seasonal storage temperature output")
+    unit.temp_distribution_output = zeros(Float64, output_steps, unit.number_of_layer_total)
     # top and bottom get their own surrounding temperature
-    unit.temp_difference_to_surrounding_output = zeros(Float64, sim_params["number_of_time_steps_output"],
+    unit.temp_difference_to_surrounding_output = zeros(Float64, output_steps,
                                                        unit.number_of_layer_total + 2)
 
     # set initial effective_ambient_temperature
@@ -1100,9 +1106,13 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         prepare_ground_fvm_unified!(unit)
         nz = length(unit.soil_dz)
         nr = length(unit.soil_dr)
-        unit.soil_temperature_field_output = zeros(Float64,
-                                                   sim_params["number_of_time_steps_output"],
-                                                   nz, nr)
+        checked_size_product([nz, nr];
+                             limit=MAX_MESH_CELLS,
+                             label="Seasonal storage ground mesh")
+        checked_size_product([output_steps, nz, nr];
+                             limit=MAX_STORED_VALUES,
+                             label="Seasonal storage ground-temperature output")
+        unit.soil_temperature_field_output = zeros(Float64, output_steps, nz, nr)
         # get soil properties per row
         unit.row_k = zeros(Float64, nz)
         unit.row_rho = zeros(Float64, nz)
@@ -2723,15 +2733,22 @@ function create_geometric_mesh(min_mesh_width::Float64,
         return dx
     end
     push!(dx, min_mesh_width)
-    while sum(dx) + dx[end] < bound
-        push!(dx, min(dx[end] * expansion_factor, max_mesh_width))
+    total_width = min_mesh_width
+    while total_width + dx[end] < bound
+        length(dx) < MAX_MESH_CELLS ||
+            throw(InputError("Seasonal storage ground mesh exceeds the supported size."))
+        next_width = min(dx[end] * expansion_factor, max_mesh_width)
+        push!(dx, next_width)
+        total_width += next_width
     end
     # trim last cell to hit bound exactly
-    excess = sum(dx) - bound
+    excess = total_width - bound
     if excess > 0
         dx[end] -= excess
-    elseif sum(dx) < bound
-        push!(dx, bound - sum(dx))
+    elseif total_width < bound
+        length(dx) < MAX_MESH_CELLS ||
+            throw(InputError("Seasonal storage ground mesh exceeds the supported size."))
+        push!(dx, bound - total_width)
     end
     return dx
 end
@@ -2766,6 +2783,8 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
     # geometric ramp sequence up to the cap
     w = Float64[min_mesh_width]
     while w[end] < max_mesh_width - eps(Float64)
+        length(w) < MAX_MESH_CELLS ||
+            throw(InputError("Seasonal storage ground mesh exceeds the supported size."))
         nextw = min(w[end] * expansion_factor, max_mesh_width)
         if nextw == w[end]      # handles expansion_factor == 1
             break
@@ -2795,6 +2814,8 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
             push!(dx, middle_len)
         else
             nmid = floor(Int, middle_len / max_mesh_width)
+            length(dx) + nmid <= MAX_MESH_CELLS ||
+                throw(InputError("Seasonal storage ground mesh exceeds the supported size."))
             append!(dx, fill(max_mesh_width, nmid))
             rem = middle_len - nmid * max_mesh_width
             if rem > 1e-12
@@ -2803,6 +2824,8 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
         end
     end
 
+    length(dx) + n <= MAX_MESH_CELLS ||
+        throw(InputError("Seasonal storage ground mesh exceeds the supported size."))
     append!(dx, reverse(w[1:n]))
 
     # tiny correction to hit 'bound' exactly

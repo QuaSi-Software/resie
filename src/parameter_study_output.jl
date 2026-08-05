@@ -11,7 +11,7 @@ Takes a separate html insertion file for interactive plots and processes it.
 function render_parameter_study_plot_insertion(file_name::String,
                                                replacements::Pair{String,String}...)::String
     insertion_path = joinpath(PARAMETER_STUDY_PLOT_INSERTIONS_PATH, file_name)
-    insertion = read(insertion_path, String)
+    insertion = bounded_read_string(insertion_path, 1 * 1024 * 1024)
 
     for (name, value) in replacements
         placeholder = "{{$name}}"
@@ -36,25 +36,14 @@ Create a CSV path derived from `parameter_study_csv_path`.
 function parameter_study_csv_path(sim_params::Dict{String,Any},
                                   io_settings::Dict{String,Any},
                                   suffix::String)::String
-    base_path = sim_params["run_path"](io_settings["parameter_study_csv_path"])
+    base_path = sim_params["output_path"](io_settings["parameter_study_csv_path"])
     directory, filename = splitdir(base_path)
     root, _ = splitext(filename)
     return joinpath(directory, "$(root)_$(suffix).csv")
 end
 
-function sensitivity_csv_string(value)::String
-    if value isa Real
-        return replace(string(Float64(value)), "." => ",")
-    end
-    return string(value)
-end
-
 function sensitivity_csv_escape(value)::String
-    text = sensitivity_csv_string(value)
-    if occursin(';', text) || occursin('"', text) || occursin('\n', text) || occursin('\r', text)
-        return "\"" * replace(text, "\"" => "\"\"") * "\""
-    end
-    return text
+    return csv_cell(value; decimal_comma=true)
 end
 
 function write_sensitivity_csv(file_path::String,
@@ -1294,7 +1283,7 @@ function create_matrix_plot(results::Vector{Any},
     # Add the same toolbar style used by the other interactive parameter-study
     # plots. The graph occupies the viewport space remaining below the toolbar.
     if endswith(lowercase(file_path), ".html")
-        html = read(file_path, String)
+        html = bounded_read_string(file_path, 128 * 1024 * 1024)
 
         json_for_html(value) = replace(JSON.json(value),
                                        "</" => "<\\/")
@@ -1382,7 +1371,7 @@ Create a plot path derived from `parameter_study_plots_path`.
 function parameter_study_plot_path(sim_params::Dict{String,Any},
                                    io_settings::Dict{String,Any},
                                    suffix::String)::String
-    base_path = sim_params["run_path"](io_settings["parameter_study_plots_path"])
+    base_path = sim_params["output_path"](io_settings["parameter_study_plots_path"])
     dir, filename = splitdir(base_path)
     root, _ = splitext(filename)
     ext = ".html"
@@ -1896,7 +1885,7 @@ function inject_convergence_objective_controls!(file_path::String,
                                                 use_log_axis::Dict{String,Bool},
                                                 run_ids::Vector{Int},
                                                 initial_objective_key::String)
-    html = read(file_path, String)
+    html = bounded_read_string(file_path, 128 * 1024 * 1024)
 
     json_for_html(value) = replace(JSON.json(value),
                                    "</" => "<\\/")
@@ -2261,7 +2250,7 @@ function inject_objective_parameter_controls!(file_path::String,
                                               initial_x::String,
                                               initial_y::String,
                                               initial_color::Union{Nothing,String})
-    html = read(file_path, String)
+    html = bounded_read_string(file_path, 128 * 1024 * 1024)
 
     json_for_html(value) = replace(JSON.json(value),
                                    "</" => "<\\/")
@@ -2546,7 +2535,7 @@ function inject_parallel_axis_zoom_controls!(file_path::String,
                                              objective_keys::Vector{String},
                                              initial_color_key::String,
                                              objective_senses::Dict{String,Symbol})
-    html = read(file_path, String)
+    html = bounded_read_string(file_path, 128 * 1024 * 1024)
     parameter_keys_json = replace(JSON.json(parameter_keys),
                                   "</" => "<\\/")
     objective_keys_json = replace(JSON.json(objective_keys),
@@ -2846,7 +2835,7 @@ function inject_3d_axis_selection_controls!(file_path::String,
                                             initial_y::String,
                                             initial_z::String,
                                             initial_color::String)
-    html = read(file_path, String)
+    html = bounded_read_string(file_path, 128 * 1024 * 1024)
 
     json_for_html(value) = replace(JSON.json(value),
                                    "</" => "<\\/")

@@ -29,6 +29,7 @@ export check_balances_of_components, check_balances_of_interfaces, Component, ea
 
 using ..Profiles
 using UUIDs
+using ..Resie: MAX_MESH_CELLS, MAX_STORED_VALUES
 
 """
 Custom exception `InputError` used to signify that an input was not correctly set up,
@@ -39,6 +40,40 @@ struct InputError <: Exception
     msg::Union{AbstractString,Nothing}
 end
 InputError() = InputError(nothing)
+
+function checked_size_product(values::AbstractVector{<:Integer}; limit::Integer, label::String)::Int
+    product = 1
+    for value in values
+        value >= 0 || throw(InputError("$label contains a negative dimension."))
+        if value != 0 && product > div(limit, value)
+            throw(InputError("$label exceeds the supported size."))
+        end
+        product *= value
+    end
+    return product
+end
+
+# Component dictionaries may contain additional metadata that is not consumed by ReSiE.
+function report_unknown_component_keys(config::AbstractDict, allowed_keys, context::String;
+                                       extra_keys=String[])
+    allowed = Set(String.(collect(allowed_keys)))
+    union!(allowed, extra_keys)
+    unsupported = sort([String(key) for key in keys(config) if !(String(key) in allowed)]; by=lowercase)
+    isempty(unsupported) ||
+        @debug "Ignoring additional component fields" context=context fields=unsupported
+    return unsupported
+end
+
+function contains_nonfinite(value)::Bool
+    if value isa AbstractFloat
+        return !isfinite(value)
+    elseif value isa AbstractArray
+        return any(contains_nonfinite, value)
+    elseif value isa AbstractDict
+        return any(contains_nonfinite, values(value))
+    end
+    return false
+end
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -1691,6 +1726,9 @@ function extract_parameter(x::Type{Component}, config::AbstractDict{String,Any},
         end
     end
 
+    contains_nonfinite(value) &&
+        throw(InputError("Parameter `$param_name` in component `$uac` contains a non-finite value."))
+
     # special handling for function-type parameters
     if isdefined(param_def, :function_type)
         if param_def.function_type == "cop"
@@ -1724,7 +1762,13 @@ function extract_control_parameters(x::Type{Component}, config::Dict{String,Any}
     # constructor. in the future we want to have those, as well as the control module,
     # parameters being handled the same as the component parameters via a SSOT approach
     if "control_parameters" in keys(config)
-        return config["control_parameters"]
+        control_parameters = config["control_parameters"]
+        control_parameters isa AbstractDict ||
+            throw(InputError("Control parameters must be an object."))
+        contains_nonfinite(control_parameters) &&
+            throw(InputError("Control parameters contain a non-finite value."))
+        return Dict{String,Any}(String(key) => value
+                                for (key, value) in pairs(control_parameters))
     end
     return Dict{String,Any}()
 end
@@ -1972,9 +2016,15 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
         push!(expression, evaluate_conditional(conditional, extracted))
     end
 
-    # eval is safe here because we built the expression from bool literals and operators
-    # with no user input making it into the expression
-    return Bool(eval(build_flat_boolean_expr(expression)))
+    result = Bool(expression[1])
+    idx = 2
+    while idx < length(expression)
+        operator = expression[idx]
+        operand = Bool(expression[idx + 1])
+        result = operator == :&& ? result && operand : result || operand
+        idx += 2
+    end
+    return result
 end
 
 """
@@ -2042,14 +2092,13 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
 
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
-            items = isa(value, Vector) ? value : [value]
-            for item in items
-                if !any(occursin.(type_def[name].options, item))
-                    options_str = join(("`$option`" for option in type_def[name].options), ", ")
-                    throw(InputError("Given value `$item` is not in the allowed options " *
-                                     "for parameter `$name` of component `$uac`. " *
-                                     "Allowed options are: $(options_str)"))
-                end
+            valid_option = value isa AbstractVector ?
+                           all(item -> item in type_def[name].options, value) :
+                           value in type_def[name].options
+            if !valid_option
+                throw(InputError("Given value `$value` is not in the allowed options for " *
+                                 "parameter `$name` of component `$uac`. " *
+                                 "Allowed options are: $(join(("`$option`" for option in type_def[name].options), ", "))"))
             end
         end
 
@@ -2113,6 +2162,10 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     # extract component parameters using the parameter dictionary as the source of truth
     extracted_params = Dict{String,Any}()
     type_def_component = component_parameters(T)
+    report_unknown_component_keys(config, keys(type_def_component), "component `$uac`";
+                                  extra_keys=["type", "input_refs", "output_refs", "connections",
+                                              "control_parameters", "control_modules",
+                                              "economic_parameters", "emissions_parameters"])
     for (param_name, param_def) in type_def_component
         try
             extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
@@ -2124,8 +2177,12 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     # extract economic parameters using the economic parameter dictionary as the source of truth
     extracted_economic_params = Dict{String,Any}()
     economic_parameters_config = get(config, "economic_parameters", Dict{String,Any}())
+    economic_parameters_config isa AbstractDict ||
+        throw(InputError("Economic parameters of component `$uac` must be an object."))
+    type_def_economy = economic_parameters(T)
+    report_unknown_component_keys(economic_parameters_config, keys(type_def_economy),
+                                  "economic parameters of component `$uac`")
     if sim_params["economic_parameters"]["calculate_economy"]
-        type_def_economy = economic_parameters(T)
         for (param_name, param_def) in type_def_economy
             try
                 extracted_economic_params[param_name] = extract_parameter(T, economic_parameters_config, param_name,
@@ -2140,8 +2197,12 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     # extract emissions parameters using the emissions parameter dictionary as the source of truth
     extracted_emissions_params = Dict{String,Any}()
     emissions_parameters_config = get(config, "emissions_parameters", Dict{String,Any}())
+    emissions_parameters_config isa AbstractDict ||
+        throw(InputError("Emissions parameters of component `$uac` must be an object."))
+    type_def_emissions = emissions_parameters(T)
+    report_unknown_component_keys(emissions_parameters_config, keys(type_def_emissions),
+                                  "emissions parameters of component `$uac`")
     if sim_params["emissions_parameters"]["calculate_emissions"]
-        type_def_emissions = emissions_parameters(T)
         for (param_name, param_def) in type_def_emissions
             try
                 extracted_emissions_params[param_name] = extract_parameter(T, emissions_parameters_config, param_name,
@@ -2222,7 +2283,7 @@ Throws:
 function handle_extraction_error(e, sim_params)
     io = IOBuffer()
     showerror(io, e)
-    print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
+    print(io, get(sim_params, "show_detailed_errors", false) ? stacktrace(catch_backtrace()) : "")
     msg = String(take!(io))
     @error msg
     return true
@@ -3091,7 +3152,7 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
     if haskey(config, profile_file_key)
         path = config[profile_file_key]
         @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file " *
-              "located at: $(sim_params["run_path"](path))"
+              "located at: $(sim_params["input_path"](path))"
         return nothing, Profile(path, sim_params)
     end
 
@@ -3101,7 +3162,7 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
         # Check if it matches a field in weather_data
         wd = sim_params["weather_data"]
         field_symbols = fieldnames(typeof(wd))
-        if any(occursin(field_name_str, string(sym)) for sym in field_symbols)
+        if field_name_str in string.(field_symbols)
             @info "For '$uac', the '$param_symbol' is taken from the project-wide weather file: $field_name_str"
             return nothing, getfield(wd, Symbol(field_name_str))
         else
@@ -3154,7 +3215,7 @@ function load_profile_from_global_weather_file(config::Dict{String,Any},
     wd = sim_params["weather_data"]
     field_name_str = config[from_global_file_key]
     field_symbols = fieldnames(typeof(wd))
-    if any(occursin(field_name_str, string(sym)) for sym in field_symbols)
+    if field_name_str in string.(field_symbols)
         return getfield(wd, Symbol(field_name_str))
     else
         throw(InputError("For component $uac the global weather file key, given as " *
@@ -3220,8 +3281,8 @@ function get_diff_solar_radiation_profile_from_config(config::Dict{String,Any}, 
         @info "For '$uac', a constant diffuse solar radiation of $(config["constant_diffuse_solar_radiation"]) Wh/m^2 is set."
         return nothing
     elseif haskey(config, "diffuse_solar_radiation_from_global_file") && haskey(sim_params, "weather_data")
-        if any(occursin(config["diffuse_solar_radiation_from_global_file"], string(field_name))
-               for field_name in fieldnames(typeof(sim_params["weather_data"])))
+        if config["diffuse_solar_radiation_from_global_file"] in
+           string.(fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the diffuse solar radiation profile is taken from the project-wide weather file: " *
                   "$(config["diffuse_solar_radiation_from_global_file"])"
             return getfield(sim_params["weather_data"], Symbol(config["diffuse_solar_radiation_from_global_file"]))
@@ -3268,8 +3329,8 @@ function get_wind_speed_profile_from_config(config::Dict{String,Any}, sim_params
         @info "For '$uac', a constant wind speed of $(config["constant_wind_speed"]) °C is set."
         return nothing
     elseif haskey(config, "wind_speed_from_global_file") && haskey(sim_params, "weather_data")
-        if any(occursin(config["wind_speed_from_global_file"], string(field_name))
-               for field_name in fieldnames(typeof(sim_params["weather_data"])))
+        if config["wind_speed_from_global_file"] in
+           string.(fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the wind speed profile is taken from the project-wide weather file: $(config["wind_speed_from_global_file"])"
             return getfield(sim_params["weather_data"], Symbol(config["wind_speed_from_global_file"]))
         else

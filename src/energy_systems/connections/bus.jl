@@ -27,13 +27,35 @@ function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
         return ConnectionMatrix([], [], nothing)
     end
 
-    input_order = [String(u) for u in config["connections"]["input_order"]]
-    output_order = [String(u) for u in config["connections"]["output_order"]]
+    connections = config["connections"]
+    connections isa AbstractDict || throw(InputError("Bus connections must be an object."))
+    unsupported = setdiff(Set(String.(keys(connections))),
+                          Set(["input_order", "output_order", "energy_flow"]))
+    isempty(unsupported) ||
+        throw(InputError("Unsupported bus connection keys: $(join(sort(collect(unsupported)), ", "))."))
+    haskey(connections, "input_order") && haskey(connections, "output_order") ||
+        throw(InputError("Bus connections require input_order and output_order."))
+    connections["input_order"] isa AbstractVector &&
+    connections["output_order"] isa AbstractVector ||
+        throw(InputError("Bus input_order and output_order must be arrays."))
+    length(connections["input_order"]) <= 10_000 &&
+    length(connections["output_order"]) <= 10_000 ||
+        throw(InputError("Bus connections contain too many entries."))
+
+    input_order = [String(u) for u in connections["input_order"]]
+    output_order = [String(u) for u in connections["output_order"]]
 
     energy_flow = nothing
-    if haskey(config["connections"], "energy_flow")
-        energy_flow = []
-        for row in config["connections"]["energy_flow"]
+    if haskey(connections, "energy_flow")
+        connections["energy_flow"] isa AbstractVector ||
+            throw(InputError("Bus energy_flow must be an array of arrays."))
+        length(connections["energy_flow"]) == length(input_order) ||
+            throw(InputError("Bus energy_flow must contain one row per input."))
+        energy_flow = Vector{Vector{Int}}()
+        for row in connections["energy_flow"]
+            row isa AbstractVector || throw(InputError("Bus energy_flow rows must be arrays."))
+            length(row) == length(output_order) ||
+                throw(InputError("Bus energy_flow rows must contain one value per output."))
             vec = [Int(v) for v in row]
             push!(energy_flow, vec)
         end
@@ -255,7 +277,7 @@ function init_from_params(x::Type{Bus}, uac::String, params::Dict{String,Any}, r
             [],                                           # input_output_rows_iteration
             false,                                        # has_custom_order
             nothing,                                      # proxy
-            uuid1(),                                      # holds the current run ID later
+            uuid4(),                                      # holds the current run ID later
             sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
 end
 
@@ -1062,8 +1084,8 @@ function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     return [f
             for f in unit.input_interfaces
             if (inclusive && f.source.sys_function == condition)
-               ||
-               (!inclusive && f.source.sys_function != condition)]
+    ||
+        (!inclusive && f.source.sys_function != condition)]
 end
 
 """
@@ -1086,8 +1108,8 @@ function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     return [f
             for f in unit.output_interfaces
             if (inclusive && f.target.sys_function == condition)
-               ||
-               (!inclusive && f.target.sys_function != condition)]
+    ||
+        (!inclusive && f.target.sys_function != condition)]
 end
 
 """

@@ -624,7 +624,7 @@ function dump_auxiliary_outputs(io_settings::Dict{String,Any},
     # export order of operations
     if io_settings["auxiliary_info"]
         aux_info_file_path = io_settings["auxiliary_info_file"]
-        open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
+        open(sim_params["output_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
             write(file_handle, listify_operations(order_of_operations))
@@ -647,12 +647,12 @@ function dump_auxiliary_outputs(io_settings::Dict{String,Any},
             end
         end
 
-        @info "Auxiliary info dumped to file $(sim_params["run_path"](aux_info_file_path))"
+        @info "Auxiliary info dumped to file $(sim_params["output_path"](aux_info_file_path))"
     end
 
     # plot additional figures potentially available from components after initialisation
     if io_settings["auxiliary_plots"]
-        aux_plots_output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        aux_plots_output_path = sim_params["output_path"](io_settings["auxiliary_plots_path"])
         aux_plots_formats = io_settings["auxiliary_plots_formats"]
         aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
@@ -865,7 +865,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     end
 
     p = plot(traces, layout)
-    file_path = sim_params["run_path"](io_settings["output_plot_file_path"])
+    file_path = sim_params["output_path"](io_settings["output_plot_file_path"])
     savefig(p, file_path)
 end
 
@@ -1037,7 +1037,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = sim_params["run_path"](io_settings["sankey_plot_file_path"])
+    file_path = sim_params["output_path"](io_settings["sankey_plot_file_path"])
     savefig(p, file_path)
 end
 
@@ -1158,16 +1158,8 @@ function aggregate_csv(input_path::AbstractString,
         return replace(s, "." => ",")
     end
 
-    # escape fields only if required by the CSV format
     function csv_escape(value::AbstractString)::String
-        s = String(value)
-
-        if occursin(string(separator), s) || occursin("\"", s) ||
-           occursin("\n", s) || occursin("\r", s)
-            return "\"" * replace(s, "\"" => "\"\"") * "\""
-        end
-
-        return s
+        return csv_cell(value)
     end
 
     function write_csv_row(io, row::AbstractVector{<:AbstractString})::Nothing

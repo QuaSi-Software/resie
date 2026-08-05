@@ -22,6 +22,15 @@ Types of weather files that are implemented.
 """
 @enum WeatherFileType wft_dat wft_epw wft_unknown
 
+function parse_weather_number(value::AbstractString, context::AbstractString)
+    integer = tryparse(Int, value)
+    integer !== nothing && return integer
+
+    number = parse(Float64, value)
+    isfinite(number) || throw(InputError("$context must contain only finite numbers."))
+    return number
+end
+
 """
     guess_file_format(weather_file_path::String)
 
@@ -41,7 +50,15 @@ function guess_file_format(weather_file_path::String)
     end
 
     # read first line and guess from how it begins
-    line = readline(weather_file_path)
+    isfile(weather_file_path) || throw(InputError("Weather path must point to a regular file."))
+    filesize(weather_file_path) <= 64 * 1024 * 1024 ||
+        throw(InputError("Weather file exceeds the maximum allowed file size."))
+    line = open(weather_file_path, "r") do file_handle
+        first_line = readline(file_handle; keep=false)
+        ncodeunits(first_line) <= 1_048_576 ||
+            throw(InputError("Weather file contains an excessively long first line."))
+        return first_line
+    end
     if startswith(line, "LOCATION")
         return wft_epw
     elseif startswith(line, "Koordinatensystem")
@@ -92,8 +109,10 @@ mutable struct WeatherData
                          file_format::WeatherFileType,
                          weather_interpolation_type_solar::String,
                          weather_interpolation_type_general::String)
-        if !isfile(weather_file_path)
-            @error "The weather file could not be found in $(weather_file_path)"
+        try
+            sim_params["input_path"](weather_file_path; max_bytes=64 * 1024 * 1024)
+        catch e
+            @error "The weather file could not be opened: $e"
             throw(InputError())
         end
 
@@ -105,17 +124,20 @@ mutable struct WeatherData
         time_step = Second(3600)  # set fixed time step width for weather data
         start_year = Dates.value(Year(sim_params["start_date"]))
         end_year = Dates.value(Year(sim_params["end_date"]))
+        nr_of_years = end_year - start_year + 1
+        nr_of_years > 0 || throw(InputError("Weather-data date range must not be empty."))
+        nr_of_years <= div(10_000_000, 8760) ||
+            throw(InputError("Weather-data date range exceeds the supported size."))
         timestamps = remove_leap_days(collect(range(DateTime(start_year, 1, 1, 0, 0, 0);
                                                     stop=DateTime(end_year, 12, 31, 23, 0, 0),
                                                     step=time_step)))
-        nr_of_years = end_year - start_year + 1
 
         if file_format == wft_dat
             weatherdata_dict, headerdata = read_dat_file(weather_file_path, sim_params)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
-            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
+            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84)
             ctx = Proj.proj_context_clone()
             transform = Proj.Transformation(inProj, outProj; ctx=ctx)
             latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
@@ -137,7 +159,7 @@ mutable struct WeatherData
                       "one given in the input file: $(sim_params["time_zone"])"
             end
 
-            # Wind speed is measured as mean over the 10 Minutes ahead of the full hour 
+            # Wind speed is measured as mean over the 10 Minutes ahead of the full hour
             wind_speed = Profile(weather_file_path * ":WindSpeed",
                                  sim_params;
                                  given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
@@ -169,11 +191,11 @@ mutable struct WeatherData
 
             sunrise, sunset = calc_sunrise_sunset(timestamps, time_step, temp_ambient_air, sim_params)
 
-            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
+            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be
             #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
 
-            # convert solar radiation data to profile. In DWD-dat, solar radiation is given as 
-            # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00. 
+            # convert solar radiation data to profile. In DWD-dat, solar radiation is given as
+            # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00.
             # Therefore the data is the mean of the hour ahead of the current time step.
             beamHorIrr = Profile(weather_file_path * ":BeamHorizontalIrradiation",
                                  sim_params;
@@ -287,7 +309,7 @@ mutable struct WeatherData
 end
 
 """
-    calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile, 
+    calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile,
                         sim_params::Dict{String,Any})
 
 Function calculate sunrise and sunset time for given timestamps.
@@ -349,7 +371,7 @@ end
 """
 read_dat_file(weather_file_path, sim_params)
 
-Function to read in a .dat weather file from the DWD 
+Function to read in a .dat weather file from the DWD
 (German weather service, download from https://kunden.dwd.de/obt/)
 
 Requirements on dat file:
@@ -362,7 +384,7 @@ The header of the -dat file has to be in the following structure:
 1 ...
 2 Rechtswert        : 3936500 Meter
 3 Hochwert          : 2449500 Meter
-4 Hoehenlage        : 450 Meter ueber NN 
+4 Hoehenlage        : 450 Meter ueber NN
 ...
 7 Art des TRY       : mittleres Jahr
 8 Bezugszeitraum    : 1995-2012
@@ -391,7 +413,7 @@ IL Qualitaetsbit bezueglich der Auswahlkriterien                           {0;1;
 function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
     local datfile
     expected_length = 8760  # timesteps
-    file_path = sim_params["run_path"](weather_file_path)
+    file_path = sim_params["input_path"](weather_file_path; max_bytes=64 * 1024 * 1024)
     try
         datfile = open(file_path, "r")
     catch e
@@ -400,77 +422,80 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
         throw(InputError())
     end
 
-    # Read header 
-    headerdata = Dict()
-    for line in eachline(datfile)
-        row = split(rstrip(line), ":"; limit=2)
-        current_name = rstrip(row[1])
-        try
-            if current_name == "Rechtswert"
-                value = parse(Int, split(row[2])[1])
-                headerdata["easting"] = value
-            elseif current_name == "Hochwert"
-                value = parse(Int, split(row[2])[1])
-                headerdata["northing"] = value
-            elseif current_name == "Hoehenlage"
-                value = parse(Float64, split(row[2])[1])
-                headerdata["altitude"] = value
-            elseif current_name == "Art des TRY"
-                headerdata["kind"] = row[2]
-            elseif current_name == "Bezugszeitraum"
-                headerdata["years"] = row[2]
+    try
+        # Read header
+        headerdata = Dict()
+        header_lines = 0
+        for line in eachline(datfile)
+            header_lines += 1
+            header_lines <= 1_000 || throw(InputError("Weather file header contains too many lines."))
+            ncodeunits(line) <= 1_048_576 || throw(InputError("Weather file contains an excessively long line."))
+            row = split(rstrip(line), ":"; limit=2)
+            current_name = rstrip(row[1])
+            try
+                if current_name == "Rechtswert"
+                    value = parse(Int, split(row[2])[1])
+                    headerdata["easting"] = value
+                elseif current_name == "Hochwert"
+                    value = parse(Int, split(row[2])[1])
+                    headerdata["northing"] = value
+                elseif current_name == "Hoehenlage"
+                    value = parse_weather_number(split(row[2])[1], "Weather file header")
+                    headerdata["altitude"] = value
+                elseif current_name == "Art des TRY"
+                    headerdata["kind"] = row[2]
+                elseif current_name == "Bezugszeitraum"
+                    headerdata["years"] = row[2]
+                end
+            catch e
+                @error "Error reading the header of the DWD .dat file in $file_path\n" *
+                       "Check if the header meets the requirements. The following error occurred: $e"
+                throw(InputError())
             end
-        catch e
-            @error "Error reading the header of the DWD .dat file in $file_path\n" *
-                   "Check if the header meets the requirements. The following error occurred: $e"
+            if row[1] == "***"
+                break
+            end
+        end
+
+        # read data
+        # Define column names of weatherdata_dict
+        colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air",
+                    "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover",
+                    "precipitable_water", "relative_humidity", "beamHorIrr", "difHorIrr",
+                    "longWaveIrr", "terrestric_heat_irr", "quality"]
+
+        weatherdata_dict = Dict{String,Vector{Any}}()
+        for col_name in colnames
+            weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
+        end
+
+        dataline = 1
+        for line in eachline(datfile)
+            dataline <= expected_length ||
+                throw(InputError("Weather file contains more than $expected_length data rows."))
+            ncodeunits(line) <= 1_048_576 || throw(InputError("Weather file contains an excessively long line."))
+            row = split(rstrip(line), r"\s+")
+            length(row) == length(colnames) ||
+                throw(InputError("Weather file row $dataline has $(length(row)) columns; expected $(length(colnames))."))
+            for (index, value) in enumerate(row)
+                weatherdata_dict[colnames[index]][dataline] = parse_weather_number(value, "Weather file row $dataline")
+            end
+            dataline += 1
+        end
+
+        # Check length
+        if dataline - 1 !== expected_length
+            @warn "Error reading the .dat weather dataset from $file_path:\n" *
+                  "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
+                  "Check the file and make sure the data block starts with ***."
             throw(InputError())
         end
-        if row[1] == "***"
-            break
-        end
+
+        @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
+        return weatherdata_dict, headerdata
+    finally
+        isopen(datfile) && close(datfile)
     end
-
-    # read data
-    # Define column names of weatherdata_dict
-    colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air",
-                "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover",
-                "precipitable_water", "relative_humidity", "beamHorIrr", "difHorIrr",
-                "longWaveIrr", "terrestric_heat_irr", "quality"]
-
-    weatherdata_dict = Dict{String,Vector{Any}}()
-    for col_name in colnames
-        weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
-    end
-
-    dataline = 1
-    for line in eachline(datfile)
-        row = split(rstrip(line), r"\s+")
-        if length(row) !== length(colnames)
-            @warn "In row $(dataline) ($(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values:\n" *
-                  "Expected $(length(colnames)) but got $(length(row)) elements!"
-        end
-        for (index, value) in enumerate(row)
-            if occursin('.', value)
-                weatherdata_dict[colnames[index]][dataline] = parse(Float64, value)
-            else
-                weatherdata_dict[colnames[index]][dataline] = parse(Int, value)
-            end
-        end
-        dataline += 1
-    end
-
-    close(datfile)
-
-    # Check length
-    if dataline - 1 !== expected_length
-        @warn "Error reading the .dat weather dataset from $file_path:\n" *
-              "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
-              "Check the file and make sure the data block starts with ***."
-        throw(InputError())
-    end
-
-    @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
-    return weatherdata_dict, headerdata
 end
 
 """
@@ -482,7 +507,7 @@ For details, see: https://designbuilder.co.uk/cahelp/Content/EnergyPlusWeatherFi
 function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     local ewpfile
     expected_length = 8760  # timesteps
-    file_path = sim_params["run_path"](weather_file_path)
+    file_path = sim_params["input_path"](weather_file_path; max_bytes=64 * 1024 * 1024)
 
     try
         ewpfile = open(file_path, "r")
@@ -492,74 +517,81 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
         throw(InputError())
     end
 
-    # Read fist line with metadata
-    firstline = readline(ewpfile)
+    try
+        # Read first line with metadata
+        firstline = readline(ewpfile)
+        ncodeunits(firstline) <= 1_048_576 || throw(InputError("Weather file contains an excessively long first line."))
 
-    head = ["loc", "city", "state-prov", "country", "data_type", "WMO_code",
-            "latitude", "longitude", "TZ", "altitude"]
-    headerdata = Dict{String,Any}(zip(head, split(chomp(firstline), ",")))
+        head = ["loc", "city", "state-prov", "country", "data_type", "WMO_code",
+                "latitude", "longitude", "TZ", "altitude"]
+        header_values = split(chomp(firstline), ",")
+        length(header_values) == length(head) ||
+            throw(InputError("EPW header has $(length(header_values)) columns; expected $(length(head))."))
+        headerdata = Dict{String,Any}(zip(head, header_values))
 
-    # convert string values to float where necessary
-    for key in ["altitude", "latitude", "longitude", "TZ", "WMO_code"]
-        headerdata[key] = parse(Float64, headerdata[key])
-    end
-
-    # define data dicts and column names
-    weatherdata_dict = Dict{String,Vector{Any}}()
-    colnames = ["year", "month", "day", "hour", "minute", "data_source_unct",
-                "temp_air", "temp_dew", "relative_humidity",
-                "atmospheric_pressure", "etr", "etrn", "longWaveIrr", "ghi",
-                "dni", "dhi", "global_hor_illum", "direct_normal_illum",
-                "diffuse_horizontal_illum", "zenith_luminance",
-                "wind_direction", "wind_speed", "total_sky_cover",
-                "opaque_sky_cover", "visibility", "ceiling_height",
-                "present_weather_observation", "present_weather_codes",
-                "precipitable_water", "aerosol_optical_depth", "snow_depth",
-                "days_since_last_snowfall", "albedo",
-                "liquid_precipitation_depth", "liquid_precipitation_quantity"]
-
-    for col_name in colnames
-        weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
-    end
-
-    # skip the next seven lines of the header
-    for _ in 1:7
-        readline(ewpfile)
-    end
-
-    # reading data
-    dataline = 1
-    for line in eachline(ewpfile)
-        row = split(rstrip(line), ',')
-        if length(row) !== length(colnames)
-            @warn "In row $(dataline) ($(row[1])-$(row[2])-$(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values.\n" *
-                  "Expected $(length(colnames)) but got $(length(row)) elements!"
+        # convert string values to numbers where necessary
+        for key in ["altitude", "latitude", "longitude", "TZ", "WMO_code"]
+            headerdata[key] = parse_weather_number(headerdata[key], "EPW header field $key")
         end
-        for (index, value) in enumerate(row)
-            if occursin('.', value)
-                weatherdata_dict[colnames[index]][dataline] = parse(Float64, value)
-            elseif occursin('?', value)
-                weatherdata_dict[colnames[index]][dataline] = value
-            else
-                weatherdata_dict[colnames[index]][dataline] = parse(Int, value)
+
+        # define data dicts and column names
+        weatherdata_dict = Dict{String,Vector{Any}}()
+        colnames = ["year", "month", "day", "hour", "minute", "data_source_unct",
+                    "temp_air", "temp_dew", "relative_humidity",
+                    "atmospheric_pressure", "etr", "etrn", "longWaveIrr", "ghi",
+                    "dni", "dhi", "global_hor_illum", "direct_normal_illum",
+                    "diffuse_horizontal_illum", "zenith_luminance",
+                    "wind_direction", "wind_speed", "total_sky_cover",
+                    "opaque_sky_cover", "visibility", "ceiling_height",
+                    "present_weather_observation", "present_weather_codes",
+                    "precipitable_water", "aerosol_optical_depth", "snow_depth",
+                    "days_since_last_snowfall", "albedo",
+                    "liquid_precipitation_depth", "liquid_precipitation_quantity"]
+
+        for col_name in colnames
+            weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
+        end
+
+        # skip the next seven lines of the header
+        for _ in 1:7
+            line = readline(ewpfile)
+            ncodeunits(line) <= 1_048_576 || throw(InputError("Weather file contains an excessively long header line."))
+        end
+
+        # reading data
+        dataline = 1
+        for line in eachline(ewpfile)
+            dataline <= expected_length ||
+                throw(InputError("Weather file contains more than $expected_length data rows."))
+            ncodeunits(line) <= 1_048_576 || throw(InputError("Weather file contains an excessively long line."))
+            row = split(rstrip(line), ',')
+            length(row) == length(colnames) ||
+                throw(InputError("Weather file row $dataline has $(length(row)) columns; expected $(length(colnames))."))
+            for (index, value) in enumerate(row)
+                if occursin('?', value)
+                    weatherdata_dict[colnames[index]][dataline] = value
+                else
+                    weatherdata_dict[colnames[index]][dataline] = parse_weather_number(value,
+                                                                                       "Weather file row $dataline")
+                end
             end
+            dataline += 1
         end
-        dataline += 1
+
+        # Check length
+        if dataline - 1 !== expected_length
+            @error "Error reading the EPW weather dataset from $file_path\n" *
+                   "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
+                   "Check the file for corruption."
+            throw(InputError())
+        end
+
+        @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
+
+        return weatherdata_dict, headerdata
+    finally
+        isopen(ewpfile) && close(ewpfile)
     end
-
-    close(ewpfile)
-
-    # Check length
-    if dataline - 1 !== expected_length
-        @error "Error reading the EPW weather dataset from $file_path\n" *
-               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
-               "Check the file for corruption."
-        throw(InputError())
-    end
-
-    @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
-
-    return weatherdata_dict, headerdata
 end
 
 function get_weather_data_keys(sim_params::Dict{String,Any}, suppress_all_output::Bool)

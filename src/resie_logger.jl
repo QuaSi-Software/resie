@@ -202,7 +202,7 @@ end
 
 Starts the general and balance warning loggers and opens the files if requested.
 
-Note: This does not set the global logger to the created object. Use `global_logger` for this.
+Use `with_logger` while running a simulation to keep the logger scoped to the current task.
 
 # Arguments
 - `log_to_console::Bool`: If the log should be printed to the console
@@ -235,14 +235,16 @@ function start_logger(log_to_console::Bool,
         time_now = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
         println(log_file_general, "ReSiE general log file of simulation started at: $(time_now)")
         if input_file !== nothing
-            println(log_file_general, "Input file: ", abspath(input_file))
+            println(log_file_general, "Input file: ",
+                    replace(basename(input_file), '\0' => "", '\r' => "\\r", '\n' => "\\n"))
         end
         println(log_file_general, "This log file contains general warnings, errors and information written by ReSiE")
         println(log_file_general, "---------------------------------")
 
         println(log_file_balanceWarn, "ReSiE balanceWarn log file of simulation started at: $(time_now)")
         if input_file !== nothing
-            println(log_file_balanceWarn, "Input file: ", abspath(input_file))
+            println(log_file_balanceWarn, "Input file: ",
+                    replace(basename(input_file), '\0' => "", '\r' => "\\r", '\n' => "\\n"))
         end
         println(log_file_balanceWarn, "This log file contains only balance warnings written by ReSiE.")
         println(log_file_balanceWarn, "---------------------------------")

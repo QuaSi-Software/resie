@@ -1052,6 +1052,12 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     n_nodes_x = length(unit.dx)
     n_nodes_y = length(unit.dy)
+    checked_size_product([n_nodes_y, n_nodes_x];
+                         limit=MAX_MESH_CELLS,
+                         label="Geothermal collector mesh")
+    checked_size_product([Int(sim_params["number_of_time_steps_output"]), n_nodes_y, n_nodes_x];
+                         limit=MAX_STORED_VALUES,
+                         label="Geothermal collector temperature output")
 
     # localize fluid and adjacent nodes as they will be calculated separately later
     unit.fluid_node_y_idx = y_pipe_node_num
@@ -1159,14 +1165,19 @@ function create_mesh_y(min_mesh_width::Float64,
                                                        min_mesh_width::Float64,
                                                        max_mesh_width::Float64,
                                                        expansion_factor::Float64)
-        distances = []
+        midpoint > 0.0 || throw(InputError("Geothermal collector mesh segment must be positive."))
+        distances = Float64[]
         current_width = min_mesh_width
+        total_width = 0.0
 
-        while distances == [] || sum(distances) + current_width < midpoint
+        while isempty(distances) || total_width + current_width < midpoint
+            length(distances) < div(MAX_MESH_CELLS, 2) ||
+                throw(InputError("Geothermal collector mesh exceeds the supported size."))
             push!(distances, current_width)
+            total_width += current_width
             current_width = min(max_mesh_width, current_width * expansion_factor)
         end
-        distance_to_midpoint = midpoint - sum(distances)
+        distance_to_midpoint = midpoint - total_width
         if distance_to_midpoint > distances[end]
             push!(distances, distance_to_midpoint)
             push!(distances, distance_to_midpoint)
@@ -1200,6 +1211,8 @@ function create_mesh_y(min_mesh_width::Float64,
     midpoint = (sy4 - sy3) / 2
     dy_3 = calculate_increasing_decreasing_distances(midpoint, min_mesh_width, max_mesh_width, expansion_factor)
 
+    length(dy_1) + length(dy_2) + length(dy_3) <= MAX_MESH_CELLS ||
+        throw(InputError("Geothermal collector mesh exceeds the supported size."))
     return [dy_1..., dy_2..., dy_3...], y_pipe_node_num
 end
 
@@ -1233,20 +1246,22 @@ function create_mesh_x(min_mesh_width::Float64,
     # maximum width of grid in x direction
     x_bound = pipe_spacing / 2     # [m]
 
-    # set first two dx to half the pipe radius
-    dx = [pipe_radius_outer / 2, pipe_radius_outer]       # [m]
+    # set first widths around the pipe
+    dx = [pipe_radius_outer / 2, pipe_radius_outer, min_mesh_width]
+    total_width = sum(dx)
 
-    # set next dx to the minimum width
-    append!(dx, min_mesh_width)
-
-    # add dx while x_bound is not exeeded
-    while sum(dx) < x_bound
-        append!(dx, min(dx[end] * expansion_factor, max_mesh_width))
+    # add dx while x_bound is not exceeded
+    while total_width < x_bound
+        length(dx) < MAX_MESH_CELLS ||
+            throw(InputError("Geothermal collector mesh exceeds the supported size."))
+        next_width = min(dx[end] * expansion_factor, max_mesh_width)
+        push!(dx, next_width)
+        total_width += next_width
     end
 
     # limit to x_bound
-    if sum(dx) > x_bound
-        dx[end] -= sum(dx) - x_bound
+    if total_width > x_bound
+        dx[end] -= total_width - x_bound
     end
 
     return dx

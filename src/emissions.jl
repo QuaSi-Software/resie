@@ -385,7 +385,7 @@ function write_emissions_results_to_CSV(emissions_result::EmissionsResult,
                         values = values[1:observation_period_in_years]
                     end
 
-                    write(file_handle, "$(component) - $(variable_name):;")
+                    write(file_handle, csv_cell("$(component) - $(variable_name):") * ";")
                     write(file_handle,
                           replace(join((@sprintf("%.2f", x) for x in values), ";") * "\n", "." => ","))
                 end
@@ -401,7 +401,7 @@ function write_emissions_results_to_CSV(emissions_result::EmissionsResult,
 
             for (variable_name, entry) in sort(collect(component_results); by=first)
                 if entry isa Real && !(entry isa AbstractVector)
-                    write(file_handle, "$(component) - $(variable_name):;")
+                    write(file_handle, csv_cell("$(component) - $(variable_name):") * ";")
                     write(file_handle,
                           replace(@sprintf("%.2f;%s\n", emissions_factor * Float64(entry), emissions_unit), "." => ","))
                 end

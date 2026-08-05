@@ -59,76 +59,88 @@ Three different function prototypes are implemented:
 - `Function`: A callable function which returns an efficiency value when given a part load
     ratio value (from 0.0 to 1.0) as argument
 """
+const MAX_FUNCTION_DEFINITION_BYTES = 64 * 1024
+const MAX_FUNCTION_COEFFICIENTS = 1_000
+const MAX_COP_FIELD_CELLS = 10_000
+
+function parse_function_coefficients(data::AbstractString, method::String;
+                                     min_count::Int=1,
+                                     max_count::Int=MAX_FUNCTION_COEFFICIENTS)::Vector{Float64}
+    raw_values = split(data, ',')
+    min_count <= length(raw_values) <= max_count ||
+        throw(InputError("Function `$method` requires between $min_count and $max_count coefficients."))
+    values = try
+        parse.(Float64, strip.(raw_values))
+    catch
+        throw(InputError("Function `$method` contains an invalid numeric coefficient."))
+    end
+    all(isfinite, values) || throw(InputError("Function `$method` contains a non-finite coefficient."))
+    return values
+end
+
+function parse_function_definition(eff_def::String)::Tuple{String,String}
+    ncodeunits(eff_def) <= MAX_FUNCTION_DEFINITION_BYTES ||
+        throw(InputError("Function definition exceeds the supported length."))
+    parts = split(eff_def, ':'; limit=2)
+    length(parts) == 2 || throw(InputError("Function definition must use `method:coefficients`."))
+    method = lowercase(strip(parts[1]))
+    data = strip(parts[2])
+    isempty(method) && throw(InputError("Function definition has no method."))
+    isempty(data) && throw(InputError("Function definition has no coefficients."))
+    return method, data
+end
+
 function parse_efficiency_function(eff_def::String)::Function
-    splitted = split(eff_def, ":")
+    method, data = parse_function_definition(eff_def)
 
-    if length(splitted) > 1
-        method = lowercase(splitted[1])
-        data = splitted[2]
-
-        if method == "const"
-            c = parse(Float64, data)
-            return plr -> c
-
-        elseif method == "poly"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return function (plr)
-                return sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
+    if method == "const"
+        c = only(parse_function_coefficients(data, method; min_count=1, max_count=1))
+        return plr -> c
+    elseif method == "poly"
+        params = parse_function_coefficients(data, method)
+        return plr -> sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
+    elseif method == "pwlin"
+        params = parse_function_coefficients(data, method; min_count=2)
+        step = 1.0 / (length(params) - 1)
+        return function (plr)
+            bracket_nr = floor(Int64, plr / step) + 1
+            lower_bound = params[bracket_nr]
+            upper_bound = params[min(bracket_nr + 1, length(params))]
+            return lower_bound + (upper_bound - lower_bound) * (plr % step) / step
+        end
+    elseif method == "offset_lin"
+        c = only(parse_function_coefficients(data, method; min_count=1, max_count=1))
+        return plr -> 1.0 - c * (1.0 - plr)
+    elseif method == "logarithmic"
+        params = parse_function_coefficients(data, method; min_count=2, max_count=2)
+        return plr -> params[1] * plr / (params[2] * plr + (1 - params[2]))
+    elseif method == "inv_poly"
+        params = parse_function_coefficients(data, method)
+        return plr -> plr / sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
+    elseif method == "exp"
+        params = parse_function_coefficients(data, method; min_count=3, max_count=3)
+        return plr -> params[1] + params[2] * exp(params[3] * plr)
+    elseif method == "power_func"
+        params = parse_function_coefficients(data, method; min_count=2, max_count=2)
+        return plr -> params[1] * plr^params[2]
+    elseif method == "linear"
+        params = parse_function_coefficients(data, method; min_count=1, max_count=2)
+        if length(params) == 1
+            return plr -> params[1] * plr
+        end
+        return plr -> params[1] * plr + params[2]
+    elseif method == "unified_plf"
+        params = parse_function_coefficients(data, method; min_count=4, max_count=4)
+        return function (plr)
+            if plr < params[1]
+                a = params[2] * (params[3] * (params[1] - 1) + 1) / params[1]
+                return a * plr / (params[3] * plr + 1 - params[3])
             end
-
-        elseif method == "pwlin"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            step = 1.0 / (length(params) - 1)
-            return function (plr)
-                bracket_nr = floor(Int64, plr / step) + 1
-                lower_bound = params[bracket_nr]
-                upper_bound = params[min(bracket_nr + 1, length(params))]
-                return lower_bound + (upper_bound - lower_bound) * (plr % step) / step
-            end
-
-        elseif method == "offset_lin"
-            c = parse(Float64, data)
-            return plr -> 1.0 - c * (1.0 - plr)
-
-        elseif method == "logarithmic"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return plr -> params[1] * plr / (params[2] * plr + (1 - params[2]))
-
-        elseif method == "inv_poly"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return plr -> plr / sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
-
-        elseif method == "exp"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return plr -> params[1] + params[2] * exp(params[3] * plr)
-
-        elseif method == "power_func"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return plr -> params[1] * plr^params[2]
-
-        elseif method == "linear"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            if length(params) == 1
-                return plr -> params[1] * plr
-            else
-                return plr -> params[1] * plr + params[2]
-            end
-
-        elseif method == "unified_plf"
-            params = map(x -> parse(Float64, x), split(data, ","))
-            return function (plr)
-                if plr < params[1]
-                    a = params[2] * (params[3] * (params[1] - 1) + 1) / params[1]
-                    return a * plr / (params[3] * plr + 1 - params[3])
-                else
-                    return (params[4] - params[2]) * (plr - params[1]) / (1 - params[1]) + params[2]
-                end
-            end
+            return (params[4] - params[2]) * (plr - params[1]) / (1 - params[1]) + params[2]
         end
     end
 
-    @error "Cannot parse efficiency function from: $eff_def"
-    return plr -> plr
+    throw(InputError("Unsupported efficiency function method `$method`."))
 end
 
 """
@@ -155,35 +167,28 @@ Two different function prototypes are implemented:
     temperatures) as input.
 """
 function parse_2dim_function(eff_def::String)::Function
-    splitted = split(eff_def, ":")
+    method, data = parse_function_definition(eff_def)
 
-    if length(splitted) > 1
-        method = lowercase(splitted[1])
-        data = splitted[2]
-
-        if method == "const"
-            c = parse(Float64, data)
-            return (x, y) -> c
-
-        elseif method == "poly-2"
-            params = parse.(Float64, split(data, ","))
-            return function (x, y)
-                return params[1] +
-                       params[2] * x +
-                       params[3] * y +
-                       params[4] * x * x +
-                       params[5] * x * y +
-                       params[6] * y * y +
-                       params[7] * x * x * x +
-                       params[8] * x * x * y +
-                       params[9] * x * y * y +
-                       params[10] * y * y * y
-            end
+    if method == "const"
+        c = only(parse_function_coefficients(data, method; min_count=1, max_count=1))
+        return (x, y) -> c
+    elseif method == "poly-2"
+        params = parse_function_coefficients(data, method; min_count=10, max_count=10)
+        return function (x, y)
+            return params[1] +
+                   params[2] * x +
+                   params[3] * y +
+                   params[4] * x * x +
+                   params[5] * x * y +
+                   params[6] * y * y +
+                   params[7] * x * x * x +
+                   params[8] * x * x * y +
+                   params[9] * x * y * y +
+                   params[10] * y * y * y
         end
     end
 
-    @error "Cannot parse 2-dimensional function from: $eff_def"
-    return (x, y) -> 0.0
+    throw(InputError("Unsupported 2-dimensional function method `$method`."))
 end
 
 """
@@ -263,79 +268,66 @@ Four different function prototypes are implemented:
     as arguments, returns the COP value at a PLR of 1.0.
 """
 function parse_cop_function(eff_def::String)::Function
-    splitted = split(eff_def, ":")
+    method_cop, data_cop = parse_function_definition(eff_def)
 
-    if length(splitted) > 1
-        method_cop = lowercase(splitted[1])
-        data_cop = splitted[2]
-
-        if method_cop == "const"
-            c = parse(Float64, data_cop)
-            return function (src, snk)
-                return c
+    if method_cop == "const"
+        c = only(parse_function_coefficients(data_cop, method_cop; min_count=1, max_count=1))
+        return (src, snk) -> c
+    elseif method_cop == "carnot"
+        c = only(parse_function_coefficients(data_cop, method_cop; min_count=1, max_count=1))
+        return function (src, snk)
+            if src === nothing || snk === nothing
+                return nothing
             end
+            return c * (273.15 + snk) / (snk - src)
+        end
+    elseif method_cop == "poly-2"
+        return parse_2dim_function(method_cop * ":" * data_cop)
+    elseif method_cop == "field"
+        raw_rows = split(data_cop, ';')
+        3 <= length(raw_rows) <= MAX_FUNCTION_COEFFICIENTS ||
+            throw(InputError("COP field has an unsupported number of rows."))
+        cells = [parse_function_coefficients(row, method_cop) for row in raw_rows]
+        dim_src = length(cells)
+        dim_snk = length(cells[1])
+        dim_snk >= 3 || throw(InputError("COP field requires at least three columns."))
+        all(length(row) == dim_snk for row in cells) ||
+            throw(InputError("COP field rows must have equal length."))
+        dim_src <= div(MAX_COP_FIELD_CELLS, dim_snk) ||
+            throw(InputError("COP field exceeds the supported size."))
+        values = reduce(vcat, permutedims.(cells))
 
-        elseif method_cop == "carnot"
-            c = parse(Float64, data_cop)
-            return function (src, snk)
-                if src === nothing || snk === nothing
-                    return nothing
+        # first dimension is source, second is sink; the first row and column contain grid points
+        return function (src, snk)
+            src_idx = nothing
+            for idx in 2:(dim_src - 1)
+                if src >= values[idx, 1] && src <= values[idx + 1, 1]
+                    src_idx = idx
                 end
-                return c * (273.15 + snk) / (snk - src)
             end
-
-        elseif method_cop == "poly-2"
-            poly = parse_2dim_function(method_cop * ":" * data_cop)
-            return poly
-
-        elseif method_cop == "field"
-            rows = split(data_cop, ';')
-            cells = [parse.(Float64, split(row, ",")) for row in rows]
-            dim_src = length(cells)
-            dim_snk = length(cells[1])
-            values = Array{Float64,2}(undef, dim_src, dim_snk)
-            for (idx_src, row) in pairs(cells)
-                for (idx_snk, val) in pairs(row)
-                    values[idx_src, idx_snk] = val
+            snk_idx = nothing
+            for idx in 2:(dim_snk - 1)
+                if snk >= values[1, idx] && snk <= values[1, idx + 1]
+                    snk_idx = idx
                 end
             end
-
-            # first dim of values is source, second is sink. source is vertical (one row is
-            # at the same source temp), sink is horizontal (one column is at the same sink
-            # temp). first row is sink temperatures, first column is source temperatures
-            return function (src, snk)
-                src_idx = nothing
-                for idx in 2:(dim_src - 1)
-                    if src >= values[idx, 1] && src <= values[idx + 1, 1]
-                        src_idx = idx
-                    end
-                end
-                snk_idx = nothing
-                for idx in 2:(dim_snk - 1)
-                    if snk >= values[1, idx] && snk <= values[1, idx + 1]
-                        snk_idx = idx
-                    end
-                end
-                if snk_idx === nothing || src_idx === nothing
-                    @error "Given temperatures $src and $snk outside of COP field."
-                    throw(BoundsError(values, (src_idx, snk_idx)))
-                end
-                return bilinear_interpolate(values[1, snk_idx],
-                                            snk,
-                                            values[1, snk_idx + 1],
-                                            values[src_idx, 1],
-                                            src,
-                                            values[src_idx + 1, 1],
-                                            values[src_idx, snk_idx],
-                                            values[src_idx, snk_idx + 1],
-                                            values[src_idx + 1, snk_idx],
-                                            values[src_idx + 1, snk_idx + 1])
+            if snk_idx === nothing || src_idx === nothing
+                throw(InputError("Given temperatures are outside of the configured COP field."))
             end
+            return bilinear_interpolate(values[1, snk_idx],
+                                        snk,
+                                        values[1, snk_idx + 1],
+                                        values[src_idx, 1],
+                                        src,
+                                        values[src_idx + 1, 1],
+                                        values[src_idx, snk_idx],
+                                        values[src_idx, snk_idx + 1],
+                                        values[src_idx + 1, snk_idx],
+                                        values[src_idx + 1, snk_idx + 1])
         end
     end
 
-    @error "Cannot parse COP function from: $eff_def"
-    return (x, y) -> 0.0
+    throw(InputError("Unsupported COP function method `$method_cop`."))
 end
 
 """
@@ -364,9 +356,13 @@ multiple solutions exist.
 function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,Any})
     tables = Dict{Symbol,Vector{Tuple{Float64,Float64}}}()
 
+    number_of_points = ceil(Int, 1.0 / unit.discretization_step) + 1
+    number_of_points <= 100_000 ||
+        throw(InputError("Efficiency lookup table exceeds the supported size."))
+
     for name in unit.interface_list
         lookup_table = []
-        for plr in collect(0.0:(unit.discretization_step):1.0)
+        for plr in 0.0:(unit.discretization_step):1.0
             push!(lookup_table, (sim_params["watt_to_wh"](unit.power) * plr *
                                  unit.efficiencies[name](plr),
                                  plr))

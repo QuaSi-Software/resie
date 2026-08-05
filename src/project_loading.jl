@@ -143,10 +143,9 @@ end
 const IO_SETTINGS_DEF = Dict{String,Any}(
     "base_path" => (
         default=nothing,
-        description="If given, this path will be used as the base path for all relative " *
-                    "paths used in the config file. If not given it defaults to the " *
-                    "current working directory for the Julia process running ReSiE, which " *
-                    "in almost all cases is the directory from which ReSiE is started.",
+        description="If given, this path will be used as the base path for relative paths " *
+                    "in local mode. Absolute paths are supported in local mode. In confined " *
+                    "mode, base_path may only select a relative subdirectory of input_root.",
         display_name="Base path",
         required=false,
         type=String,
@@ -299,7 +298,6 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         display_name="Auxiliary plots formats",
         required=false,
         type=Vector{String},
-        options=["html", "pdf", "png", "ps", "svg"],
         json_type="list",
         unit="-"
     ),
@@ -1274,10 +1272,11 @@ const SENSITIVITY_ANALYSIS_DEF = Dict{String,Any}(
 Read and parse the JSON-encoded Dict in the given file.
 """
 function read_JSON(filepath::String)::OrderedDict{String,Any}
-    open(filepath, "r") do file_handle
-        content = read(file_handle, String)
-        return JSON.parse(content; dicttype=OrderedDict)
-    end
+    content = bounded_read_string(filepath, MAX_CONFIG_FILE_BYTES)
+    validate_json_nesting(content)
+    parsed = JSON.parse(content; dicttype=OrderedDict)
+    validate_finite(parsed, "project config")
+    return parsed
 end
 
 """
@@ -1329,11 +1328,21 @@ end
 Constructs the dictionary of IO settings from the given config, considering default values.
 
 # Arguments
--`project_config::AbstractDict{String,Any}`: The project config
+- `project_config::AbstractDict{String,Any}`: The project config.
+- `path_mode::Symbol`: Either `:local` or `:confined`.
+- `input_root::Union{Nothing,AbstractString}`: Required input directory in confined mode.
+- `output_root::Union{Nothing,AbstractString}`: Required output directory in confined mode.
 # Returns
 -`Dict{String,Any}`: The IO settings dictionary
 """
-function get_io_settings(project_config::AbstractDict{String,Any})::Dict{String,Any}
+function get_io_settings(project_config::AbstractDict{String,Any};
+                         path_mode::Symbol=:local,
+                         input_root::Union{Nothing,AbstractString}=nothing,
+                         output_root::Union{Nothing,AbstractString}=nothing,
+                         base_path_override::Union{Nothing,AbstractString}=nothing,
+                         output_path_override::Union{Nothing,AbstractString}=nothing)::Dict{String,Any}
+    report_unknown_keys(project_config["io_settings"], keys(IO_SETTINGS_DEF), "IO settings")
+
     # extract most parameter values using the extract function on the base type component
     # (even though we are not checking components...)
     io_settings = Dict{String,Any}()
@@ -1373,15 +1382,62 @@ function get_io_settings(project_config::AbstractDict{String,Any})::Dict{String,
         delete!(io_settings, "step_info_interval")
     end
 
-    if haskey(io_settings, "base_path") && !isnothing(io_settings["base_path"])
-        io_settings["base_path"] = abspath(io_settings["base_path"])
-    else
-        io_settings["base_path"] = abspath(joinpath(dirname(@__FILE__), ".."))
-    end
-
     # again, we use the component validation function as it avoids duplicate code
     EnergySystems.validate_config(EnergySystems.Component, io_settings, "IO settings",
                                   Dict{String,Any}(), IO_SETTINGS_DEF)
+
+    path_mode = validate_path_mode(path_mode)
+    if path_mode == :local && (input_root !== nothing || output_root !== nothing)
+        throw(ArgumentError("input_root and output_root may only be used in confined mode."))
+    end
+    io_settings["path_mode"] = path_mode
+
+    if path_mode == :local
+        if base_path_override !== nothing
+            io_settings["base_path"] = resolve_local_directory(base_path_override)
+        elseif haskey(io_settings, "base_path") && !isnothing(io_settings["base_path"])
+            io_settings["base_path"] = resolve_local_directory(io_settings["base_path"])
+        else
+            # Preserve the established ReSiE behavior for local execution.
+            io_settings["base_path"] = realpath(abspath(joinpath(dirname(@__FILE__), "..")))
+        end
+
+        if output_path_override !== nothing
+            io_settings["output_path"] = abspath(validate_path_string(output_path_override))
+        else
+            # Relative output paths use the same base path as relative input paths.
+            io_settings["output_path"] = io_settings["base_path"]
+        end
+        io_settings["input_root"] = nothing
+    else
+        if input_root === nothing
+            throw(ArgumentError("Confined path mode requires an input_root."))
+        end
+        if output_root === nothing && output_path_override === nothing
+            throw(ArgumentError("Confined path mode requires an output_root."))
+        end
+
+        confined_input_root = resolve_local_directory(input_root)
+        io_settings["input_root"] = confined_input_root
+
+        if base_path_override !== nothing
+            resolved_base = realpath(base_path_override)
+            path_is_within(resolved_base, confined_input_root) ||
+                throw(InputError("Base path must remain inside the confined input directory."))
+            reject_symlink_components(confined_input_root, resolved_base)
+            io_settings["base_path"] = resolved_base
+        elseif haskey(io_settings, "base_path") && !isnothing(io_settings["base_path"])
+            io_settings["base_path"] = resolve_project_directory(confined_input_root,
+                                                                 io_settings["base_path"])
+        else
+            io_settings["base_path"] = confined_input_root
+        end
+
+        configured_output_root = output_path_override === nothing ? output_root : output_path_override
+        output_path = abspath(validate_path_string(configured_output_root))
+        mkpath(output_path)
+        io_settings["output_path"] = realpath(output_path)
+    end
 
     return io_settings
 end
@@ -1400,6 +1456,10 @@ Constructs the dictionary of simulation parameters.
 function get_simulation_params(project_config::AbstractDict{String,Any},
                                io_settings::Dict{String,Any};
                                preparation_cache::Union{Nothing,PreparationCache}=nothing)::Dict{String,Any}
+    report_unknown_keys(project_config["simulation_parameters"],
+                        keys(SIMULATION_PARAMETERS_DEF),
+                        "simulation parameters")
+
     # load time and step info directly, bypassing extraction and validation
     time_step,
     start_date,
@@ -1457,21 +1517,36 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
         return wh * SECONDS_PER_HOUR / time_step
     end
 
-    # add helper function for using paths, absolute or relative to the run base path
-    sim_params["run_path"] = function (path)
-        return isabspath(path) ? path : abspath(joinpath(io_settings["base_path"], path))
+    # Keep the path policy outside the project file so trusted callers select it.
+    if io_settings["path_mode"] == :confined
+        sim_params["input_path"] = function (path; max_bytes::Integer=MAX_INPUT_FILE_BYTES)
+            resolved = resolve_input_path(io_settings["base_path"], path; max_bytes=max_bytes)
+            path_is_within(resolved, io_settings["output_path"]) &&
+                throw(InputError("Output files cannot be used as project inputs in confined mode."))
+            return resolved
+        end
+        sim_params["output_path"] = function (path)
+            return resolve_output_path(io_settings["output_path"], path)
+        end
+    else
+        sim_params["input_path"] = function (path; max_bytes::Integer=MAX_INPUT_FILE_BYTES)
+            return resolve_local_input_path(io_settings["base_path"], path; max_bytes=max_bytes)
+        end
+        sim_params["output_path"] = function (path)
+            return resolve_local_output_path(io_settings["output_path"], path)
+        end
     end
 
     # load weather profiles accessible for all components
     weather_file_path = sim_params["weather_file_path"]
     if weather_file_path !== nothing
-        weather_path_abs = sim_params["run_path"](weather_file_path)
+        weather_path_abs = sim_params["input_path"](weather_file_path; max_bytes=MAX_PROFILE_FILE_BYTES)
 
         if preparation_cache === nothing
             # WeatherData() writes the latitude and longitude to sim_params if either of them is
             # nothing at this point
             @globalInfo "Loading weather data..."
-            sim_params["weather_data"] = WeatherData(weather_path_abs,
+            sim_params["weather_data"] = WeatherData(weather_file_path,
                                                      sim_params,
                                                      guess_file_format(weather_path_abs),
                                                      sim_params["weather_interpolation_type_solar"],
@@ -1495,7 +1570,7 @@ function get_simulation_params(project_config::AbstractDict{String,Any},
 
             if entry === nothing
                 @globalInfo "Loading weather data..."
-                weather_data = WeatherData(weather_path_abs,
+                weather_data = WeatherData(weather_file_path,
                                            sim_params,
                                            guess_file_format(weather_path_abs),
                                            sim_params["weather_interpolation_type_solar"],
@@ -1541,8 +1616,18 @@ Construct and prepare parameters, energy system components and the order of oper
 """
 function prepare_inputs(project_config::AbstractDict{String,Any},
                         run_ID::UUID;
-                        preparation_cache::Union{Nothing,PreparationCache}=nothing)
-    io_settings = get_io_settings(project_config)
+                        preparation_cache::Union{Nothing,PreparationCache}=nothing,
+                        path_mode::Symbol=:local,
+                        input_root::Union{Nothing,AbstractString}=nothing,
+                        output_root::Union{Nothing,AbstractString}=nothing,
+                        base_path_override::Union{Nothing,AbstractString}=nothing,
+                        output_path_override::Union{Nothing,AbstractString}=nothing)
+    io_settings = get_io_settings(project_config;
+                                  path_mode=path_mode,
+                                  input_root=input_root,
+                                  output_root=output_root,
+                                  base_path_override=base_path_override,
+                                  output_path_override=output_path_override)
     sim_params = get_simulation_params(project_config, io_settings;
                                        preparation_cache=preparation_cache)
     sim_params["run_ID"] = run_ID
@@ -1644,6 +1729,44 @@ the symbol of the component class exactly. The structure is described in more de
 accompanying documentation on the project file.
 """
 function load_components(config_ordered::AbstractDict{String,Any}, sim_params::Dict{String,Any})::Grouping
+    length(config_ordered) <= MAX_COMPONENTS ||
+        throw(InputError("Project contains more than $MAX_COMPONENTS components."))
+    for (unit_key, entry) in pairs(config_ordered)
+        identifier = String(unit_key)
+        ncodeunits(identifier) <= MAX_COMPONENT_IDENTIFIER_LENGTH ||
+            throw(InputError("Component identifier exceeds $MAX_COMPONENT_IDENTIFIER_LENGTH bytes."))
+        occursin(r"^[A-Za-z0-9_.-]+$", identifier) ||
+            throw(InputError("Component identifier `$identifier` contains unsupported characters."))
+        entry isa AbstractDict || throw(InputError("Component `$identifier` must be an object."))
+        haskey(entry, "type") || throw(InputError("Component `$identifier` has no `type`."))
+        entry["type"] isa AbstractString ||
+            throw(InputError("The `type` of component `$identifier` must be a string."))
+        component_type = String(entry["type"])
+        ncodeunits(component_type) <= MAX_COMPONENT_IDENTIFIER_LENGTH &&
+        occursin(r"^[A-Za-z][A-Za-z0-9_]*$", component_type) ||
+            throw(InputError("The `type` of component `$identifier` is not a valid component name."))
+        for key in ["input_refs", "output_refs"]
+            if haskey(entry, key)
+                refs = entry[key]
+                (refs isa AbstractVector || refs isa AbstractDict) ||
+                    throw(InputError("Component `$identifier` setting `$key` must be an array or object."))
+                length(refs) <= MAX_COMPONENTS ||
+                    throw(InputError("Component `$identifier` setting `$key` contains too many references."))
+                targets = refs isa AbstractDict ? values(refs) : refs
+                all(target -> target isa AbstractString &&
+                              ncodeunits(target) <= MAX_COMPONENT_IDENTIFIER_LENGTH &&
+                              occursin(r"^[A-Za-z0-9_.-]+$", target), targets) ||
+                    throw(InputError("Component `$identifier` setting `$key` contains an invalid component reference."))
+                if refs isa AbstractDict
+                    all(medium -> medium isa AbstractString &&
+                                  ncodeunits(medium) <= MAX_COMPONENT_IDENTIFIER_LENGTH &&
+                                  occursin(r"^[A-Za-z][A-Za-z0-9_]*$", medium), keys(refs)) ||
+                        throw(InputError("Component `$identifier` setting `$key` contains an invalid interface name."))
+                end
+            end
+        end
+    end
+
     # convert OrderedDict to normal Dict to have a normal dict in all components as they do not
     # require any sorting
     to_dict(x) = x
@@ -1666,10 +1789,11 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
             throw(InputError())
         end
         unit_class = getproperty(EnergySystems, symbol)
-        if unit_class <: EnergySystems.Component
-            instance = unit_class(unit_key, unit_config, sim_params)
-            components[unit_key] = instance
+        if !(unit_class isa Type && unit_class <: EnergySystems.Component)
+            throw(InputError("The configured type `$(unit_config["type"])` is not an energy-system component."))
         end
+        instance = unit_class(unit_key, unit_config, sim_params)
+        components[unit_key] = instance
     end
 
     # link inputs/outputs
@@ -1710,14 +1834,33 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
     for (unit_key, entry) in pairs(config)
         unit = components[unit_key]
 
-        for module_config in default(entry, "control_modules", [])
-            if !haskey(mapping, module_config["name"])
-                @warn("Unknown control module type $(module_config["name"]) while loading " *
-                      "unit $(unit.uac)")
-                continue
-            end
-            module_class = mapping[module_config["name"]]
-            push!(unit.controller.modules, module_class(module_config, components, sim_params, unit.uac))
+        module_configs = default(entry, "control_modules", [])
+        module_configs isa AbstractVector ||
+            throw(InputError("Control modules of component `$(unit.uac)` must be an array."))
+        length(module_configs) <= MAX_CONTROL_MODULES_PER_COMPONENT ||
+            throw(InputError("Component `$(unit.uac)` contains too many control modules."))
+
+        for module_config in module_configs
+            module_config isa AbstractDict ||
+                throw(InputError("Control module of component `$(unit.uac)` must be an object."))
+            haskey(module_config, "name") && module_config["name"] isa AbstractString ||
+                throw(InputError("Control module of component `$(unit.uac)` requires a string `name`."))
+            module_name = String(module_config["name"])
+            ncodeunits(module_name) <= MAX_COMPONENT_IDENTIFIER_LENGTH &&
+            occursin(r"^[A-Za-z][A-Za-z0-9_]*$", module_name) ||
+                throw(InputError("Control module name is not a valid module name."))
+            haskey(mapping, module_name) ||
+                throw(InputError("Unknown control module type `$module_name` for component `$(unit.uac)`."))
+            module_class = mapping[module_name]
+            report_unknown_keys(module_config,
+                                keys(EnergySystems.control_module_parameters(module_class)),
+                                "control module `$module_name` of component `$(unit.uac)`";
+                                extra_keys=["name"])
+            validate_finite(module_config, "control module `$module_name`")
+            module_parameters = Dict{String,Any}(String(key) => value
+                                                 for (key, value) in pairs(module_config))
+            push!(unit.controller.modules, module_class(module_parameters,
+                                                        components, sim_params, unit.uac))
         end
     end
 
@@ -1843,10 +1986,21 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
               "(`time_step` and `time_step_unit` have to be given!).")
     end
 
-    nr_of_steps = UInt(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
-    nr_of_steps_output = UInt(max(0,
-                                  floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date_output))) /
-                                        time_step)) + 1)
+    time_step > 0 || throw(InputError("Simulation time step must be greater than zero."))
+    end_date >= start_date || throw(InputError("Simulation end date must not precede its start date."))
+
+    nr_of_steps_int = Int(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) +
+                          1)
+    nr_of_steps_output_int = Int(max(0,
+                                     floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date_output))) /
+                                           time_step)) + 1)
+    nr_of_steps_int <= MAX_SIMULATION_STEPS ||
+        throw(InputError("Simulation exceeds the maximum number of supported time steps ($MAX_SIMULATION_STEPS)."))
+    nr_of_steps_output_int <= MAX_SIMULATION_STEPS ||
+        throw(InputError("Simulation output exceeds the maximum number of supported time steps ($MAX_SIMULATION_STEPS)."))
+
+    nr_of_steps = UInt(nr_of_steps_int)
+    nr_of_steps_output = UInt(nr_of_steps_output_int)
 
     # set end_date to be integer dividable by the timestep
     end_date = add_ignoring_leap_days(start_date, (nr_of_steps - 1) * Second(time_step))
@@ -1880,6 +2034,9 @@ function get_economic_parameters(project_config::AbstractDict{String,Any},
         )
     end
 
+    report_unknown_keys(project_config["economic_parameters"],
+                        keys(ECONOMIC_PARAMETERS_DEF),
+                        "Economic parameters")
     economic_parameters = Dict{String,Any}()
     for (name, param_def) in pairs(ECONOMIC_PARAMETERS_DEF)
         economic_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
@@ -1956,6 +2113,9 @@ function get_emissions_parameters(project_config::AbstractDict{String,Any},
         )
     end
 
+    report_unknown_keys(project_config["emissions_parameters"],
+                        keys(EMISSIONS_PARAMATERS_DEF),
+                        "Emissions parameters")
     emissions_parameters = Dict{String,Any}()
     for (name, param_def) in pairs(EMISSIONS_PARAMATERS_DEF)
         emissions_parameters[name] = EnergySystems.extract_parameter(EnergySystems.Component,
@@ -1980,6 +2140,7 @@ function extract_parameter_section(config::AbstractDict{String,Any},
                                    definitions::Dict{String,Any},
                                    sim_params::Dict{String,Any},
                                    display_name::String)::Dict{String,Any}
+    report_unknown_keys(config, keys(definitions), display_name)
     extracted = Dict{String,Any}()
     for (name, param_def) in pairs(definitions)
         extracted[name] = EnergySystems.extract_parameter(EnergySystems.Component,
@@ -2104,6 +2265,12 @@ function load_parameter_study_parameters(parameter_study_config::AbstractDict{St
     return prepare_parameter_study!(parameter_study, sim_params, project_config)
 end
 
+function parameter_product_value(parameter_values::Vector{Vector{Float64}}, linear_index::Integer)
+    lengths = length.(parameter_values)
+    indices = Tuple(CartesianIndices(Tuple(lengths))[linear_index])
+    return tuple((parameter_values[i][indices[i]] for i in eachindex(parameter_values))...)
+end
+
 function prepare_parameter_study!(parameter_study::Dict{String,Any},
                                   sim_params::Dict{String,Any},
                                   project_config::AbstractDict{String,Any})::Dict{String,Any}
@@ -2112,7 +2279,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
     sensitivity_analysis = parameter_study["sensitivity_analysis"]
     runtime = parameter_study["runtime"]
 
-    runtime["iterator"] = [1]
+    runtime["iterator"] = 1:1
+    runtime["parameter_value_at"] = _ -> ()
     runtime["parameter_keys"] = String[]
     runtime["parameter_values"] = Vector{Vector{Float64}}()
     runtime["objective_output_spec"] = Dict{String,Any}()
@@ -2122,7 +2290,15 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
     sensitivity_upper_values = Float64[]
     parameter_bounds = Array{Float64}(undef, 0, 3)
 
-    for (uac, params) in pairs(sort(parameter_study["parameters"]; by=lowercase))
+    parameter_definitions = parameter_study["parameters"]
+    parameter_definitions isa AbstractDict ||
+        throw(InputError("Parameter study parameters must be an object."))
+    length(parameter_definitions) <= MAX_PARAMETER_STUDY_PARAMETERS ||
+        throw(InputError("Parameter study contains too many component parameter groups."))
+
+    for (uac, params) in pairs(sort(parameter_definitions; by=lowercase))
+        params isa AbstractDict ||
+            throw(InputError("Parameter study entry `$uac` must be an object."))
         for (key_param, raw_def) in pairs(sort(params; by=lowercase))
             key = uac * " " * key_param
             parameter_exists = if haskey(project_config["components"], uac)
@@ -2145,13 +2321,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
             end
 
             def = Dict{String,Any}(String(k) => v for (k, v) in pairs(raw_def))
-            allowed_keys = Set(keys(PARAMETER_STUDY_PARAMETER_DEF))
-            unsupported_keys = sort(collect(setdiff(Set(keys(def)), allowed_keys)); by=lowercase)
-            if !isempty(unsupported_keys)
-                @error "Unsupported parameter definition keys for $key: " *
-                       join(unsupported_keys, ", ")
-                throw(InputError())
-            end
+            report_unknown_keys(def, keys(PARAMETER_STUDY_PARAMETER_DEF),
+                                "parameter study definition `$key`")
 
             for (name, param_def) in pairs(PARAMETER_STUDY_PARAMETER_DEF)
                 if haskey(def, name)
@@ -2165,6 +2336,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
             end
             parameter_study["parameters"][uac][key_param] = def
             push!(runtime["parameter_keys"], key)
+            length(runtime["parameter_keys"]) <= MAX_PARAMETER_STUDY_PARAMETERS ||
+                throw(InputError("Parameter study exceeds the maximum of $MAX_PARAMETER_STUDY_PARAMETERS parameters."))
 
             lower_bound = NaN
             upper_bound = NaN
@@ -2204,6 +2377,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
             end
 
             if has_values
+                length(def["values"]) <= MAX_PARAMETER_VALUES ||
+                    throw(InputError("The values list of parameter $key exceeds $MAX_PARAMETER_VALUES entries."))
                 raw_values = collect(def["values"])
                 if isempty(raw_values)
                     @error "The values list of parameter $key must not be empty."
@@ -2253,6 +2428,9 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
                         @error "The range_step of parameter $key must be greater than zero."
                         throw(InputError())
                     end
+                    estimated_length = floor(Int, (range_stop - range_start) / range_step) + 1
+                    estimated_length <= MAX_PARAMETER_VALUES ||
+                        throw(InputError("The range of parameter $key exceeds $MAX_PARAMETER_VALUES values."))
                     values = Float64.(collect(range(; start=range_start,
                                                     stop=range_stop,
                                                     step=range_step)))
@@ -2261,6 +2439,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
                     if range_length < 2
                         @error "The range_length of parameter $key must be at least 2."
                         throw(InputError())
+                    elseif range_length > MAX_PARAMETER_VALUES
+                        throw(InputError("The range_length of parameter $key exceeds $MAX_PARAMETER_VALUES."))
                     end
                     values = Float64.(collect(range(; start=range_start,
                                                     stop=range_stop,
@@ -2363,6 +2543,8 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
     else
         200
     end
+    runtime["sensitivity_max_runs"] <= MAX_PARAMETER_STUDY_RUNS ||
+        throw(InputError("Sensitivity analysis exceeds the maximum of $MAX_PARAMETER_STUDY_RUNS runs."))
 
     normalised_bounds = nothing
     if optimisation["run_optimisation"]
@@ -2375,7 +2557,15 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
     for (func, raw_spec) in pairs(parameter_study["objective_params"])
         spec = raw_spec
         if func == "sum" || func == "mean"
+            raw_spec isa AbstractDict ||
+                throw(InputError("Objective parameter `$func` must be an object."))
             for (output_group, output_entries) in pairs(raw_spec)
+                output_entries isa AbstractVector ||
+                    throw(InputError("Objective output group `$output_group` must be an array."))
+                length(output_entries) <= MAX_OBJECTIVE_VALUES ||
+                    throw(InputError("Objective output group `$output_group` contains too many entries."))
+                all(entry -> entry isa AbstractString, output_entries) ||
+                    throw(InputError("Objective output group `$output_group` must contain only strings."))
                 group_key = String(output_group)
                 existing_entries = get!(runtime["objective_output_spec"],
                                         group_key,
@@ -2383,7 +2573,14 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
                 append!(existing_entries, output_entries)
             end
             spec = parse_outkeys(raw_spec)
-        elseif func != "economic" && func != "emissions"
+        elseif func == "economic" || func == "emissions"
+            raw_spec isa AbstractVector ||
+                throw(InputError("Objective parameter `$func` must be an array."))
+            length(raw_spec) <= MAX_OBJECTIVE_VALUES ||
+                throw(InputError("Objective parameter `$func` contains too many entries."))
+            all(entry -> entry isa AbstractString, raw_spec) ||
+                throw(InputError("Objective parameter `$func` must contain only strings."))
+        else
             @error "Objective parameter {$func: $raw_spec} could not be read. $func has " *
                    "to be one of 'sum', 'mean', 'economic', 'emissions'."
             throw(InputError())
@@ -2410,6 +2607,10 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
         unique!(output_entries)
     end
     sort!(runtime["objective_params_keys"]; by=lowercase)
+    isempty(runtime["objective_params_keys"]) &&
+        throw(InputError("Parameter study requires at least one objective value."))
+    length(runtime["objective_params_keys"]) <= MAX_OBJECTIVE_VALUES ||
+        throw(InputError("Parameter study exceeds the maximum of $MAX_OBJECTIVE_VALUES objective values."))
 
     runtime["objective_function"],
     runtime["objective_function_name"],
@@ -2430,10 +2631,22 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
 
     if parameter_variation["run_parameter_variation"]
         algorithm = parameter_variation["algorithm"]
+        parameter_values = runtime["parameter_values"]
+        lengths = length.(parameter_values)
+        isempty(lengths) && throw(InputError("Parameter variation requires at least one parameter."))
+
         if algorithm == "product"
-            runtime["iterator"] = Iterators.product(runtime["parameter_values"]...)
+            run_count = checked_product(lengths;
+                                        limit=MAX_PARAMETER_STUDY_RUNS,
+                                        label="Parameter variation")
+            runtime["iterator"] = 1:run_count
+            runtime["parameter_value_at"] = index -> parameter_product_value(parameter_values, index)
         elseif algorithm == "zip"
-            runtime["iterator"] = zip(runtime["parameter_values"]...)
+            run_count = minimum(lengths)
+            run_count <= MAX_PARAMETER_STUDY_RUNS ||
+                throw(InputError("Parameter variation exceeds the maximum of $MAX_PARAMETER_STUDY_RUNS runs."))
+            runtime["iterator"] = 1:run_count
+            runtime["parameter_value_at"] = index -> tuple((values[index] for values in parameter_values)...)
         elseif startswith(algorithm, "random_")
             parts = split(algorithm, "_")
             if length(parts) != 2 || isnothing(tryparse(Int, parts[2]))
@@ -2441,9 +2654,18 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
                        "Use product, zip or random_*, where * is an integer."
                 throw(InputError())
             end
-            iterator = Iterators.product(runtime["parameter_values"]...)
-            n_samples = min(parse(Int, parts[2]), length(iterator))
-            runtime["iterator"] = rand(collect(iterator), n_samples)
+            requested_samples = parse(Int, parts[2])
+            requested_samples > 0 || throw(InputError("Random parameter variation requires at least one sample."))
+            requested_samples <= MAX_PARAMETER_STUDY_RUNS ||
+                throw(InputError("Random parameter variation exceeds the maximum of $MAX_PARAMETER_STUDY_RUNS runs."))
+            product_count = checked_product(lengths;
+                                            limit=MAX_PARAMETER_STUDY_RUNS,
+                                            label="Parameter variation")
+            n_samples = min(requested_samples, product_count)
+            sampled_indices = rand(1:product_count, n_samples)
+            runtime["iterator"] = 1:n_samples
+            runtime["parameter_value_at"] = index -> parameter_product_value(parameter_values,
+                                                                             sampled_indices[index])
         else
             @error "Algorithm $algorithm is not supported for parameter variation. " *
                    "Use product, zip or random_*, where * is an integer."
@@ -2473,6 +2695,39 @@ end
 
 function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bounds)
     optim_kwargs = something(get(optimiser_config, "optim_kwargs", nothing), Dict{String,Any}())
+
+    max_runs = something(get(optimiser_config, "max_runs", nothing), 1_000)
+    max_time = something(get(optimiser_config, "max_time", nothing), 3_600)
+    1 <= max_runs <= MAX_PARAMETER_STUDY_RUNS ||
+        throw(InputError("Optimisation max_runs must be between 1 and $MAX_PARAMETER_STUDY_RUNS."))
+    1 <= max_time <= 86_400 ||
+        throw(InputError("Optimisation max_time must be between 1 and 86400 seconds."))
+    optimiser_config["max_runs"] = max_runs
+    optimiser_config["max_time"] = max_time
+
+    algorithm_name = get(optimiser_config, "algorithm", nothing)
+    algorithm_name isa String || throw(InputError("Optimisation algorithm must be a string."))
+    ncodeunits(algorithm_name) <= 64 ||
+        throw(InputError("Optimisation algorithm name is too long."))
+    occursin(r"^[A-Za-z][A-Za-z0-9_]*$", algorithm_name) ||
+        throw(InputError("Optimisation algorithm contains unsupported characters."))
+
+    allowed_optim_kwargs = Dict(
+        "Optim" => Set(["allow_f_increases", "successive_f_tol"]),
+        "BlackBoxOptim" => Set(["MinDeltaFitnessTolerance", "FitnessTolerance",
+                                "TargetFitness", "MaxStepsWithoutProgress"]),
+        "Metaheuristics" => Set(["n_partitions"]),
+        "NLopt" => Set{String}(),
+        "NOMAD" => Set{String}(),
+    )
+    allowed = get(allowed_optim_kwargs, optimiser_config["type"], Set{String}())
+    unsupported = sort(collect(setdiff(Set(String.(keys(optim_kwargs))), allowed)); by=lowercase)
+    isempty(unsupported) ||
+        throw(InputError("Unsupported optim_kwargs for $(optimiser_config["type"]): $(join(unsupported, ", "))"))
+    if haskey(optim_kwargs, "n_partitions")
+        1 <= Int(optim_kwargs["n_partitions"]) <= 100 ||
+            throw(InputError("Metaheuristics n_partitions must be between 1 and 100."))
+    end
 
     # A configured zero disables or prevents convergence in the supported backends.
     function reject_duplicate_tolerance(common_name::String,
@@ -2536,7 +2791,7 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         push!(optimiser["args"], alg)
 
         optimiser["kwargs"] = Dict{Symbol,Any}()
-        optimiser["kwargs"][:show_trace] = true
+        optimiser["kwargs"][:show_trace] = false
         for (keyword, val) in pairs(optim_kwargs)
             optimiser["kwargs"][Symbol(keyword)] = val
         end
@@ -2585,11 +2840,6 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         optimiser["kwargs"][:Method] = alg
         optimiser["kwargs"][:SearchRange] = Tuple.(eachrow(normalised_bounds[:, 1:2]))
         optimiser["kwargs"][:NumDimensions] = size(normalised_bounds, 1)
-        n_evaluation_threads = Threads.nthreads(:default) - 1
-        if n_evaluation_threads > 1
-            optimiser["kwargs"][:NThreads] = n_evaluation_threads
-            optimiser["kwargs"][:PopulationSize] = max(20, 4 * n_evaluation_threads)
-        end
         if !isnothing(optimiser_config["max_runs"])
             optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
         end
@@ -2599,6 +2849,9 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
         for (keyword, val) in pairs(optim_kwargs)
             optimiser["kwargs"][Symbol(keyword)] = val
         end
+        optimiser["kwargs"][:MaxFuncEvals] = optimiser_config["max_runs"]
+        optimiser["kwargs"][:MaxTime] = optimiser_config["max_time"]
+        optimiser["kwargs"][:NThreads] = 1
         if !isnothing(optimiser_config["f_tol_abs"])
             # Stop when two consecutive best-fitness improvements differ by less
             # than the configured objective tolerance.
@@ -2623,7 +2876,11 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             throw(InputError())
         end
 
-        alg = getproperty(Metaheuristics, Symbol(optimiser_config["algorithm"]))
+        algorithm_symbol = Symbol(algorithm_name)
+        isdefined(Metaheuristics, algorithm_symbol) ||
+            throw(InputError("Unknown Metaheuristics algorithm '$algorithm_name'."))
+        alg = getproperty(Metaheuristics, algorithm_symbol)
+        alg isa Type || throw(InputError("Unsupported Metaheuristics algorithm '$algorithm_name'."))
 
         optimiser["args"] = Any[[normalised_bounds[:, 1] normalised_bounds[:, 2]]']
 
@@ -2638,8 +2895,17 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
                 throw(InputError())
             end
 
-            n_partitions = get(optim_kwargs, "n_partitions", 12)
-            reference_directions = Metaheuristics.gen_ref_dirs(optimiser["N_obj"], n_partitions)
+            n_partitions = Int(get(optim_kwargs, "n_partitions", 12))
+            n_objectives = optimiser["N_obj"]
+            total = n_objectives + n_partitions - 1
+            choose = min(n_partitions, n_objectives - 1)
+            reference_count = BigInt(1)
+            for index in 1:choose
+                reference_count = div(reference_count * (total - choose + index), index)
+                reference_count <= MAX_PARAMETER_STUDY_RUNS ||
+                    throw(InputError("MOEA/D reference directions exceed the supported size."))
+            end
+            reference_directions = Metaheuristics.gen_ref_dirs(n_objectives, n_partitions)
 
             push!(args_alg, reference_directions)
         end
@@ -2649,9 +2915,6 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             kwargs_alg[:N] = max(2, ceil(Int, optimiser_config["max_runs"] / 4))
         end
 
-        if Threads.nthreads() > 1
-            kwargs_general[:parallel_evaluation] = true
-        end
         if !isnothing(optimiser_config["max_runs"])
             kwargs_general[:f_calls_limit] = optimiser_config["max_runs"]
         end
@@ -2675,6 +2938,9 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             end
         end
 
+        kwargs_general[:f_calls_limit] = optimiser_config["max_runs"]
+        kwargs_general[:time_limit] = optimiser_config["max_time"]
+        kwargs_general[:parallel_evaluation] = false
         options = Metaheuristics.Options(; kwargs_general...)
         if optimiser_config["algorithm"] == "CCMO"
             push!(optimiser["args"], alg(Metaheuristics.NSGA2(args_alg...; kwargs_alg...); options=options))
@@ -2722,6 +2988,8 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             end
         end
 
+        optimiser["kwargs"][:maxeval] = optimiser_config["max_runs"]
+        optimiser["kwargs"][:maxtime] = optimiser_config["max_time"]
         for (keyword, val) in pairs(optimiser["kwargs"])
             NLopt.setproperty!(alg, keyword, val)
         end
@@ -2756,6 +3024,8 @@ function configure_optimiser_backend!(optimiser, optimiser_config, normalised_bo
             end
         end
 
+        kwargs_general[:max_bb_eval] = optimiser_config["max_runs"]
+        kwargs_general[:max_time] = optimiser_config["max_time"]
         optimiser["kwargs"][:options] = NOMAD.NomadOptions(; kwargs_general...)
         optimiser["args"] = [size(normalised_bounds, 1), optimiser["N_obj"],
                              fill("OBJ", optimiser["N_obj"]), normalised_bounds[:, 3]]

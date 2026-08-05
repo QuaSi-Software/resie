@@ -28,6 +28,7 @@ end
 # this registry should be the only global state in the package and contains the state for
 # ongoing or paused simulation runs
 current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
+const current_runs_lock = ReentrantLock()
 
 """
     get_run(id)
@@ -40,7 +41,9 @@ Get the simulation run container for the given ID.
 - `SimulationRun`: The simulation run container
 """
 function get_run(id::UUID)::SimulationRun
-    return current_runs[id]
+    return lock(current_runs_lock) do
+        current_runs[id]
+    end
 end
 
 """
@@ -52,7 +55,9 @@ Closes the given run, removing it from the run registry.
 - `id:UUID`: The ID of the run
 """
 function close_run(id::UUID)
-    delete!(current_runs, id)
+    lock(current_runs_lock) do
+        pop!(current_runs, id, nothing)
+    end
 end
 
 """
@@ -64,6 +69,8 @@ struct InputError <: Exception
     msg::Union{AbstractString,Nothing}
 end
 InputError() = InputError(nothing)
+
+include("security.jl")
 
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
@@ -148,13 +155,33 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     do_calculate_emissions = sim_params["emissions_parameters"]["calculate_emissions"]
     do_create_sankey = !suppress_all_output && io_settings["sankey_plot"] !== "nothing"
 
+    output_steps = Int(sim_params["number_of_time_steps_output"])
+    if do_create_plot_weather
+        checked_product([output_steps, 1 + length(weather_data_keys)];
+                        limit=MAX_STORED_VALUES,
+                        label="Weather plot output")
+    end
+    if do_write_CSV && !do_write_CSV_continuously
+        csv_columns = 1 + length(something(output_keys_to_CSV, [])) +
+                      (do_write_CSV_weather ? length(weather_data_keys) : 0)
+        checked_product([output_steps, csv_columns];
+                        limit=MAX_STORED_VALUES,
+                        label="CSV output")
+    end
+    if do_create_plot_data || do_calculate_economy || do_calculate_emissions || collect_objective_results
+        checked_product([output_steps, 1 + length(all_requested_output_keys)];
+                        limit=MAX_STORED_VALUES,
+                        label="Simulation output")
+    end
+
     # Initialize the arrays for output
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
     output_csv = do_write_CSV && !do_write_CSV_continuously ?
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
-                                1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
+                                1 + length(something(output_keys_to_CSV, [])) +
+                                (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
     output_data_all_requested = do_create_plot_data || do_calculate_economy || do_calculate_emissions ||
                                 collect_objective_results ?
@@ -166,8 +193,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     if do_write_CSV
         header = get_output_header(output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
         # Reset the output file and add headers for the given outputs.
-        open(sim_params["run_path"](csv_file_path), "w") do file_handle
-            write(file_handle, join(header, ';') * "\n")
+        open(sim_params["output_path"](csv_file_path), "w") do file_handle
+            write(file_handle, join((csv_cell(value) for value in header), ';') * "\n")
         end
     end
 
@@ -179,6 +206,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         output_sourcenames_sankey,
         output_targetnames_sankey = get_interface_information(components)
         # preallocate for speed: Matrix with data of interfaces in every timestep
+        checked_product([output_steps, nr_of_interfaces];
+                        limit=MAX_STORED_VALUES,
+                        label="Sankey output")
         output_interface_values = zeros(Float64, sim_params["number_of_time_steps_output"], nr_of_interfaces)
     end
 
@@ -235,14 +265,15 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                      sim_params,
                                      csv_time_unit,
                                      io_settings)
-                row[2:end] = replace.(row[2:end], '.' => ',')
+                safe_row = [csv_cell(value; decimal_comma=(index > 1))
+                            for (index, value) in enumerate(row)]
                 if do_write_CSV_continuously
                     # Write row to the output file
-                    open(sim_params["run_path"](csv_file_path), "a") do file_handle
-                        write(file_handle, join(row, ';') * "\n")
+                    open(sim_params["output_path"](csv_file_path), "a") do file_handle
+                        write(file_handle, join(safe_row, ';') * "\n")
                     end
                 else
-                    output_csv[output_steps, :] = row
+                    output_csv[output_steps, :] = safe_row
                 end
             end
 
@@ -327,7 +358,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
     # write output to CSV if not done continuously
     if do_write_CSV
-        csv_file_path_abs = sim_params["run_path"](csv_file_path)
+        csv_file_path_abs = sim_params["output_path"](csv_file_path)
         if do_write_CSV_continuously
             @info "CSV-file with outputs continuously written to $(csv_file_path_abs)"
         else
@@ -341,9 +372,9 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     end
 
     if do_write_CSV && do_write_summary_CSV
-        output_path = sim_params["run_path"](replace(csv_file_path, r"\.csv$"i => "_aggregated.csv"))
+        output_path = sim_params["output_path"](replace(csv_file_path, r"\.csv$"i => "_aggregated.csv"))
 
-        success = aggregate_csv(csv_file_path,
+        success = aggregate_csv(csv_file_path_abs,
                                 output_path,
                                 output_keys_to_CSV,
                                 weather_CSV_keys,
@@ -369,8 +400,8 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                   weather_data_keys,
                                   io_settings,
                                   sim_params)
-        filepath = sim_params["run_path"](io_settings["output_plot_file_path"])
-        @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
+        filepath = sim_params["output_path"](io_settings["output_plot_file_path"])
+        @info "Line plot created and saved to $filepath"
     end
 
     # create Sankey diagram
@@ -382,14 +413,14 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                       nr_of_interfaces,
                       io_settings,
                       sim_params)
-        filepath = sim_params["run_path"](io_settings["sankey_plot_file_path"])
+        filepath = sim_params["output_path"](io_settings["sankey_plot_file_path"])
         @info "Sankey created and saved to $filepath"
     end
 
     # plot additional figures potentially available from components after simulation
     if io_settings["auxiliary_plots"] && !suppress_all_output
         component_list = []
-        output_path = sim_params["run_path"](io_settings["auxiliary_plots_path"])
+        output_path = sim_params["output_path"](io_settings["auxiliary_plots_path"])
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
                 push!(component_list, component[2].uac)
@@ -404,14 +435,14 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     # output economic results
     if do_calculate_economy && !suppress_all_output
         if io_settings["plot_economic_cashflows"]
-            filepath = sim_params["run_path"](io_settings["economic_plot_cashflows_file_path"])
+            filepath = sim_params["output_path"](io_settings["economic_plot_cashflows_file_path"])
             success = plot_economic_results(economic_result, filepath, sim_params,
                                             io_settings["fixed_output_precision"], "cashflows")
             success && @info "Economy plot created and saved to $filepath"
         end
 
         if io_settings["plot_economic_present_values"]
-            filepath = sim_params["run_path"](io_settings["economic_plot_present_values_file_path"])
+            filepath = sim_params["output_path"](io_settings["economic_plot_present_values_file_path"])
             success = plot_economic_results(economic_result, filepath, sim_params,
                                             io_settings["fixed_output_precision"], "present_values")
             success && @info "Economy plot created and saved to $filepath"
@@ -419,7 +450,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
         # export economic results to CSV
         if io_settings["output_economic_csv"]
-            filepath = sim_params["run_path"](io_settings["economic_csv_file_path"])
+            filepath = sim_params["output_path"](io_settings["economic_csv_file_path"])
             success = write_economic_results_to_CSV(economic_result, filepath, sim_params)
             success && @info "Economic results exported to $filepath"
         end
@@ -429,7 +460,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     if do_calculate_emissions && !suppress_all_output
         # plot figure with yearly emissions
         if io_settings["plot_emission_results"]
-            filepath = sim_params["run_path"](io_settings["emissions_plot_file_path"])
+            filepath = sim_params["output_path"](io_settings["emissions_plot_file_path"])
             success = plot_emissions_results(emissions_result, filepath, sim_params,
                                              io_settings["fixed_output_precision"])
             success && @info "Emissions plot created and saved to $filepath"
@@ -437,7 +468,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 
         if io_settings["output_emissions_csv"]
             # export emissions results to CSV
-            filepath = sim_params["run_path"](io_settings["emissions_csv_file_path"])
+            filepath = sim_params["output_path"](io_settings["emissions_csv_file_path"])
             success = write_emissions_results_to_CSV(emissions_result, filepath, sim_params)
             success && @info "Emissions results exported to $filepath"
         end
@@ -446,7 +477,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
     # plot utilized price and emission profiles
     if (do_calculate_economy || do_calculate_emissions) && io_settings["plot_price_and_emission_profiles"] &&
        !suppress_all_output
-        filepath = sim_params["run_path"](io_settings["price_and_emission_profile_file_path"])
+        filepath = sim_params["output_path"](io_settings["price_and_emission_profile_file_path"])
         success = plot_extended_price_and_emissions_profiles(economic_result, emissions_result, filepath, sim_params,
                                                              io_settings["fixed_output_precision"])
         success && @info "Utilized price and emission profiles exported as plot to $filepath"
@@ -456,18 +487,30 @@ function run_simulation_loop(sim_params::Dict{String,Any},
 end
 
 """
-    load_and_run(filepath, run_ID)
+    load_and_run(filepath, run_ID; path_mode=:local, input_root=nothing, output_root=nothing)
 
 Load a project from the given file and run the simulation with it.
 
+Local mode preserves the established ReSiE path behavior: relative paths use `base_path`
+and absolute paths are allowed. Confined mode restricts project paths to caller-provided input
+and output roots. The project configuration cannot select the path mode itself. Server callers
+should use `load_and_run_confined` rather than selecting the mode through this generic entry point.
+
 # Arguments
 - `filepath::String`: Filepath to the project config file.
-- `run_ID::UUID`: The run ID used in the run registry
-- `logger::Union{Nothing,Resie_Logger.CustomLogger}`: Logger used for ReSiE
+- `run_ID::UUID`: The run ID used in the run registry.
+- `logger::Union{Nothing,Resie_Logger.CustomLogger}`: Logger used for ReSiE.
+- `path_mode::Symbol`: Either `:local` or `:confined`.
+- `input_root::Union{Nothing,AbstractString}`: Required input directory in confined mode.
+- `output_root::Union{Nothing,AbstractString}`: Required output directory in confined mode.
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resie_Logger.CustomLogger}=nothing)::Bool
+function load_and_run(filepath::String, run_ID::UUID;
+                      logger::Union{Nothing,Resie_Logger.CustomLogger}=nothing,
+                      path_mode::Symbol=:local,
+                      input_root::Union{Nothing,AbstractString}=nothing,
+                      output_root::Union{Nothing,AbstractString}=nothing)::Bool
     start = now()
     success = true
     @globalInfo "---- Simulation setup ----"
@@ -475,77 +518,139 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     @globalInfo "Now reading project config"
 
     project_config = nothing
+    project_path = nothing
 
     try
-        # we can't use run_path() here because that is only defined after loading the config
-        # in the first place. so we hope we've been given a valid path and forbid upwards
-        # path traversal for security reasons
-        if occursin("..", filepath)
-            @error "Project config filepath must not contain .. path traversal"
-            return false
+        path_mode = validate_path_mode(path_mode)
+        if path_mode == :confined && (input_root === nothing || output_root === nothing)
+            throw(ArgumentError("Confined path mode requires input_root and output_root."))
+        elseif path_mode == :local && (input_root !== nothing || output_root !== nothing)
+            throw(ArgumentError("input_root and output_root may only be used in confined mode."))
         end
-        project_config = read_JSON(abspath(filepath))
-    catch exc
-        if isa(exc, MethodError)
-            @error "Could not parse project config file at $(abspath(filepath))"
-            return false
-        end
-    end
 
-    if project_config === nothing
-        @error "Could not find or parse project config file at $(abspath(filepath))"
+        if path_mode == :confined
+            confined_input_root = resolve_local_directory(input_root)
+            requested_project_path = abspath(validate_path_string(filepath))
+            path_is_within(requested_project_path, confined_input_root) ||
+                throw(InputError("Project config must remain inside the confined input directory."))
+            reject_symlink_components(confined_input_root, requested_project_path)
+        end
+
+        project_path = resolve_project_file(filepath; confined=path_mode == :confined)
+        if path_mode == :confined
+            path_is_within(project_path, confined_input_root) ||
+                throw(InputError("Project config resolves outside the confined input directory."))
+        end
+        project_config = read_JSON(project_path)
+        report_unknown_keys(project_config,
+                            ["components", "simulation_parameters", "io_settings",
+                             "economic_parameters", "emissions_parameters",
+                             "parameter_study", "order_of_operation"],
+                            "project config")
+        for section in ["components", "simulation_parameters", "io_settings"]
+            haskey(project_config, section) ||
+                throw(InputError("Project config is missing required section `$section`."))
+            project_config[section] isa AbstractDict ||
+                throw(InputError("Project config section `$section` must be an object."))
+        end
+        for section in ["economic_parameters", "emissions_parameters", "parameter_study"]
+            if haskey(project_config, section) && project_config[section] !== nothing
+                project_config[section] isa AbstractDict ||
+                    throw(InputError("Project config section `$section` must be an object."))
+            end
+        end
+        if haskey(project_config, "order_of_operation")
+            project_config["order_of_operation"] isa AbstractVector ||
+                throw(InputError("Project config section `order_of_operation` must be an array."))
+            length(project_config["order_of_operation"]) <= MAX_ORDER_OPERATIONS ||
+                throw(InputError("Project config contains too many explicit operations."))
+        end
+    catch exc
+        @error "Could not read project config: $(sanitise_log_text(sprint(showerror, exc)))"
         return false
     end
 
     @globalInfo "Now preparing inputs"
     preparation_cache = PreparationCache()
 
-    # set log level by operating mode
-    if logger !== nothing
-        Resie_Logger.set_min_log_level!(logger, get_min_log_level(project_config, logger))
-    end
-    io_settings = get_io_settings(project_config)
-    sim_params = get_simulation_params(project_config, io_settings; preparation_cache=preparation_cache)
-
-    if sim_params["parameter_study"]["runtime"]["enabled"]
-        # perform the configured parameter study
-        success,
-        evaluated_parameter_sets,
-        local_evaluated_parameter_sets = perform_parameter_study(io_settings,
-                                                                 sim_params,
-                                                                 project_config;
-                                                                 preparation_cache=preparation_cache)
-
-        figure_results = if sim_params["parameter_study"]["sensitivity_analysis"]["include_local_sensitivity_results_in_figures"]
-            vcat(evaluated_parameter_sets, local_evaluated_parameter_sets)
-        else
-            evaluated_parameter_sets
+    try
+        # set log level by operating mode
+        if logger !== nothing
+            Resie_Logger.set_min_log_level!(logger, get_min_log_level(project_config, logger))
         end
+        io_settings = get_io_settings(project_config;
+                                      path_mode=path_mode,
+                                      input_root=input_root,
+                                      output_root=output_root)
+        sim_params = get_simulation_params(project_config, io_settings; preparation_cache=preparation_cache)
 
-        if !isempty(figure_results)
-            create_parameter_study_diagnostic_plots(figure_results, io_settings, sim_params)
-        end
-    else
-        # perform single simulation run
-        # establish overarching locks for parallelization
-        run_lock = ReentrantLock()
-        output_lock = ReentrantLock()
-        try
-            _ = run_simulation_sample(io_settings, sim_params, nothing, project_config,
-                                      nothing, run_ID, run_lock, output_lock;
-                                      suppress_all_output=false,
-                                      preparation_cache=preparation_cache)
-        catch e
-            if e isa InterruptException
-                @globalInfo "Simulation interrupted by user."
-                success = false
+        if sim_params["parameter_study"]["runtime"]["enabled"]
+            # perform the configured parameter study
+            success,
+            evaluated_parameter_sets,
+            local_evaluated_parameter_sets = perform_parameter_study(io_settings,
+                                                                     sim_params,
+                                                                     project_config;
+                                                                     preparation_cache=preparation_cache)
+
+            figure_results = if sim_params["parameter_study"]["sensitivity_analysis"]["include_local_sensitivity_results_in_figures"]
+                vcat(evaluated_parameter_sets, local_evaluated_parameter_sets)
             else
-                rethrow()
+                evaluated_parameter_sets
             end
+
+            if !isempty(figure_results)
+                create_parameter_study_diagnostic_plots(figure_results, io_settings, sim_params)
+            end
+        else
+            # perform single simulation run
+            run_lock = ReentrantLock()
+            output_lock = ReentrantLock()
+            result = run_simulation_sample(io_settings, sim_params, nothing, project_config,
+                                           nothing, run_ID, run_lock, output_lock;
+                                           suppress_all_output=false,
+                                           preparation_cache=preparation_cache)
+            success = isempty(get(result, "error", ""))
         end
+    catch e
+        if e isa InterruptException
+            @globalInfo "Simulation interrupted by user."
+        else
+            error_id = uuid4()
+            @error "Simulation setup or execution failed with error ID $error_id" exception=(e, catch_backtrace())
+        end
+        success = false
     end
 
     return success
+end
+
+"""
+    load_and_run_confined(filepath, run_ID; input_root, output_root, logger=nothing)
+
+Load and run a project with mandatory confined input and output paths.
+
+This entry point is intended for server use. Unlike `load_and_run`, it has no local path
+mode and always applies confinement. The project configuration cannot change either root.
+
+# Arguments
+- `filepath::String`: Filepath to the project config file.
+- `run_ID::UUID`: The run ID used in the run registry.
+- `input_root::AbstractString`: Trusted input directory supplied by the caller.
+- `output_root::AbstractString`: Trusted output directory supplied by the caller.
+- `logger::Union{Nothing,Resie_Logger.CustomLogger}`: Logger used for ReSiE.
+# Returns
+- `Bool`: `true` if the simulation was successful, `false` otherwise.
+"""
+function load_and_run_confined(filepath::String, run_ID::UUID;
+                               input_root::AbstractString,
+                               output_root::AbstractString,
+                               logger::Union{Nothing,Resie_Logger.CustomLogger}=nothing)::Bool
+    return load_and_run(filepath, run_ID;
+                        logger=logger,
+                        path_mode=:confined,
+                        input_root=input_root,
+                        output_root=output_root)
 end
 
 """
@@ -592,10 +697,18 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
 
     try
         sim_params, io_settings, components, operations = prepare_inputs(project_config, run_ID;
-                                                                         preparation_cache=preparation_cache)
+                                                                         preparation_cache=preparation_cache,
+                                                                         path_mode=io_settings["path_mode"],
+                                                                         input_root=io_settings["input_root"],
+                                                                         output_root=io_settings["path_mode"] ==
+                                                                                     :confined ?
+                                                                                     io_settings["output_path"] :
+                                                                                     nothing,
+                                                                         base_path_override=io_settings["base_path"],
+                                                                         output_path_override=io_settings["output_path"])
         @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
-        lock(run_lock) do
+        lock(current_runs_lock) do
             current_runs[run_ID] = SimulationRun(sim_params, io_settings, components, operations)
         end
 
@@ -621,7 +734,8 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
             rethrow()
         end
 
-        if !isnothing(parameter_study_results_path) && filesize(parameter_study_results_path) == 0
+        if !isnothing(parameter_study_results_path) &&
+           (!isfile(parameter_study_results_path) || filesize(parameter_study_results_path) == 0)
             throw(e)
         end
 
@@ -633,29 +747,23 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
             results["objective"] = Inf
         end
 
-        # save exact error message to output file
-        error_message = sprint(showerror, e)
-        full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
-        @globalInfo full_error_message
-        results["error"] = "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+        error_id = uuid4()
+        @error "Simulation failed with error ID $error_id" exception=(e, catch_backtrace())
+        results["error"] = "Simulation failed (error ID: $error_id)."
     finally
-        lock(run_lock) do
-            close_run(run_ID)
-        end
+        close_run(run_ID)
     end
 
     if sim_params["parameter_study"]["runtime"]["enabled"] &&
        io_settings["write_parameter_study_csv_continuously"] &&
        !isnothing(parameter_study_results_path)
         # Write results to file after the single simulation has finished.
-        row = join(collect(values(results)), ';') * "\n"
-        row = replace(row, ',' => ' ')
-        row = replace(row, '.' => ',')
+        row = join((csv_cell(value; decimal_comma=true) for value in values(results)), ';') * "\n"
         # Lock the file writing
         lock(output_lock) do
             # create header if file is empty
             if filesize(parameter_study_results_path) == 0
-                header = join(collect(keys(results)), ';') * "\n"
+                header = join((csv_cell(key) for key in keys(results)), ';') * "\n"
                 open(parameter_study_results_path, "w") do file_handle
                     write(file_handle, header)
                 end
@@ -666,7 +774,7 @@ function run_simulation_sample(io_settings::Dict{String,Any}, sim_params::Dict{S
         end
     end
 
-    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
+    @info "-- Simulation run finished in $(seconds(now() - start)) s"
     return results
 end
 

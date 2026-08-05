@@ -79,6 +79,13 @@ Returns default simulation parameters useful for tests.
 - `Dict{String,Any}`: Default simulation parameters
 """
 function get_default_sim_params()::Dict{String,Any}
+    input_path = function (path; max_bytes::Integer=typemax(Int))
+        return path
+    end
+    output_path = function (path)
+        return path
+    end
+
     return Dict{String,Any}(
         "time" => 0,
         "time_since_output" => 0,
@@ -99,10 +106,9 @@ function get_default_sim_params()::Dict{String,Any}
         "wh_to_watts" => function (w)
             return w * 4.0
         end,
-        "run_ID" => uuid1(),
-        "run_path" => function (path)
-            return path
-        end,
+        "run_ID" => uuid4(),
+        "input_path" => input_path,
+        "output_path" => output_path,
         "show_detailed_errors" => true,
         "economic_parameters" => Dict{String,Any}("calculate_economy" => false),
         "emissions_parameters" => Dict{String,Any}("calculate_emissions" => false),
@@ -127,5 +133,7 @@ code under test.
 """
 function setup_mock_run!(components::Dict{String,<:Any}, sim_params::Dict{String,Any};
                          io_settings::Dict{String,Any}=Dict{String,Any}(), ooo::Vector{Any}=[])
-    Resie.current_runs[sim_params["run_ID"]] = Resie.SimulationRun(sim_params, io_settings, components, ooo)
+    lock(Resie.current_runs_lock) do
+        Resie.current_runs[sim_params["run_ID"]] = Resie.SimulationRun(sim_params, io_settings, components, ooo)
+    end
 end

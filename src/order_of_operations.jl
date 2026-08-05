@@ -2095,6 +2095,10 @@ For busses with proxy busses, only the proxy busses are taken into account.
 """
 function find_parallels(components)
     function find_paths(unit, path, all_paths, old_uac)
+        length(path) < MAX_GRAPH_DEPTH ||
+            throw(InputError("Component graph exceeds the maximum traversal depth."))
+        length(all_paths) < MAX_GRAPH_PATHS ||
+            throw(InputError("Component graph contains too many candidate paths."))
         push!(path, unit)
         for outface in values(unit.output_interfaces)
             if (outface === nothing
@@ -2116,6 +2120,8 @@ function find_parallels(components)
                 find_paths(outface.target, new_path, all_paths, outface.source.uac)
             end
         end
+        length(all_paths) < MAX_GRAPH_PATHS ||
+            throw(InputError("Component graph contains too many candidate paths."))
         push!(all_paths, copy(path))
         pop!(path)
     end
@@ -2311,23 +2317,27 @@ end
 Add connected units of the same system function to the node set in a non-recursive manner.
 """
 function add_non_recursive!(node_set, unit, caller_uac)
-    push!(node_set, unit)
+    pending = Any[unit]
 
-    for inface in values(unit.input_interfaces)
-        inface.is_secondary_interface && continue
-        if inface.source.uac == caller_uac
-            continue
-        elseif inface.source.sys_function === unit.sys_function
-            add_non_recursive!(node_set, inface.source, unit.uac)
+    while !isempty(pending)
+        current = pop!(pending)
+        current in node_set && continue
+        push!(node_set, current)
+        length(node_set) <= MAX_COMPONENTS ||
+            throw(InputError("Component chain exceeds the maximum supported size."))
+
+        for inface in values(current.input_interfaces)
+            inface.is_secondary_interface && continue
+            if inface.source.sys_function === current.sys_function && !(inface.source in node_set)
+                push!(pending, inface.source)
+            end
         end
-    end
 
-    for outface in values(unit.output_interfaces)
-        outface.is_secondary_interface && continue
-        if outface.target.uac == caller_uac
-            continue
-        elseif outface.target.sys_function === unit.sys_function
-            add_non_recursive!(node_set, outface.target, unit.uac)
+        for outface in values(current.output_interfaces)
+            outface.is_secondary_interface && continue
+            if outface.target.sys_function === current.sys_function && !(outface.target in node_set)
+                push!(pending, outface.target)
+            end
         end
     end
 end
@@ -2363,6 +2373,11 @@ function add_non_recursive_indirect_outputs!(node_set,
                                              interrupt_at_grids=false,
                                              interrupt_at_grids_both_ways=false,
                                              interrupt_at_component=nothing)
+    length(checked_interfaces) <= MAX_GRAPH_DEPTH ||
+        throw(InputError("Component graph exceeds the maximum traversal depth."))
+    length(node_set) <= MAX_COMPONENTS ||
+        throw(InputError("Component chain exceeds the maximum supported size."))
+
     if interrupt_at_component == unit
         return
     end
@@ -2448,6 +2463,11 @@ function add_non_recursive_indirect_inputs!(node_set,
                                             interrupt_at_grids=false,
                                             interrupt_at_grids_both_ways=false,
                                             interrupt_at_component=nothing)
+    length(checked_interfaces) <= MAX_GRAPH_DEPTH ||
+        throw(InputError("Component graph exceeds the maximum traversal depth."))
+    length(node_set) <= MAX_COMPONENTS ||
+        throw(InputError("Component chain exceeds the maximum supported size."))
+
     if interrupt_at_component == unit
         return
     end
@@ -2525,7 +2545,12 @@ should be set as empty array ([]).
 The maximum distance to the furthest sink as Int.
 """
 function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
+    length(checked_interfaces) <= MAX_GRAPH_DEPTH ||
+        throw(InputError("Component graph exceeds the maximum traversal depth."))
+
     is_leaf = function (current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
+        length(checked_interfaces_leaf) <= MAX_GRAPH_DEPTH ||
+            throw(InputError("Component graph exceeds the maximum traversal depth."))
         for outface in values(current_node.output_interfaces)
             if outface !== nothing
                 outface.is_secondary_interface && continue

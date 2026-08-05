@@ -17,6 +17,33 @@ end
 InputError() = InputError(nothing)
 
 """
+    resolve_profile_input_path(file_path, sim_params; max_bytes)
+
+Resolves a profile path using the current `input_path` callback. The legacy `run_path`
+callback remains supported for direct callers and older tests that construct simulation
+parameters manually.
+"""
+function resolve_profile_input_path(file_path::String, sim_params::Dict{String,Any};
+                                    max_bytes::Integer)::String
+    if haskey(sim_params, "input_path")
+        return sim_params["input_path"](file_path; max_bytes=max_bytes)
+    elseif haskey(sim_params, "run_path")
+        resolved_path = sim_params["run_path"](file_path)
+        resolved_path isa AbstractString ||
+            throw(InputError("The configured path resolver must return a string."))
+
+        absolute_path = abspath(resolved_path)
+        isfile(absolute_path) ||
+            throw(InputError("Input path must point to a regular file: $absolute_path"))
+        filesize(absolute_path) <= max_bytes ||
+            throw(InputError("Input file exceeds the maximum allowed file size: $absolute_path"))
+        return absolute_path
+    end
+
+    throw(InputError("No input path resolver is configured."))
+end
+
+"""
 Holds values from a file so they can be retrieved later and indexed by time.
 
 Profiles are automatically aggregated or segmentated to fit the simulation time step.
@@ -94,7 +121,7 @@ mutable struct Profile
         profile_cache_key = nothing
 
         if use_profile_cache
-            abs_file_path = sim_params["run_path"](file_path)
+            abs_file_path = resolve_profile_input_path(file_path, sim_params; max_bytes=64 * 1024 * 1024)
             profile_cache_key = (abs_file_path,
                                  sim_params["start_date"],
                                  sim_params["end_date"],
@@ -131,13 +158,15 @@ mutable struct Profile
 
             repeat_profile = false
 
-            file_path = sim_params["run_path"](file_path)
+            file_path = resolve_profile_input_path(file_path, sim_params; max_bytes=64 * 1024 * 1024)
             file_handle = nothing
             current_line = nothing
 
             try
                 file_handle = open(file_path, "r")
-                for (line_idx, line) in enumerate(readlines(file_handle))
+                for (line_idx, line) in enumerate(eachline(file_handle))
+                    line_idx <= 2_000_000 || throw(InputError("Profile contains too many lines."))
+                    ncodeunits(line) <= 1_048_576 || throw(InputError("Profile contains an excessively long line."))
                     current_line = line_idx
                     line = strip(line)
 
@@ -175,7 +204,6 @@ mutable struct Profile
                             push!(profile_values, parse(Float64, String(strip(splitted[2]))))
                         else
                             @error "The profile at $(file_path) has some corrupt data in line $(line_idx). Please check!"
-                            close(file_handle)
                             throw(InputError())
                         end
                     end
@@ -189,6 +217,8 @@ mutable struct Profile
                     close(file_handle)
                 end
             end
+            all(isfinite, profile_values) || throw(InputError("Profile contains a non-finite value."))
+            length(profile_values) <= 2_000_000 || throw(InputError("Profile contains too many values."))
             profile_timestamps_date = Vector{DateTime}(undef, length(profile_values))
             # convert profile_timestamps to DateTime
             if time_definition == "startdate_timestepsize"
