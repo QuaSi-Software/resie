@@ -76,8 +76,12 @@ function operation_cache_key(project_config::AbstractDict{String,Any},
     if haskey(runtime, "parameter_keys")
         for key in runtime["parameter_keys"]
             uac, param_key = split(key, " ")
-            if haskey(component_cfg, uac) && haskey(component_cfg[uac], param_key)
-                component_cfg[uac][param_key] = "__PARAMETER_STUDY_NONSTRUCTURAL_VALUE__"
+            if haskey(component_cfg, uac)
+                location = resolve_parameter_path(component_cfg[uac], param_key)
+                if location !== nothing
+                    container, leaf_key = location
+                    container[leaf_key] = "__PARAMETER_STUDY_NONSTRUCTURAL_VALUE__"
+                end
             end
         end
     end
@@ -295,6 +299,7 @@ const IO_SETTINGS_DEF = Dict{String,Any}(
         display_name="Auxiliary plots formats",
         required=false,
         type=Vector{String},
+        options=["html", "pdf", "png", "ps", "svg"],
         json_type="list",
         unit="-"
     ),
@@ -1549,6 +1554,38 @@ function prepare_inputs(project_config::AbstractDict{String,Any},
 end
 
 """
+    resolve_parameter_path(config, parameter_path)
+
+Resolve a parameter path in a configuration dictionary.
+
+The path may reference a direct key, such as `volume`, or a nested key using
+dot-separated notation, such as `economic_parameters.lifetime_years`. Direct
+keys are checked first.
+
+# Arguments
+- `config::AbstractDict`: Configuration dictionary in which the parameter is located.
+- `parameter_path::AbstractString`: Direct key or dot-separated path to the parameter.
+
+# Returns
+- `Union{Tuple{AbstractDict,String},Nothing}`: The dictionary containing the parameter
+  and its final key, or `nothing` if the path does not exist.
+"""
+
+function resolve_parameter_path(config::AbstractDict, parameter_path::AbstractString)
+    haskey(config, parameter_path) && return config, String(parameter_path)
+
+    parts = String.(split(parameter_path, "."))
+    current = config
+
+    for part in parts[1:(end - 1)]
+        current isa AbstractDict && haskey(current, part) || return nothing
+        current = current[part]
+    end
+
+    return current isa AbstractDict && haskey(current, parts[end]) ? (current, parts[end]) : nothing
+end
+
+"""
     load_control_module_class_mapping()
 
 Loads the control modules' classes index by their name as used in the input file.
@@ -2089,9 +2126,9 @@ function prepare_parameter_study!(parameter_study::Dict{String,Any},
         for (key_param, raw_def) in pairs(sort(params; by=lowercase))
             key = uac * " " * key_param
             parameter_exists = if haskey(project_config["components"], uac)
-                haskey(project_config["components"][uac], key_param)
+                resolve_parameter_path(project_config["components"][uac], key_param) !== nothing
             elseif haskey(project_config, uac)
-                haskey(project_config[uac], key_param)
+                resolve_parameter_path(project_config[uac], key_param) !== nothing
             else
                 false
             end

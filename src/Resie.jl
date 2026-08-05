@@ -340,7 +340,7 @@ function run_simulation_loop(sim_params::Dict{String,Any},
         end
     end
 
-    if do_write_summary_CSV
+    if do_write_CSV && do_write_summary_CSV
         output_path = sim_params["run_path"](replace(csv_file_path, r"\.csv$"i => "_aggregated.csv"))
 
         success = aggregate_csv(csv_file_path,
@@ -471,8 +471,8 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
     start = now()
     success = true
     @globalInfo "---- Simulation setup ----"
-    @globalInfo "-- Starting simulation at $(start)"
-    @globalInfo "-- Now reading project config"
+    @globalInfo "Starting simulation at $(start)"
+    @globalInfo "Now reading project config"
 
     project_config = nothing
 
@@ -497,7 +497,7 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
         return false
     end
 
-    @globalInfo "-- Now preparing inputs"
+    @globalInfo "Now preparing inputs"
     preparation_cache = PreparationCache()
 
     # set log level by operating mode
@@ -522,7 +522,7 @@ function load_and_run(filepath::String, run_ID::UUID; logger::Union{Nothing,Resi
             evaluated_parameter_sets
         end
 
-        if sim_params["parameter_study"]["runtime"]["run_primary_study"] && !isempty(figure_results)
+        if !isempty(figure_results)
             create_parameter_study_diagnostic_plots(figure_results, io_settings, sim_params)
         end
     else
