@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/district_economy_emissions/out.csv",
+        "csv_output_file_path": "./test/scenarios/district_economy_emissions/out.csv",
         "csv_time_unit": "date",
         "csv_output": "nothing",
         "csv_output_weather": false,
@@ -8,9 +8,9 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/district_economy_emissions/auxiliary_info.md",
         "auxiliary_plots": false,
-        "sankey_plot_file": "./test/scenarios/district_economy_emissions/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/district_economy_emissions/sankey_plot.html",
         "sankey_plot": "default",
-        "output_plot_file": "./test/scenarios/district_economy_emissions/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/district_economy_emissions/output_plot.html",
         "output_plot_time_unit": "date",
         "output_plot": "all_incl_flows",
         "plot_weather_data": false,
@@ -18,12 +18,12 @@
         "economic_plot_cashflows_file_path": "./test/scenarios/district_economy_emissions/economic_results_cashflows.html",
         "plot_economic_present_values": true,
         "economic_plot_present_values_file_path": "./test/scenarios/district_economy_emissions/economic_results_present_values.html",
-        "output_economic_CSV": true,
-        "economic_CSV_file_path": "./test/scenarios/district_economy_emissions/economic_results.csv",
+        "output_economic_csv": true,
+        "economic_csv_file_path": "./test/scenarios/district_economy_emissions/economic_results.csv",
         "plot_emission_results": true,
         "emissions_plot_file_path": "./test/scenarios/district_economy_emissions/emissions_plot.html",
-        "output_emissions_CSV": true,
-        "emissions_CSV_file_path": "./test/scenarios/district_economy_emissions/emissions_results.csv",
+        "output_emissions_csv": true,
+        "emissions_csv_file_path": "./test/scenarios/district_economy_emissions/emissions_results.csv",
         "plot_price_and_emission_profiles": false
     },
     "simulation_parameters": {

@@ -208,7 +208,7 @@ const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
     ),
     "eval_factor_heat" => (
         default=5.0,
-        description="Weight for heat demand matching in optimization",
+        description="Weight for heat demand matching in optimisation",
         display_name="Eval. factor heat",
         required=false,
         validations=[
@@ -260,7 +260,7 @@ const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
     ),
     "x_abstol" => (
         default=0.01,
-        description="Absolute tolerance for PLR optimization",
+        description="Absolute tolerance for PLR optimisation",
         display_name="Abs. tolerance PLR",
         required=false,
         validations=[
@@ -274,7 +274,7 @@ const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(
     ),
     "f_abstol" => (
         default=0.001,
-        description="Objective function tolerance for PLR optimization",
+        description="Objective function tolerance for PLR optimisation",
         display_name="Abs. tolerance obj. function",
         required=false,
         validations=[

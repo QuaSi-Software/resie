@@ -1,0 +1,561 @@
+<script>
+(function () {
+    const plotData = {{PLOT_DATA_JSON}};
+    const variableKeys = {{VARIABLE_KEYS_JSON}};
+    const parameterKeys = {{PARAMETER_KEYS_JSON}};
+    const parameterKeySet = new Set(parameterKeys);
+    const runIds = {{RUN_IDS_JSON}};
+    const highlightRunIds = new Set({{HIGHLIGHT_RUN_IDS_JSON}});
+    const objectiveSenses = {{OBJECTIVE_SENSES_JSON}};
+    const isMultiobjective = {{IS_MULTIOBJECTIVE_JSON}};
+
+    const initialSelection = {
+        x: {{INITIAL_X_JSON}},
+        y: {{INITIAL_Y_JSON}},
+        color: {{INITIAL_COLOR_JSON}}
+    };
+
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll('.js-plotly-plot');
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function formatValue(value) {
+        if (!isFiniteNumber(value)) {
+            return String(value);
+        }
+
+        const absolute = Math.abs(value);
+
+        if (absolute !== 0 && (absolute >= 100000 || absolute < 0.001)) {
+            return value.toExponential(4);
+        }
+
+        return Number(value.toPrecision(6)).toString();
+    }
+
+    function colorSense(colorKey) {
+        return objectiveSenses[colorKey] === 'max' ? 'max' : 'min';
+    }
+
+    function colorBounds(values) {
+        const finite = values.filter(isFiniteNumber);
+
+        if (finite.length === 0) {
+            return [0.0, 1.0];
+        }
+
+        let minimum = Math.min(...finite);
+        let maximum = Math.max(...finite);
+
+        if (!(maximum > minimum)) {
+            const delta =
+                Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+            minimum -= delta;
+            maximum += delta;
+        }
+
+        return [minimum, maximum];
+    }
+
+    function availableColorKeys() {
+        return variableKeys.filter(
+            key => Array.isArray(plotData[key]) && plotData[key].some(isFiniteNumber)
+        );
+    }
+
+    function validIndices(xKey, yKey, colorKey) {
+        const pointCount = runIds.length;
+        const indices = [];
+
+        for (let index = 0; index < pointCount; index += 1) {
+            const xValue = plotData[xKey][index];
+            const yValue = plotData[yKey][index];
+            const colorValue = colorKey === null ? null : plotData[colorKey][index];
+
+            if (!isFiniteNumber(xValue) || !isFiniteNumber(yValue)) {
+                continue;
+            }
+
+            if (colorKey !== null && !isFiniteNumber(colorValue)) {
+                continue;
+            }
+
+            indices.push(index);
+        }
+
+        return indices;
+    }
+
+    function buildSeries(xKey, yKey, colorKey) {
+        const indices = validIndices(xKey, yKey, colorKey);
+        const x = indices.map(index => plotData[xKey][index]);
+        const y = indices.map(index => plotData[yKey][index]);
+        const colorValues = colorKey === null
+            ? null
+            : indices.map(index => plotData[colorKey][index]);
+
+        const text = indices.map(index => {
+            let label = 'run ' + runIds[index] +
+                '<br>' + xKey + ' = ' + formatValue(plotData[xKey][index]) +
+                '<br>' + yKey + ' = ' + formatValue(plotData[yKey][index]);
+
+            if (colorKey !== null) {
+                label += '<br>' + colorKey + ' = ' + formatValue(plotData[colorKey][index]);
+            }
+
+            return label;
+        });
+
+        const highlightIndices = indices.filter(
+            index => highlightRunIds.has(runIds[index])
+        );
+
+        const highlightLocalPositions = highlightIndices.map(
+            globalIndex => indices.indexOf(globalIndex)
+        ).filter(position => position >= 0);
+
+        return {
+            x,
+            y,
+            text,
+            colorValues,
+            bounds: colorKey === null ? null : colorBounds(colorValues),
+            highlightX: highlightLocalPositions.map(position => x[position]),
+            highlightY: highlightLocalPositions.map(position => y[position]),
+            highlightText: highlightLocalPositions.map(position => text[position]),
+            highlightName: isMultiobjective ? 'Pareto solutions' : 'Best solution',
+            useLogAxis: y.length > 0 && y.every(value => value > 0),
+            hasPoints: indices.length > 0
+        };
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupControls, 200);
+            return;
+        }
+
+        if (document.getElementById('objective-parameter-controls')) {
+            return;
+        }
+
+        const runTraceIndex = gd.data.findIndex(trace => trace.name === 'Runs');
+        const highlightTraceIndex = gd.data.findIndex(trace => trace.name !== 'Runs');
+
+        if (runTraceIndex < 0 || highlightTraceIndex < 0) {
+            return;
+        }
+
+        const controls = document.createElement('div');
+        controls.id = 'objective-parameter-controls';
+        controls.style.flex = '0 0 auto';
+        controls.style.width = '100%';
+        controls.style.boxSizing = 'border-box';
+        controls.style.zIndex = '10000';
+        controls.style.fontFamily = 'Arial, sans-serif';
+        controls.style.fontSize = '13px';
+        controls.style.margin = '0';
+        controls.style.padding = '6px 10px 10px';
+        controls.style.background = 'rgba(255,255,255,0.98)';
+        controls.style.borderBottom = '1px solid #bbb';
+        controls.style.boxShadow = '0 1px 5px rgba(0,0,0,0.12)';
+        controls.style.display = 'flex';
+        controls.style.flexWrap = 'wrap';
+        controls.style.alignItems = 'center';
+        controls.style.gap = '6px 12px';
+
+        const controlsHeading = document.createElement('span');
+        controlsHeading.textContent =
+            'Figure settings:';
+        controlsHeading.style.fontWeight = '600';
+        controlsHeading.style.marginRight = '4px';
+        controls.appendChild(controlsHeading);
+
+        function createControlRow() {
+            const row = document.createElement('div');
+            row.style.display = 'inline-flex';
+            row.style.alignItems = 'center';
+            row.style.flexWrap = 'wrap';
+            row.style.flex = '1 1 640px';
+            row.style.minWidth = '0';
+            row.style.maxWidth = '100%';
+            row.style.gap = '6px 10px';
+            controls.appendChild(row);
+            return row;
+        }
+
+        const selectionRow = createControlRow();
+
+        function appendGroupedVariableOptions(select, values) {
+            const groups = [
+                {
+                    label: 'Variable parameters',
+                    values: values.filter(value => parameterKeySet.has(value))
+                },
+                {
+                    label: 'Objectives',
+                    values: values.filter(value => !parameterKeySet.has(value))
+                }
+            ];
+
+            groups.forEach(groupDefinition => {
+                if (groupDefinition.values.length === 0) {
+                    return;
+                }
+
+                const group = document.createElement('optgroup');
+                group.label = groupDefinition.label;
+
+                groupDefinition.values.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    group.appendChild(option);
+                });
+
+                select.appendChild(group);
+            });
+        }
+
+        function createSelect(parent, labelText, values, initialValue) {
+            const container = document.createElement('label');
+            container.style.display = 'inline-flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '5px';
+            container.style.minWidth = '0';
+            container.style.whiteSpace = 'nowrap';
+
+            const label = document.createElement('span');
+            label.textContent = labelText;
+
+            const select = document.createElement('select');
+            select.style.width = 'clamp(130px, 20vw, 320px)';
+            select.style.maxWidth = '100%';
+            select.style.minWidth = '110px';
+
+            appendGroupedVariableOptions(select, values);
+
+            select.value = initialValue;
+
+            container.appendChild(label);
+            container.appendChild(select);
+            parent.appendChild(container);
+
+            return select;
+        }
+
+        const xSelect = createSelect(selectionRow,
+                                     'X axis:',
+                                     variableKeys,
+                                     initialSelection.x);
+
+        const ySelect = createSelect(selectionRow,
+                                     'Y axis:',
+                                     variableKeys,
+                                     initialSelection.y);
+
+        const colorContainer = document.createElement('label');
+        colorContainer.style.display = 'inline-flex';
+        colorContainer.style.alignItems = 'center';
+        colorContainer.style.gap = '5px';
+        colorContainer.style.minWidth = '0';
+        colorContainer.style.whiteSpace = 'nowrap';
+
+        const colorLabel = document.createElement('span');
+        colorLabel.textContent = 'Color:';
+        colorContainer.appendChild(colorLabel);
+
+        const colorSelect = document.createElement('select');
+        colorSelect.style.width = 'clamp(130px, 20vw, 320px)';
+        colorSelect.style.maxWidth = '100%';
+        colorSelect.style.minWidth = '110px';
+        colorContainer.appendChild(colorSelect);
+        selectionRow.appendChild(colorContainer);
+
+        const resetSelectionButton = document.createElement('button');
+        resetSelectionButton.textContent = 'Reset selection';
+        selectionRow.appendChild(resetSelectionButton);
+
+        const resetViewButton = document.createElement('button');
+        resetViewButton.textContent = 'Reset view';
+        selectionRow.appendChild(resetViewButton);
+
+        gd.parentNode.insertBefore(controls, gd);
+
+        // Use the same full-width responsive toolbar layout as the
+        // parallel-coordinates figure. The plot receives the remaining
+        // viewport height, including after the toolbar wraps.
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height = '100%';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.height = '100%';
+        document.body.style.width = '100%';
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+
+        plotParent.style.height = '100vh';
+        plotParent.style.width = '100%';
+        plotParent.style.display = 'flex';
+        plotParent.style.flexDirection = 'column';
+        plotParent.style.overflow = 'hidden';
+        plotParent.style.minWidth = '0';
+
+        gd.style.flex = '1 1 auto';
+        gd.style.minHeight = '0';
+        gd.style.minWidth = '0';
+        gd.style.width = '100%';
+
+        function resizePlotToViewport() {
+            const parentTop = plotParent.getBoundingClientRect().top;
+            const controlsHeight = controls.getBoundingClientRect().height;
+            const availableHeight = Math.max(
+                1,
+                window.innerHeight - parentTop - controlsHeight
+            );
+
+            gd.style.height = availableHeight + 'px';
+            gd.style.width = '100%';
+
+            return Plotly.relayout(gd, {
+                autosize: true,
+                height: availableHeight
+            }).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        const controlsResizeObserver =
+            typeof ResizeObserver === 'function'
+                ? new ResizeObserver(resizePlotToViewport)
+                : null;
+
+        if (controlsResizeObserver !== null) {
+            controlsResizeObserver.observe(controls);
+        }
+
+        let colorUpdateTimer = null;
+
+        function axisContainsValue(axisName, value) {
+            if (!isFiniteNumber(value)) {
+                return false;
+            }
+
+            const axis = gd._fullLayout[axisName];
+
+            if (
+                !axis ||
+                !Array.isArray(axis.range) ||
+                axis.range.length !== 2
+            ) {
+                return true;
+            }
+
+            let coordinate = value;
+
+            if (axis.type === 'log') {
+                if (!(value > 0)) {
+                    return false;
+                }
+
+                coordinate = Math.log10(value);
+            }
+
+            const lower = Math.min(axis.range[0], axis.range[1]);
+            const upper = Math.max(axis.range[0], axis.range[1]);
+
+            return coordinate >= lower && coordinate <= upper;
+        }
+
+        function updateVisibleColorBounds() {
+            const colorKey =
+                colorSelect.value === '' ? null : colorSelect.value;
+
+            if (colorKey === null) {
+                return Promise.resolve();
+            }
+
+            const series = buildSeries(
+                xSelect.value,
+                ySelect.value,
+                colorKey
+            );
+
+            const visibleColorValues = [];
+
+            for (let index = 0; index < series.x.length; index += 1) {
+                if (
+                    axisContainsValue('xaxis', series.x[index]) &&
+                    axisContainsValue('yaxis', series.y[index]) &&
+                    isFiniteNumber(series.colorValues[index])
+                ) {
+                    visibleColorValues.push(
+                        series.colorValues[index]
+                    );
+                }
+            }
+
+            const bounds = visibleColorValues.length > 0
+                ? colorBounds(visibleColorValues)
+                : series.bounds;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    'marker.cmin': bounds[0],
+                    'marker.cmax': bounds[1]
+                },
+                [runTraceIndex]
+            );
+        }
+
+        function scheduleVisibleColorUpdate() {
+            if (colorUpdateTimer !== null) {
+                window.clearTimeout(colorUpdateTimer);
+            }
+
+            colorUpdateTimer = window.setTimeout(
+                updateVisibleColorBounds,
+                0
+            );
+        }
+
+        function refreshColorOptions(preferredValue) {
+            const candidates = availableColorKeys();
+            const currentValue = preferredValue !== undefined ? preferredValue : colorSelect.value;
+
+            colorSelect.innerHTML = '';
+
+            const noneOption = document.createElement('option');
+            noneOption.value = '';
+            noneOption.textContent = 'None';
+            colorSelect.appendChild(noneOption);
+
+            appendGroupedVariableOptions(colorSelect, candidates);
+
+            if (currentValue && candidates.includes(currentValue)) {
+                colorSelect.value = currentValue;
+            } else {
+                colorSelect.value = '';
+            }
+        }
+
+        function applySelection(resetAxes) {
+            const xKey = xSelect.value;
+            const yKey = ySelect.value;
+            const colorKey = colorSelect.value === '' ? null : colorSelect.value;
+            const series = buildSeries(xKey, yKey, colorKey);
+
+            const runUpdate = {
+                x: [series.x],
+                y: [series.y],
+                text: [series.text],
+                'marker.size': 7,
+                'marker.opacity': 0.78,
+                'marker.showscale': colorKey !== null
+            };
+
+            if (colorKey === null) {
+                runUpdate['marker.color'] = 'rgb(31,119,180)';
+                runUpdate['marker.reversescale'] = false;
+            } else {
+                runUpdate['marker.color'] = [series.colorValues];
+                runUpdate['marker.colorscale'] = 'Viridis';
+                runUpdate['marker.reversescale'] =
+                    colorSense(colorKey) === 'min';
+                runUpdate['marker.cmin'] = series.bounds[0];
+                runUpdate['marker.cmax'] = series.bounds[1];
+                runUpdate['marker.colorbar.title.text'] = colorKey;
+            }
+
+            const highlightUpdate = {
+                x: [series.highlightX],
+                y: [series.highlightY],
+                text: [series.highlightText],
+                name: series.highlightName
+            };
+
+            Promise.all([
+                Plotly.restyle(gd, runUpdate, [runTraceIndex]),
+                Plotly.restyle(gd, highlightUpdate, [highlightTraceIndex])
+            ]).then(function () {
+                const layoutUpdate = {
+                    'xaxis.title.text': xKey,
+                    'yaxis.title.text': yKey,
+                    'yaxis.type': series.useLogAxis ? 'log' : 'linear'
+                };
+
+                if (resetAxes) {
+                    layoutUpdate['xaxis.range'] = null;
+                    layoutUpdate['yaxis.range'] = null;
+                    layoutUpdate['xaxis.autorange'] = true;
+                    layoutUpdate['yaxis.autorange'] = true;
+                }
+
+                return Plotly.relayout(gd, layoutUpdate);
+            }).then(updateVisibleColorBounds);
+        }
+
+        xSelect.addEventListener('change', function () {
+            applySelection(true);
+        });
+
+        ySelect.addEventListener('change', function () {
+            refreshColorOptions();
+            applySelection(true);
+        });
+
+        colorSelect.addEventListener('change', function () {
+            applySelection(false);
+        });
+
+        resetSelectionButton.addEventListener('click', function () {
+            xSelect.value = initialSelection.x;
+            ySelect.value = initialSelection.y;
+            refreshColorOptions(initialSelection.color || '');
+            applySelection(true);
+        });
+
+        resetViewButton.addEventListener('click', function () {
+            Plotly.relayout(gd, {
+                'xaxis.range': null,
+                'yaxis.range': null,
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }).then(updateVisibleColorBounds);
+        });
+
+        gd.on('plotly_relayout', function (eventData) {
+            const keys = Object.keys(eventData || {});
+
+            const axisChanged = keys.some(
+                key =>
+                    /^(xaxis|yaxis)\.(range|range\[\d+\]|autorange)$/.test(key)
+            );
+
+            if (axisChanged) {
+                scheduleVisibleColorUpdate();
+            }
+        });
+
+        refreshColorOptions(initialSelection.color || '');
+
+        window.addEventListener('resize', resizePlotToViewport);
+        window.setTimeout(resizePlotToViewport, 0);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupControls);
+    } else {
+        setupControls();
+    }
+})();
+</script>

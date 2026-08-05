@@ -1,10 +1,10 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/hp_cascade/out.csv",
+        "csv_output_file_path": "./test/scenarios/hp_cascade/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/hp_cascade/auxiliary_info.md",
         "fixed_output_precision": 10,
-        "sankey_plot_file": "./test/scenarios/hp_cascade/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/hp_cascade/sankey_plot.html",
         "sankey_plot": "default",
         "__heating_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"],

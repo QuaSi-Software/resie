@@ -5,27 +5,28 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\heating_and_cooling\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/672 in 0.556 s. ETA: 10.7662 s
-[Info] Progress: 66/672 in 0.043 s. ETA: 0.7896 s
-[Info] Progress: 99/672 in 0.078 s. ETA: 1.3544 s
-[Info] Progress: 132/672 in 0.063 s. ETA: 1.0309 s
-[Info] Progress: 165/672 in 0.066 s. ETA: 0.9986 s
-[Info] Progress: 198/672 in 0.047 s. ETA: 0.6751 s
-[Info] Progress: 231/672 in 0.048 s. ETA: 0.6415 s
-[Info] Progress: 264/672 in 0.032 s. ETA: 0.3956 s
-[Info] Progress: 297/672 in 0.034 s. ETA: 0.3864 s
-[Info] Progress: 330/672 in 0.046 s. ETA: 0.4767 s
-[Info] Progress: 363/672 in 0.02 s. ETA: 0.1873 s
-[Info] Progress: 396/672 in 0.036 s. ETA: 0.3011 s
-[Info] Progress: 429/672 in 0.029 s. ETA: 0.2135 s
-[Info] Progress: 462/672 in 0.035 s. ETA: 0.2227 s
-[Info] Progress: 495/672 in 0.039 s. ETA: 0.2092 s
-[Info] Progress: 528/672 in 0.13 s. ETA: 0.5673 s
-[Info] Progress: 561/672 in 0.05 s. ETA: 0.1682 s
-[Info] Progress: 594/672 in 0.039 s. ETA: 0.0922 s
-[Info] Progress: 627/672 in 0.037 s. ETA: 0.0505 s
-[Info] Progress: 660/672 in 0.044 s. ETA: 0.0160 s
+[Info] Progress: 33/672 in 0.141 s. ETA: 2.7303 s
+[Info] Progress: 66/672 in 0.017 s. ETA: 0.3122 s
+[Info] Progress: 99/672 in 0.003 s. ETA: 0.0521 s
+[Info] Progress: 132/672 in 0.014 s. ETA: 0.2291 s
+[Info] Progress: 165/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 198/672 in 0.017 s. ETA: 0.2442 s
+[Info] Progress: 231/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 264/672 in 0.015 s. ETA: 0.1855 s
+[Info] Progress: 297/672 in 0.001 s. ETA: 0.0114 s
+[Info] Progress: 330/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 363/672 in 0.016 s. ETA: 0.1498 s
+[Info] Progress: 396/672 in 0.0 s. ETA: 0.0000 s
+[Info] Progress: 429/672 in 0.022 s. ETA: 0.1620 s
+[Info] Progress: 462/672 in 0.009 s. ETA: 0.0573 s
+[Info] Progress: 495/672 in 0.011 s. ETA: 0.0590 s
+[Info] Progress: 528/672 in 0.009 s. ETA: 0.0393 s
+[Info] Progress: 561/672 in 0.01 s. ETA: 0.0336 s
+[Info] Progress: 594/672 in 0.006 s. ETA: 0.0142 s
+[Info] Progress: 627/672 in 0.009 s. ETA: 0.0123 s
+[Info] Progress: 660/672 in 0.008 s. ETA: 0.0029 s
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\test\scenarios\heating_and_cooling\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\heating_and_cooling\sankey_plot.html
 [Info] general log saved to .\test\scenarios\heating_and_cooling\general.log
+[Info] balanceWarn log saved to .\test\scenarios\heating_and_cooling\balanceWarn.log

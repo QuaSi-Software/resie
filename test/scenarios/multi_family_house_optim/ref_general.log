@@ -1,0 +1,85 @@
+ReSiE general log file of simulation started at: 2000-01-01 00:00:00
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[GlobalInfo] ---- Simulation setup ---- (.\src\resie_logger.jl:82)
+[GlobalInfo] Starting simulation at 2000-01-01 00:00:00
+[GlobalInfo] Now reading project config (.\src\resie_logger.jl:82)
+[GlobalInfo] Now preparing inputs (.\src\resie_logger.jl:82)
+[GlobalInfo] Loading weather data... (.\src\resie_logger.jl:82)
+[GlobalInfo] Preparing reusable data for repeated simulation runs... (.\src\resie_logger.jl:82)
+[GlobalInfo] ---- Simulation setup completed. ---- (.\src\resie_logger.jl:82)
+[GlobalInfo] ---- Starting simulations on 1 Threads. ---- (.\src\resie_logger.jl:82)
+[GlobalInfo] Starting simulations for optimisation... (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=1, best=64232.641 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=2, best=63669.244 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=3, best=63669.244 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=4, best=63669.244 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=5, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=6, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=7, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=8, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=9, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=10, best=62068.433 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=11, best=61576.632 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=12, best=60588.925 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=13, best=60575.571 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=14, best=60575.571 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=15, best=59553.34 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=16, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=17, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=18, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=19, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=20, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=21, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=22, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=23, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=24, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=25, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=26, best=58865.977 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=27, best=58798.516 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=28, best=58798.516 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=29, best=58748.974 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation progress: evaluations=30, best=58667.966 (.\src\resie_logger.jl:82)
+[GlobalInfo] Optimisation completed in XX s. 30 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Best Optimisation result:
+Objective: 58667.966
+
+Parameter                               Value
+---------------------------------------------
+Building_Battery capacity              200000
+Building_heating_BFT volume         2.8870225
+Building_HP power_th                67525.181
+Building_PV scale                        1000
+ (.\src\resie_logger.jl:82)
+[GlobalInfo] Calculating local sensitivity... (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 1 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 2 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 3 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 4 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 5 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 6 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 7 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity status: 8 of 8 runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity results:
+Reference objective: 58667.966
+
+Parameter                           Lower         Δ objective (Δ %)         Upper         Δ objective (Δ %)  Elasticity
+-----------------------------------------------------------------------------------------------------------------------
+Building_Battery capacity          180000       330.8897 (+0.564 %)        220000      -356.3064 (-0.607 %)    -0.05857
+Building_heating_BFT volume       2.59832     533157.4 (+908.771 %)      3.175725       67.00618 (+0.114 %)      -45.43
+Building_HP power_th             60772.66     4297115 (+7324.465 %)       74277.7       341.5082 (+0.582 %)      -366.2
+Building_PV scale                     900       372.7774 (+0.635 %)          1100      -394.1159 (-0.672 %)    -0.06536
+ (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity outputs:
+  CSV: .\test\scenarios\multi_family_house_optim\parameter_study_local_sensitivity.csv
+  Response overview plot: .\test\scenarios\multi_family_house_optim\parameter_study_plots_local_sensitivity_response_overview.html
+  Response trends plot: .\test\scenarios\multi_family_house_optim\parameter_study_plots_local_sensitivity_response_trends.html (.\src\resie_logger.jl:82)
+[GlobalInfo] Local sensitivity analysis completed in XX s. 8 additional runs completed. (.\src\resie_logger.jl:82)
+[GlobalInfo] ---- Parameter study finished in XX s. 38 total runs completed. ---- (.\src\resie_logger.jl:82)
+[GlobalInfo] Preparing parameter-study figures... (.\src\resie_logger.jl:82)
+[GlobalInfo] Parameter-study matrix plot created and saved to .\test\scenarios\multi_family_house_optim\parameter_study_plots_matrix_plot.html (.\src\resie_logger.jl:82)
+[GlobalInfo] Parameter-study convergence plot created and saved to .\test\scenarios\multi_family_house_optim\parameter_study_plots_convergence.html (.\src\resie_logger.jl:82)
+[GlobalInfo] Parameter-study parameter plot created and saved to .\test\scenarios\multi_family_house_optim\parameter_study_plots_objective_parameter_explorer.html (.\src\resie_logger.jl:82)
+[GlobalInfo] Parameter-study parallel plot created and saved to .\test\scenarios\multi_family_house_optim\parameter_study_plots_parallel_coordinates.html (.\src\resie_logger.jl:82)
+[GlobalInfo] Parameter-study 3D plot created and saved to .\test\scenarios\multi_family_house_optim\parameter_study_plots_interactive_3d.html (.\src\resie_logger.jl:82)

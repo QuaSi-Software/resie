@@ -21,11 +21,11 @@ If no scenario name is given, performs the command for all scenarios. Be aware t
 might take a while.
 """
 
-include("../../src/resie_logger.jl")
-using .Resie_Logger
 using Resie
 using UUIDs
 using Logging
+
+const Resie_Logger = Resie.Resie_Logger
 
 KNOWN_COMMANDS = Set(["generate_output",
                       "set_reference",
@@ -121,7 +121,15 @@ function rename_paths_and_dates(subdir::String)
                        "general.log",
                        "economic_results_cashflows.html",
                        "economic_results_present_values.html",
-                       "emissions_plot.html"]
+                       "emissions_plot.html",
+                       "parameter_study_plots_convergence.html",
+                       "parameter_study_plots_interactive_3d.html",
+                       "parameter_study_plots_matrix_plot.html",
+                       "parameter_study_plots_objective_parameter_explorer.html",
+                       "parameter_study_plots_parallel_coordinates.html",
+                       "parameter_study_plots_global_sensitivity.html",
+                       "parameter_study_plots_local_sensitivity_response_overview.html",
+                       "parameter_study_plots_local_sensitivity_response_trends.html"]
 
     path_prefix = abspath(joinpath(dirname(@__FILE__), "..", ".."))
 
@@ -138,6 +146,13 @@ function rename_paths_and_dates(subdir::String)
 
         # replace dates of log files
         content = replace(content, r"started at: .+\n" => "started at: 2000-01-01 00:00:00\n")
+        content = replace(content, r"Starting simulation at .+\n" => "Starting simulation at 2000-01-01 00:00:00\n")
+
+        # replace time counts of log files
+        content = replace(content, r"(?<=completed in )\d+\s+min\s+\d+\s+s\." => "XX s.")
+        content = replace(content, r"(?<=finished in )\d+\s+min\s+\d+\s+s\." => "XX s.")
+        content = replace(content, r"(?<=complete in )\d+\s+min\s+\d+\s+s\." => "XX s.")
+        content = replace(content, r"ETA: (?:\d+ h )?(?:\d+ min )?\d+ s" => "ETA: XX")
 
         # replace IDs of plots
         id_match = match(r"id=([0-9a-f-]+)\s", content)
@@ -181,6 +196,13 @@ function generate_output(name::String, subdir::String)
         if project_config !== nothing
             io_settings = Resie.get_io_settings(project_config)
             sim_params = Resie.get_simulation_params(project_config, io_settings)
+            if sim_params["parameter_study"]["runtime"]["enabled"]
+                print("|Detailed status output for szenario including parameter study is currently not available.\n " *
+                      "  Please wait until the simulation has finished...\n")
+                Resie_Logger.close_logger(logger)
+                generate_output_full_workflow(name, subdir)
+                return
+            end
             print("|  ✓  ")
         else
             print("|     ")
@@ -232,7 +254,7 @@ function generate_output(name::String, subdir::String)
         && step_order !== nothing)
         # end of condition
         Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, io_settings, components, step_order)
-        Resie.run_simulation_loop(sim_params, io_settings, components, step_order)
+        Resie.run_simulation_loop(sim_params, io_settings, components, step_order; suppress_all_output=false)
         print("|  ✓  ")
     else
         print("|     ")
@@ -245,6 +267,37 @@ function generate_output(name::String, subdir::String)
     print("|  ✓  ")
 
     println("|")
+end
+
+function generate_output_full_workflow(name::String, subdir::String)
+    logger = setup_logger(subdir)
+    run_ID = uuid1()
+    success = false
+
+    try
+        input_path = joinpath(subdir, "inputs.json")
+
+        success = Resie.load_and_run(input_path,
+                                     run_ID;
+                                     logger=logger)
+    catch error
+        println("  Failed: Scenario $name failed with error $error")
+        success = false
+    finally
+        if haskey(Resie.current_runs, run_ID)
+            Resie.close_run(run_ID)
+        end
+
+        Resie_Logger.close_logger(logger)
+    end
+
+    rename_paths_and_dates(subdir)
+
+    if success
+        println("  Success: Scenario $name completed successfully.")
+    else
+        println("  Failed: Scenario $name failed.")
+    end
 end
 
 """
@@ -268,7 +321,18 @@ function set_reference(name, subdir)
                       "economic_results_present_values.html",
                       "economic_results.csv",
                       "emissions_plot.html",
-                      "emissions_results.csv"]
+                      "emissions_results.csv",
+                      "parameter_study_plots_convergence.html",
+                      "parameter_study_plots_interactive_3d.html",
+                      "parameter_study_plots_matrix_plot.html",
+                      "parameter_study_plots_objective_parameter_explorer.html",
+                      "parameter_study_plots_parallel_coordinates.html",
+                      "parameter_study_plots_global_sensitivity.html",
+                      "parameter_study_plots_local_sensitivity_response_overview.html",
+                      "parameter_study_plots_local_sensitivity_response_trends.html",
+                      "parameter_study_all_results.csv",
+                      "parameter_study_global_sensitivity.csv",
+                      "parameter_study_local_sensitivity.csv"]
 
     println("Setting reference outputs for scenario $name")
 
@@ -303,7 +367,18 @@ function compare(name, subdir)
                     "economic_results_present_values.html",
                     "economic_results.csv",
                     "emissions_plot.html",
-                    "emissions_results.csv"]
+                    "emissions_results.csv",
+                    "parameter_study_plots_convergence.html",
+                    "parameter_study_plots_interactive_3d.html",
+                    "parameter_study_plots_matrix_plot.html",
+                    "parameter_study_plots_objective_parameter_explorer.html",
+                    "parameter_study_plots_parallel_coordinates.html",
+                    "parameter_study_plots_global_sensitivity.html",
+                    "parameter_study_plots_local_sensitivity_response_overview.html",
+                    "parameter_study_plots_local_sensitivity_response_trends.html",
+                    "parameter_study_all_results.csv",
+                    "parameter_study_global_sensitivity.csv",
+                    "parameter_study_local_sensitivity.csv"]
 
     print("Comparing output file content for scenario $name: ")
 
@@ -371,6 +446,17 @@ function rebuild_overview(scenarios_dir)
                    "economic_results.csv",
                    "emissions_plot.html",
                    "emissions_results.csv",
+                   "parameter_study_plots_convergence.html",
+                   "parameter_study_plots_interactive_3d.html",
+                   "parameter_study_plots_matrix_plot.html",
+                   "parameter_study_plots_objective_parameter_explorer.html",
+                   "parameter_study_plots_parallel_coordinates.html",
+                   "parameter_study_plots_global_sensitivity.html",
+                   "parameter_study_plots_local_sensitivity_response_overview.html",
+                   "parameter_study_plots_local_sensitivity_response_trends.html",
+                   "parameter_study_all_results.csv",
+                   "parameter_study_global_sensitivity.csv",
+                   "parameter_study_local_sensitivity.csv",
                    "ref_auxiliary_info.md",
                    "ref_balanceWarn.log",
                    "ref_general.log",
@@ -380,7 +466,18 @@ function rebuild_overview(scenarios_dir)
                    "ref_economic_results_present_values.html",
                    "ref_economic_results.csv",
                    "ref_emissions_plot.html",
-                   "ref_emissions_results.csv"]
+                   "ref_emissions_results.csv",
+                   "ref_parameter_study_plots_convergence.html",
+                   "ref_parameter_study_plots_interactive_3d.html",
+                   "ref_parameter_study_plots_matrix_plot.html",
+                   "ref_parameter_study_plots_objective_parameter_explorer.html",
+                   "ref_parameter_study_plots_parallel_coordinates.html",
+                   "ref_parameter_study_plots_global_sensitivity.html",
+                   "ref_parameter_study_plots_local_sensitivity_response_overview.html",
+                   "ref_parameter_study_plots_local_sensitivity_response_trends.html",
+                   "ref_parameter_study_all_results.csv",
+                   "ref_parameter_study_global_sensitivity.csv",
+                   "ref_parameter_study_local_sensitivity.csv"]
 
     scenarios_list_html = ""
     for name in readdir(scenarios_dir)

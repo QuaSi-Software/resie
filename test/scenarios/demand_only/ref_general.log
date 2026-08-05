@@ -11,3 +11,4 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Line plot created and saved to .\output\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\demand_only\sankey_plot.html
 [Info] general log saved to .\test\scenarios\demand_only\general.log
+[Info] balanceWarn log saved to .\test\scenarios\demand_only\balanceWarn.log
