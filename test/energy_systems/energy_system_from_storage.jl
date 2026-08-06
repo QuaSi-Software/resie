@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../test_util.jl")
 
@@ -56,7 +56,7 @@ function test_run_energy_system_from_storage()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -216,7 +216,7 @@ function test_run_energy_system_from_storage_denied()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]

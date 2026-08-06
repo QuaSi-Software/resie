@@ -1,6 +1,6 @@
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 function test_coalesce_greater()
     @test EnergySystems.coalesce_greater(1.0, 2.0) == false

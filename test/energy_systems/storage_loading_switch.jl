@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../test_util.jl")
 
@@ -71,7 +71,7 @@ function test_primary_producer_can_load_storage()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid_1 = components["TST_GRI_01"]
     grid_2 = components["TST_GRI_02"]

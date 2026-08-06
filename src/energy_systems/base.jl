@@ -3340,7 +3340,7 @@ function all_component_parameters()::Dict{String,Any}
         )
     end
 
-    for (name, cm_type) in pairs(Resie.load_control_module_class_mapping())
+    for (name, cm_type) in pairs(ResieQuasi.load_control_module_class_mapping())
         all_parameters["control_modules"][name] = control_module_parameters(cm_type)
     end
 

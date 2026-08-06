@@ -1,4 +1,4 @@
-module Resie
+module ResieQuasi
 
 using Printf
 using Dates: now, seconds
@@ -128,12 +128,12 @@ function run_simulation_loop(sim_params::Dict{String,Any},
                                                   sim_params["parameter_study"],
                                                   components,
                                                   suppress_all_output)
-    all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
-                                                                                            String[]),
-                                                                                  something(output_keys_economic_emissions,
-                                                                                            String[]),
-                                                                                  something(output_keys_parameter_study,
-                                                                                            String[]))))
+    all_requested_output_keys = Vector{ResieQuasi.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
+                                                                                                 String[]),
+                                                                                       something(output_keys_economic_emissions,
+                                                                                                 String[]),
+                                                                                       something(output_keys_parameter_study,
+                                                                                                 String[]))))
     weather_data_keys = get_weather_data_keys(sim_params, suppress_all_output)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing && io_settings["plot_weather_data"]

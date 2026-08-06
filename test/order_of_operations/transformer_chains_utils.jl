@@ -1,7 +1,7 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+import ResieQuasi as Resie
+using ResieQuasi.EnergySystems
 
 function test_distance_from_sink()
     components_config = Dict{String,Any}(

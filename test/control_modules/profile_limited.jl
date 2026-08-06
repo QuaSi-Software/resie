@@ -1,6 +1,6 @@
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
@@ -35,7 +35,7 @@ end
 function test_boiler_direct_demand_follows_profile()
     components_config = get_energy_system_fuel_boiler_direct()
     simulation_params = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_params)
+    components = ResieQuasi.load_components(components_config, simulation_params)
     setup_mock_run!(components, simulation_params)
     grid = components["TST_GRI_01"]
     boiler = components["TST_FB_01"]
@@ -161,7 +161,7 @@ end
 function test_heat_pump_cascade_follows_profile()
     components_config = get_energy_system_heat_pump_cascade()
     simulation_params = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_params)
+    components = ResieQuasi.load_components(components_config, simulation_params)
     setup_mock_run!(components, simulation_params)
     source = components["TST_SRC_01"]
     grid_1 = components["TST_GRI_01"]

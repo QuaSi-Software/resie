@@ -1,6 +1,6 @@
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
@@ -49,7 +49,7 @@ function setup_control_tests()
 
     simulation_params = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_params)
+    components = ResieQuasi.load_components(components_config, simulation_params)
 
     return components, simulation_params
 end

@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../../test_util.jl")
 
@@ -72,7 +72,7 @@ function test_many_to_many()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
     demand_1 = components["TST_DEM_01"]

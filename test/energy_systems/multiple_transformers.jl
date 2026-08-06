@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../test_util.jl")
 
@@ -77,7 +77,7 @@ end
 function test_multiple_transformer_with_limitations()
     components_config = get_energy_system_ely_and_hp()
     simulation_parameters = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -248,7 +248,7 @@ end
 function test_heat_pump_min_use_fraction_limited_by_ely()
     components_config = get_energy_system_ely_and_hp()
     simulation_parameters = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]

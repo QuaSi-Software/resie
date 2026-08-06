@@ -1,7 +1,7 @@
 module Profiles
 using Interpolations
 using Dates, TimeZones
-using Resie.SolarIrradiance
+using ResieQuasi.SolarIrradiance
 
 export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days

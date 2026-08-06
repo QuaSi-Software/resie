@@ -1,9 +1,9 @@
 module Weatherdata
 
-using Resie.Profiles
+using ResieQuasi.Profiles
 using Dates
 using Proj
-using Resie.SolarIrradiance
+using ResieQuasi.SolarIrradiance
 
 export WeatherData, gather_weather_data, get_weather_data_keys, WeatherFileType, guess_file_format
 

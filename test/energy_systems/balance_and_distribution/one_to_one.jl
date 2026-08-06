@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../../test_util.jl")
 
@@ -24,7 +24,7 @@ function test_one_to_one_grid()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
 
@@ -75,7 +75,7 @@ function test_one_to_one_flexible_source()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     source = components["TST_SRC_01"]
 

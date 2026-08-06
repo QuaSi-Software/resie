@@ -10,7 +10,7 @@ end
 
 using UUIDs
 using Logging
-using Resie
+import ResieQuasi as Resie
 
 using Logging
 const Resie_Logger = Resie.Resie_Logger

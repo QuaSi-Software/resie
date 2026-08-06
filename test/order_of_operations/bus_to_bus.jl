@@ -1,8 +1,8 @@
 
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
@@ -86,8 +86,8 @@ function test_ooo_bus_to_bus()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
-    ooo = Resie.calculate_order_of_operations(components)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
+    ooo = ResieQuasi.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end
 
