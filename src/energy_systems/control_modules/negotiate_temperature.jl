@@ -236,7 +236,7 @@ from a given source. Several options are available:
                        in a connected STES.
 - Mean temperature: The desired output temperature is set to the mean value of the upper and lower temperature bound,
                     calculated from the source and the target component. This is computationally much cheaper than 
-                    optimization but can lead to quite good results.
+                    optimisation but can lead to quite good results.
 
 # Arguments
 - `mod::CM_Negotiate_Temperature`: The current control module
@@ -284,7 +284,7 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     end
 
     if mod.parameters["temperature_mode"] == "optimize"
-        # use optimization to determine the temperature for the maximum energy delivery from source to target
+        # use optimisation to determine the temperature for the maximum energy delivery from source to target
         return find_best_temperature_and_get_energy(mod,
                                                     calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,

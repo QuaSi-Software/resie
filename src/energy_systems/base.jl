@@ -307,7 +307,13 @@ function _weighted_mean(values::Union{Floathing,Vector{<:Floathing}},
     end
 
     valid_weights = filter(!isnothing, weights)
-    normalized_weights = valid_weights ./ _sum(valid_weights)
+    valid_weights_sum = _sum(valid_weights)
+
+    if valid_weights_sum == 0.0 || valid_weights_sum === nothing
+        return 0.0
+    end
+
+    normalized_weights = valid_weights ./ valid_weights_sum
     valid_values = filter(!isnothing, values)
 
     if length(valid_values) != length(normalized_weights)
@@ -2040,10 +2046,14 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
 
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
-            if !(value in type_def[name].options)
-                throw(InputError("Given value `$value` is not in the allowed options for " *
-                                 "parameter `$name` of component `$uac`. " *
-                                 "Allowed options are: $(join(("`$option`" for option in type_def[name].options), ", "))"))
+            items = isa(value, Vector) ? value : [value]
+            for item in items
+                if !any(occursin.(type_def[name].options, item))
+                    options_str = join(("`$option`" for option in type_def[name].options), ", ")
+                    throw(InputError("Given value `$item` is not in the allowed options " *
+                                     "for parameter `$name` of component `$uac`. " *
+                                     "Allowed options are: $(options_str)"))
+                end
             end
         end
 

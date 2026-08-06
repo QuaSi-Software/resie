@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "csv_output_file": "./output/out.csv",
+        "csv_output_file_path": "./output/out.csv",
         "auxiliary_info": true,
         "auxiliary_plots": false,
         "auxiliary_info_file": "./output/auxiliary_info.md",

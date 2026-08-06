@@ -81,6 +81,41 @@ mutable struct Profile
                      sunrise_sunset::Vector{Profile}=Vector{Profile}(), # optional: sunrise and sunset times for solar radiation interpolation
                      given_repeat_profile::Bool=false,
                      do_not_shorten_profile::Bool=false)              # keeps the profile length, no shortening will happen
+        cache = get(sim_params, "preparation_cache", nothing)
+
+        # Only cache file-based profiles. Profiles created from vectors are usually generated
+        # from weather data or component-specific in-memory data and are not the bottleneck.
+        # Also avoid caching solar-radiation profiles with an explicit sunrise/sunset vector,
+        # because that vector is an additional dependency of the interpolation result.
+        use_profile_cache = cache !== nothing &&
+                            isempty(given_profile_values) &&
+                            isempty(sunrise_sunset)
+
+        profile_cache_key = nothing
+
+        if use_profile_cache
+            abs_file_path = sim_params["run_path"](file_path)
+            profile_cache_key = (abs_file_path,
+                                 sim_params["start_date"],
+                                 sim_params["end_date"],
+                                 sim_params["time_step_seconds"],
+                                 get(sim_params, "force_profiles_to_repeat", false),
+                                 shift,
+                                 interpolation_type,
+                                 given_repeat_profile,
+                                 do_not_shorten_profile)
+
+            cached_profile = lock(cache.lock) do
+                get(cache.profiles, profile_cache_key, nothing)
+            end
+
+            if cached_profile !== nothing
+                return new(cached_profile.time_step,
+                           cached_profile.data_type,
+                           cached_profile.data)
+            end
+        end
+
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -302,6 +337,9 @@ mutable struct Profile
             end
         end
 
+        # validate data read from source
+        validate_finite_profile_values(profile_values, file_path; timestamps=profile_timestamps_date, context="input")
+
         # shift the profile timestep according to the given shift to get the correct definition:
         # Values are given as the mean/sum over the upcoming time step.
         if shift > Second(0)
@@ -411,12 +449,27 @@ mutable struct Profile
                                                             sunrise_sunset=sunrise_sunset,
                                                             do_not_shorten_profile=do_not_shorten_profile)
 
+        # validate converted data
+        validate_finite_profile_values(profile_values, file_path; timestamps=profile_timestamps_date,
+                                       context="converted")
+
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
-        return new(sim_params["time_step_seconds"],   # Period [s]: time_step, equals simulation time step after conversion
-                   data_type,                         # String: intensive or extensive profile data
-                   profile_dict)                      # Dict{DateTime, Float64}() dict with timestamp as key and data of 
-        #                                               profile, in simulation time step
+        profile = new(sim_params["time_step_seconds"],   # Period [s]: time_step, equals simulation time step after conversion
+                      data_type,                         # String: intensive or extensive profile data
+                      profile_dict)                      # Dict{DateTime, Float64}() dict with timestamp as key and data of 
+        #                                                  profile, in simulation time step
+
+        # save profile to cache if needed
+        if use_profile_cache
+            lock(cache.lock) do
+                if !haskey(cache.profiles, profile_cache_key)
+                    cache.profiles[profile_cache_key] = profile
+                end
+            end
+        end
+
+        return profile
     end
 end
 
@@ -466,6 +519,39 @@ function parse_datestamp(datetime_str::String,
                "timestamp given `$(datetime_str)`.\n The following error occured: $e"
         throw(InputError())
     end
+end
+
+"""
+Check a profile for NaN, Inf, and -Inf values.
+
+Throws `InputError` when one or more non-finite values are found.
+"""
+function validate_finite_profile_values(values::AbstractVector{<:Real},
+                                        file_path::AbstractString;
+                                        timestamps::Union{Nothing,AbstractVector{DateTime}}=nothing,
+                                        context::AbstractString="input")
+    invalid_indices = findall(value -> !isfinite(value), values)
+    isempty(invalid_indices) && return nothing
+
+    number_of_examples = min(length(invalid_indices), 10)
+    examples = String[]
+
+    for index in invalid_indices[1:number_of_examples]
+        location = timestamps !== nothing &&
+                   length(timestamps) == length(values) ?
+                   Dates.format(timestamps[index], dateformat"yyyy-mm-dd HH:MM:SS") : "index $index"
+        push!(examples, "$location = $(repr(values[index]))")
+    end
+
+    omitted = length(invalid_indices) - number_of_examples
+    omitted_text = omitted > 0 ? "; $omitted additional value(s) omitted" : ""
+
+    message = "The $context data of profile '$file_path' contains " *
+              "$(length(invalid_indices)) non-finite value(s), such as NaN or ±Inf. " *
+              "Examples: $(join(examples, ", "))$omitted_text"
+
+    @error message
+    throw(InputError(message))
 end
 
 """
