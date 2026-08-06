@@ -5,26 +5,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\chpp_two_hyst\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/671 in 0.023 s. ETA: 0.4447 s
-[Info] Progress: 66/671 in 0.005 s. ETA: 0.0917 s
-[Info] Progress: 99/671 in 0.004 s. ETA: 0.0693 s
-[Info] Progress: 132/671 in 0.007 s. ETA: 0.1143 s
-[Info] Progress: 165/671 in 0.007 s. ETA: 0.1073 s
-[Info] Progress: 198/671 in 0.004 s. ETA: 0.0573 s
-[Info] Progress: 231/671 in 0.006 s. ETA: 0.0800 s
-[Info] Progress: 264/671 in 0.006 s. ETA: 0.0740 s
-[Info] Progress: 297/671 in 0.006 s. ETA: 0.0680 s
-[Info] Progress: 330/671 in 0.005 s. ETA: 0.0517 s
-[Info] Progress: 363/671 in 0.005 s. ETA: 0.0467 s
-[Info] Progress: 396/671 in 0.006 s. ETA: 0.0500 s
-[Info] Progress: 429/671 in 0.006 s. ETA: 0.0440 s
-[Info] Progress: 462/671 in 0.005 s. ETA: 0.0317 s
-[Info] Progress: 495/671 in 0.004 s. ETA: 0.0213 s
-[Info] Progress: 528/671 in 0.006 s. ETA: 0.0260 s
-[Info] Progress: 561/671 in 0.006 s. ETA: 0.0200 s
-[Info] Progress: 594/671 in 0.006 s. ETA: 0.0140 s
-[Info] Progress: 627/671 in 0.006 s. ETA: 0.0080 s
-[Info] Progress: 660/671 in 0.004 s. ETA: 0.0013 s
+[Info] Progress: 33/671 in 0.033 s. ETA: 0.6380 s
+[Info] Progress: 66/671 in 0.009 s. ETA: 0.1283 s
+[Info] Progress: 99/671 in 0.008 s. ETA: 0.1387 s
+[Info] Progress: 132/671 in 0.008 s. ETA: 0.1307 s
+[Info] Progress: 165/671 in 0.008 s. ETA: 0.1227 s
+[Info] Progress: 198/671 in 0.005 s. ETA: 0.0717 s
+[Info] Progress: 231/671 in 0.013 s. ETA: 0.1733 s
+[Info] Progress: 264/671 in 0.01 s. ETA: 0.1233 s
+[Info] Progress: 297/671 in 0.013 s. ETA: 0.1473 s
+[Info] Progress: 330/671 in 0.009 s. ETA: 0.0930 s
+[Info] Progress: 363/671 in 0.002 s. ETA: 0.0187 s
+[Info] Progress: 396/671 in 0.016 s. ETA: 0.1333 s
+[Info] Progress: 429/671 in 0.01 s. ETA: 0.0733 s
+[Info] Progress: 462/671 in 0.008 s. ETA: 0.0507 s
+[Info] Progress: 495/671 in 0.007 s. ETA: 0.0373 s
+[Info] Progress: 528/671 in 0.01 s. ETA: 0.0433 s
+[Info] Progress: 561/671 in 0.004 s. ETA: 0.0133 s
+[Info] Progress: 594/671 in 0.011 s. ETA: 0.0257 s
+[Info] Progress: 627/671 in 0.007 s. ETA: 0.0093 s
+[Info] Progress: 660/671 in 0.01 s. ETA: 0.0033 s
 [Info] -- Finished time step loop
 [Info] CSV-file with outputs written to .\test\scenarios\chpp_two_hyst\out.csv
 [Info] Summary CSV-file with outputs created and written to .\test\scenarios\chpp_two_hyst\out_aggregated.csv

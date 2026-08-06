@@ -727,7 +727,8 @@ function control(unit::Battery,
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.max_discharge_energy)
 
     charge_current = unit.max_charge_C_rate * unit.capacity_cell_Ah
-    if charge_is_allowed(unit.controller, sim_params) && unit.extracted_charge_last > 0 &&
+    if charge_is_allowed(unit.controller, sim_params) && 
+       (unit.extracted_charge_last > 0 || unit.model_type == "simplified") &&
        unit.capacity > 0
        # end of expression
         charge_current = -unit.max_charge_C_rate * unit.capacity_cell_Ah
