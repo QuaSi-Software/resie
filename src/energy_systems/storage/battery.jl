@@ -727,7 +727,7 @@ function control(unit::Battery,
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.max_discharge_energy)
 
     charge_current = unit.max_charge_C_rate * unit.capacity_cell_Ah
-    if charge_is_allowed(unit.controller, sim_params) && unit.extracted_charge_last > 0 &&# unit.SOC < unit.SOC_max && #TODO test
+    if charge_is_allowed(unit.controller, sim_params) && unit.extracted_charge_last > 0 &&
        unit.capacity > 0
        # end of expression
         charge_current = -unit.max_charge_C_rate * unit.capacity_cell_Ah
@@ -776,11 +776,9 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                           unit.capacity_cell_Ah * 0.0001)
         # limit Voltage to reasonable range to prevent find_zero to run into an asymptote
         if energy < 0 && !ignore_V_cell_last
-                V_min = max(unit.V_cell_last * 0.9, unit.V_cell_min)
+            V_min = max(unit.V_cell_last * 0.9, unit.V_cell_min)
 
         elseif energy > 0
-            #TODO increased limit on V_max; with very small discharge the Voltage can jump 
-            # above V_max and fall through the raster
             if !ignore_V_cell_last
                 V_max = min(unit.V_cell_last * 1.1, unit.V_cell_max)
             end
@@ -807,7 +805,7 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                sign(V_cell_function(V_min, cell_energy, dt, unit, ignore_V_cell_last)) !=
                sign(V_cell_function(V_max, cell_energy, dt, unit, ignore_V_cell_last))
                # end of expression
-            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, dt, unit, 
+            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, dt, unit,
                                                          ignore_V_cell_last),
                                (V_min, V_max),
                                Roots.Brent())
@@ -823,12 +821,12 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         # if less energy is removed then needed to be empty but voltage is outside of realistic 
         # range and would drop jump up because of strong influence of f_I at low currents
         elseif energy > 0 && abs(energy) < unit.load * 0.8 &&
-               sign(V_cell_function(unit.V_cell_min, cell_energy, dt, unit, 
+               sign(V_cell_function(unit.V_cell_min, cell_energy, dt, unit,
                                     ignore_V_cell_last)) !=
-               sign(V_cell_function(unit.V_cell_max, cell_energy, dt, unit, 
+               sign(V_cell_function(unit.V_cell_max, cell_energy, dt, unit,
                                     ignore_V_cell_last))
                # end of expression
-            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, dt, unit, 
+            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, dt, unit,
                                                          ignore_V_cell_last;
                                                          ignore_fi=true),
                                unit.V_cell_last,
@@ -839,8 +837,8 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         elseif energy > 0
             ul = min(asymp * 0.999, cell_energy)
             try
-                max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, 
-                                                                      e_cell, dt, unit, 
+                max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min,
+                                                                      e_cell, dt, unit,
                                                                       ignore_V_cell_last),
                                             (unit.capacity_cell_Ah * 0.0001, ul),
                                             Roots.Brent())
@@ -853,12 +851,12 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         # range and would drop below minimum because of behaviour connected to f_I
         elseif energy < 0 && abs(energy) < (unit.capacity - unit.load) * 0.8
             asymp = find_zero(e_cell -> denom(unit.V_cell_min, e_cell, unit, dt),
-                            -asymp_guess,
-                            Roots.Order1())
+                              -asymp_guess,
+                              Roots.Order1())
             ll = max(asymp * 0.999, cell_energy)
             try
-                max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, 
-                                                                      e_cell, dt, unit, 
+                max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min,
+                                                                      e_cell, dt, unit,
                                                                       ignore_V_cell_last),
                                             (ll, -sim_params["watt_to_wh"](unit.capacity_cell_Ah * 0.01)),
                                             Roots.Brent())
@@ -886,9 +884,9 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         # if battery is charged but less energy can be charged than given
         elseif energy < 0
             if sign(V_cell_function(V_max, cell_energy, dt, unit, ignore_V_cell_last)) !=
-               sign(V_cell_function(V_max, -unit.capacity_cell_Ah * 0.0001, dt, unit, 
+               sign(V_cell_function(V_max, -unit.capacity_cell_Ah * 0.0001, dt, unit,
                                     ignore_V_cell_last))
-               # end fo expression
+               # end of expression
                 max_energy_cell = find_zero(e_cell -> V_cell_function(V_max, e_cell, dt,
                                                                       unit, ignore_V_cell_last),
                                             (cell_energy, -unit.capacity_cell_Ah * 0.0001),
@@ -916,7 +914,7 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         charge = max_energy_cell / V_cell_avg
         max_current = sim_params["wh_to_watts"](max_energy_cell) / V_cell_avg
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p * unit.n_cell_s
-        efficiency = ifelse(max_energy_cell == 0, NaN, 
+        efficiency = ifelse(max_energy_cell == 0, NaN,
                             1 - abs(unit.r_i * max_current / V_cell_avg))
         return efficiency, V_cell, max_energy_bat, charge
     end
@@ -998,7 +996,7 @@ function calc_efficiency_current(current::Number, unit::Battery,
         # check if the resulting voltage with given energy is between V_min & V_max. If very
         # little energy is added the voltage of the battery can drop and give a wrong result
         if current < 0 && abs(current) < 0.1 * unit.capacity_cell_Ah &&
-           (V_cell < V_min || V_cell > V_max) #TODO check if it helps
+           (V_cell < V_min || V_cell > V_max)
            # end of expression
             V_cell = unit.V_cell_last
 
@@ -1008,11 +1006,11 @@ function calc_efficiency_current(current::Number, unit::Battery,
                               -(unit.SOC_max - unit.SOC) / 100 * unit.capacity_cell_Ah / 2,
                               Roots.Order1())
             ll = max(asymp * 0.999, current)
-            max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_min, 
-                                                                    I_cell, dt, unit),
-                            (ll, -sim_params["watt_to_wh"](unit.capacity_cell_Ah * 0.01)),
-                            Roots.Brent())
-           
+            max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_min,
+                                                                      I_cell, dt, unit),
+                                    (ll, -sim_params["watt_to_wh"](unit.capacity_cell_Ah * 0.01)),
+                                    Roots.Brent())
+
             V_cell = unit.V_cell_min
 
         # if battery is discharged but less energy can be removed than given
@@ -1022,7 +1020,7 @@ function calc_efficiency_current(current::Number, unit::Battery,
                               Roots.Order1())
             ul = min(asymp * 0.999, current)
             try
-                max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_min, 
+                max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_min,
                                                                           I_cell, dt, unit),
                                         (unit.capacity_cell_Ah * 0.0001, ul),
                                         Roots.Brent())
@@ -1036,14 +1034,14 @@ function calc_efficiency_current(current::Number, unit::Battery,
             if sign(V_cell_function_current(unit.V_cell_max, current, dt, unit)) !=
                sign(V_cell_function_current(unit.V_cell_max, -unit.capacity_cell_Ah * 0.0001,
                                             dt, unit))
-                # end fo expression
-                max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_max, 
+               # end fo expression
+                max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_max,
                                                                           I_cell, dt, unit),
                                         (current, -unit.capacity_cell_Ah * 0.0001),
                                         Roots.Brent())
             else
                 try
-                    max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_max, 
+                    max_current = find_zero(I_cell -> V_cell_function_current(unit.V_cell_max,
                                                                               I_cell, dt, unit),
                                             -unit.capacity_cell_Ah * 0.01,
                                             Roots.Order1())
@@ -1138,7 +1136,7 @@ function f_V_cell(extracted_charge::Number, current::Number, unit::Battery, n::N
     if extracted_charge > Q && (V_cell < unit.V_cell_min || V_cell > unit.V_cell_max)
         V_cell = unit.V_cell_min - 0.1
     elseif extracted_charge < 0
-        V_cell = unit.V_cell_max + 0.1    
+        V_cell = unit.V_cell_max + 0.1
     end
     return V_cell
 end
@@ -1255,7 +1253,7 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                                              unit.V_n
                 end
                 unit.SOC = unit.capacity > 0 ? (unit.load / unit.capacity) * 100 : 0
-                unit.V_cell = f_V_cell(unit.extracted_charge, 0.0, unit, unit.cycles, 
+                unit.V_cell = f_V_cell(unit.extracted_charge, 0.0, unit, unit.cycles,
                                        unit.Temp)
 
             # check for constant voltage charging cutoff point 
@@ -1275,9 +1273,9 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                 # ignore effect of current on capacity for SOC calculation to stabilize the 
                 # SOC calculation when current changes a lot between time steps
                 f_I = 1
-                f_n = 1 + unit.k_qn[1] * (n - 1) * n / 2 + 
+                f_n = 1 + unit.k_qn[1] * (n - 1) * n / 2 +
                       unit.k_qn[2] * (n - 1) * n * (2 * n - 1) / 2
-                f_T = 1 + unit.k_qT[1] * (T - unit.T_ref) + 
+                f_T = 1 + unit.k_qT[1] * (T - unit.T_ref) +
                       unit.k_qT[2] * (T - unit.T_ref)^2
                 Q = unit.capacity_cell_Ah * f_I * f_n * f_T
 
