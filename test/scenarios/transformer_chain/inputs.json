@@ -1,15 +1,15 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/transformer_chain/out.csv",
+        "csv_output_file_path": "./test/scenarios/transformer_chain/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/transformer_chain/auxiliary_info.md",
         "fixed_output_precision": 10,
-        "sankey_plot_file": "./test/scenarios/transformer_chain/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/transformer_chain/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "all_incl_flows",
         "csv_output_weather": true,
         "plot_weather_data": true,
-        "output_plot_file": "./test/scenarios/transformer_chain/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/transformer_chain/output_plot.html",
         "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
@@ -46,21 +46,21 @@
             "constant_temperature": 20
         },
         "TST_GRI_natgas": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_c_natgas",
             "output_refs": [
                 "TST_CHP_01"
             ]
         },
         "TST_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"
             ]
         },
         "TST_GRI_02": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "medium": "m_e_ac_230v",
             "input_refs": [
                 "TST_BUS_EL"

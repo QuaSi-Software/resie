@@ -1,19 +1,19 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+import ResieQuasi as Resie
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
 function test_ooo_storage_loading_switch()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_01"],
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GBO_02"],
         ),

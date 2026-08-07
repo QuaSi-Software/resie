@@ -1,7 +1,7 @@
 ﻿Emissions results
 Note: Positive values are emissions, negative values are credits / avoided emissions.
-Total emissions:;391651,79;kg CO₂e
-Energy emissions:;391651,79;kg CO₂e
+Total emissions:;392432,34;kg CO₂e
+Energy emissions:;392432,34;kg CO₂e
 Embodied emissions:;0,00;kg CO₂e
 
 Yearly emissions in [kg CO₂e/year]:
@@ -9,7 +9,7 @@ Yearly emissions in [kg CO₂e/year]:
 Ambient_heat - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
 Building_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_PV - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
-Building_el_GRI - energy_emissions_per_year:;25754,95;24982,30;24232,83;23505,85;22800,67;22116,65;21453,15;20809,56;20185,27;19579,71;18992,32;18422,55;17869,88;17333,78;16813,77;16309,35;15820,07;15345,47;14885,11;14438,55
+Building_el_GRI - energy_emissions_per_year:;25806,28;25032,09;24281,13;23552,69;22846,11;22160,73;21495,91;20851,03;20225,50;19618,73;19030,17;18459,27;17905,49;17368,32;16847,27;16341,86;15851,60;15376,05;14914,77;14467,33
 Building_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
@@ -18,7 +18,7 @@ Emissions breakdown per component:
 Ambient_heat - emissions_energy:;0,00;kg CO₂e
 Building_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_PV - emissions_energy:;0,00;kg CO₂e
-Building_el_GRI - emissions_energy:;391651,79;kg CO₂e
+Building_el_GRI - emissions_energy:;392432,34;kg CO₂e
 Building_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
 Building_el_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_heating_demand - emissions_credits_energy:;0,00;kg CO₂e

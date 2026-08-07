@@ -1,13 +1,13 @@
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
 function get_energy_system_fuel_boiler_direct()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_FB_01"],
             "medium" => "m_c_g_natgas",
         ),
@@ -35,7 +35,7 @@ end
 function test_boiler_direct_demand_follows_profile()
     components_config = get_energy_system_fuel_boiler_direct()
     simulation_params = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_params)
+    components = ResieQuasi.load_components(components_config, simulation_params)
     setup_mock_run!(components, simulation_params)
     grid = components["TST_GRI_01"]
     boiler = components["TST_FB_01"]
@@ -111,12 +111,12 @@ function get_energy_system_heat_pump_cascade()
             "constant_power" => 40000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_HP_01"],
             "medium" => "m_e_ac_230v",
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_HP_02"],
             "medium" => "m_e_ac_230v",
         ),
@@ -149,7 +149,7 @@ function get_energy_system_heat_pump_cascade()
             "fudge_factor" => 1.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "output_refs" => [],
             "medium" => "m_h_w_ht1",
             "output_temperature" => 90,
@@ -161,7 +161,7 @@ end
 function test_heat_pump_cascade_follows_profile()
     components_config = get_energy_system_heat_pump_cascade()
     simulation_params = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_params)
+    components = ResieQuasi.load_components(components_config, simulation_params)
     setup_mock_run!(components, simulation_params)
     source = components["TST_SRC_01"]
     grid_1 = components["TST_GRI_01"]

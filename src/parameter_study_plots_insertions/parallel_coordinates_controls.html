@@ -1,0 +1,1332 @@
+<script>
+(function () {
+    const parameterKeys = {{PARAMETER_KEYS_JSON}};
+    const parameterKeySet = new Set(parameterKeys);
+    const objectiveKeys = {{OBJECTIVE_KEYS_JSON}};
+    const objectiveKeySet = new Set(objectiveKeys);
+    const objectiveSenses = {{OBJECTIVE_SENSES_JSON}};
+    const initialColorKey = {{INITIAL_COLOR_KEY_JSON}};
+    function findPlotlyDiv() {
+        const divs = document.querySelectorAll(".js-plotly-plot");
+        return divs.length > 0 ? divs[0] : null;
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (gd === null || !gd.data || gd.data.length === 0) {
+            window.setTimeout(setupControls, 200);
+            return;
+        }
+
+        if (document.getElementById("parallel-axis-zoom-controls")) {
+            return;
+        }
+
+        const traceIndex = gd.data.findIndex(
+            trace => trace.type === "parcoords"
+        );
+
+        if (traceIndex < 0) {
+            return;
+        }
+
+        const dims = gd.data[traceIndex].dimensions;
+
+        const originalRanges = dims.map(
+            dimension =>
+                Array.isArray(dimension.range)
+                    ? dimension.range.slice()
+                    : null
+        );
+
+        const originalCmin = gd.data[traceIndex].line.cmin;
+        const originalCmax = gd.data[traceIndex].line.cmax;
+        const originalColorValues = Array.from(
+            gd.data[traceIndex].line.color || []
+        );
+        const originalColorscale =
+            gd.data[traceIndex].line.colorscale;
+
+        function copyColorscale(colorscale) {
+            return Array.isArray(colorscale)
+                ? colorscale.map(stop =>
+                    Array.isArray(stop) ? stop.slice() : stop
+                )
+                : colorscale;
+        }
+
+        function reverseColorscale(colorscale) {
+            if (!Array.isArray(colorscale)) {
+                return colorscale;
+            }
+
+            return colorscale
+                .slice()
+                .reverse()
+                .map(stop => [1.0 - Number(stop[0]), stop[1]]);
+        }
+
+        // Encode the objective direction directly in the colourscale.
+        // Plotly's built-in "Reset axes" action can restore reversescale
+        // independently of a colourscale changed with Plotly.restyle.
+        // Keeping reversescale false prevents the colour direction from
+        // changing when axes are reset.
+        const initialColorSense =
+            objectiveKeySet.has(initialColorKey) &&
+            Object.prototype.hasOwnProperty.call(
+                objectiveSenses,
+                initialColorKey
+            )
+                ? objectiveSenses[initialColorKey]
+                : "min";
+
+        // Keep one canonical scale whose low end is yellow and whose high
+        // end is purple. Derive it once from the initial Plotly trace, then
+        // copy it for every update so Plotly cannot mutate the stored scale.
+        const lowValuesYellowColorscale =
+            initialColorSense === "min"
+                ? copyColorscale(originalColorscale)
+                : reverseColorscale(originalColorscale);
+
+        function colorscaleForSense(sense) {
+            return sense === "max"
+                ? reverseColorscale(lowValuesYellowColorscale)
+                : copyColorscale(lowValuesYellowColorscale);
+        }
+
+        function colorscaleRestyleValue(sense) {
+            // Plotly.restyle treats array-valued attributes as per-trace
+            // values. The extra array level assigns the complete colorscale
+            // to this one trace instead of unpacking its colour stops.
+            return [colorscaleForSense(sense)];
+        }
+
+        let currentColorKey = initialColorKey;
+        let currentColorValues = originalColorValues.slice();
+        let currentBaseCmin = originalCmin;
+        let currentBaseCmax = originalCmax;
+        let updatingColorBounds = false;
+        let colorUpdateTimer = null;
+
+        function isFiniteNumber(value) {
+            return typeof value === "number" &&
+                   Number.isFinite(value);
+        }
+
+        function adaptiveColorBounds(values) {
+            const finite = values.filter(isFiniteNumber);
+
+            if (finite.length === 0) {
+                return null;
+            }
+
+            let minimum = Math.min(...finite);
+            let maximum = Math.max(...finite);
+
+            if (!(maximum > minimum)) {
+                const delta =
+                    Math.max(Math.abs(minimum), 1.0) * 1.0e-9;
+
+                minimum -= delta;
+                maximum += delta;
+            }
+
+            return [minimum, maximum];
+        }
+
+        function valueInsideRange(value, range) {
+            if (
+                !isFiniteNumber(value) ||
+                !Array.isArray(range) ||
+                range.length !== 2
+            ) {
+                return false;
+            }
+
+            const lower = Math.min(range[0], range[1]);
+            const upper = Math.max(range[0], range[1]);
+
+            return value >= lower && value <= upper;
+        }
+
+        function valueInsideConstraint(value, constraint) {
+            if (!Array.isArray(constraint)) {
+                return true;
+            }
+
+            if (Array.isArray(constraint[0])) {
+                return constraint.some(
+                    range => valueInsideRange(value, range)
+                );
+            }
+
+            return valueInsideRange(value, constraint);
+        }
+
+        function activeVisibleColorValues() {
+            const currentDimensions =
+                gd.data[traceIndex].dimensions;
+
+            const hasActiveRange = currentDimensions.some(
+                dimension =>
+                    Array.isArray(dimension.range) ||
+                    Array.isArray(dimension.constraintrange)
+            );
+
+            if (!hasActiveRange) {
+                return null;
+            }
+
+            const visible = [];
+            const pointCount = currentColorValues.length;
+
+            for (let pointIndex = 0;
+                 pointIndex < pointCount;
+                 pointIndex += 1) {
+                let isVisible = true;
+
+                for (const dimension of currentDimensions) {
+                    const value = dimension.values[pointIndex];
+
+                    if (
+                        Array.isArray(dimension.range) &&
+                        !valueInsideRange(value, dimension.range)
+                    ) {
+                        isVisible = false;
+                        break;
+                    }
+
+                    if (
+                        Array.isArray(dimension.constraintrange) &&
+                        !valueInsideConstraint(
+                            value,
+                            dimension.constraintrange
+                        )
+                    ) {
+                        isVisible = false;
+                        break;
+                    }
+                }
+
+                if (
+                    isVisible &&
+                    isFiniteNumber(currentColorValues[pointIndex])
+                ) {
+                    visible.push(currentColorValues[pointIndex]);
+                }
+            }
+
+            return visible;
+        }
+
+        function updateVisibleColorBounds() {
+            const visibleValues = activeVisibleColorValues();
+            const bounds = visibleValues === null
+                ? [currentBaseCmin, currentBaseCmax]
+                : adaptiveColorBounds(visibleValues);
+
+            const selectedBounds = bounds === null
+                ? [currentBaseCmin, currentBaseCmax]
+                : bounds;
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.cmin": selectedBounds[0],
+                    "line.cmax": selectedBounds[1]
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            });
+        }
+
+        function scheduleVisibleColorUpdate() {
+            if (colorUpdateTimer !== null) {
+                window.clearTimeout(colorUpdateTimer);
+            }
+
+            colorUpdateTimer = window.setTimeout(
+                updateVisibleColorBounds,
+                0
+            );
+        }
+
+        const originalUnselectedOpacity =
+            gd.data[traceIndex].unselected &&
+            gd.data[traceIndex].unselected.line &&
+            isFiniteNumber(
+                gd.data[traceIndex].unselected.line.opacity
+            )
+                ? gd.data[traceIndex].unselected.line.opacity
+                : 0.10;
+
+        document.documentElement.style.height = "100%";
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.height = "100%";
+        document.body.style.width = "100%";
+        document.body.style.margin = "0";
+        document.body.style.overflow = "hidden";
+        document.body.style.display = "flex";
+        document.body.style.flexDirection = "column";
+
+        const panel = document.createElement("div");
+        panel.id = "parallel-axis-zoom-controls";
+        panel.style.flex = "0 0 auto";
+        panel.style.width = "100%";
+        panel.style.boxSizing = "border-box";
+        panel.style.zIndex = "10000";
+        panel.style.fontFamily = "Arial, sans-serif";
+        panel.style.fontSize = "13px";
+        panel.style.background = "rgba(255,255,255,0.98)";
+        panel.style.borderBottom = "1px solid #bbb";
+        panel.style.boxShadow = "0 1px 5px rgba(0,0,0,0.12)";
+
+        const content = document.createElement("div");
+        content.style.padding = "6px 10px 12px";
+        content.style.width = "100%";
+        content.style.boxSizing = "border-box";
+        content.style.display = "flex";
+        content.style.flexWrap = "wrap";
+        content.style.gap = "6px 12px";
+        content.style.alignItems = "center";
+
+        panel.appendChild(content);
+
+        const heading = document.createElement("span");
+        heading.textContent = "Figure settings:";
+        heading.style.fontWeight = "600";
+        heading.style.marginRight = "4px";
+        content.appendChild(heading);
+
+        function addControl(labelText, control) {
+            const group = document.createElement("label");
+            group.style.display = "inline-flex";
+            group.style.alignItems = "center";
+            group.style.gap = "5px";
+            group.style.whiteSpace = "nowrap";
+
+            const label = document.createElement("span");
+            label.textContent = labelText;
+
+            group.appendChild(label);
+            group.appendChild(control);
+            content.appendChild(group);
+        }
+
+        const axisSelect = document.createElement("select");
+        axisSelect.style.width = "clamp(140px, 22vw, 220px)";
+        axisSelect.style.maxWidth = "100%";
+        axisSelect.style.minWidth = "120px";
+
+        const axisGroups = [
+            {
+                label: "Variable parameters",
+                entries: []
+            },
+            {
+                label: "Objectives",
+                entries: []
+            }
+        ];
+
+        dims.forEach((dimension, index) => {
+            const label =
+                dimension.label || ("Axis " + (index + 1));
+            const groupIndex = parameterKeySet.has(label) ? 0 : 1;
+
+            axisGroups[groupIndex].entries.push({
+                index: index,
+                label: label
+            });
+        });
+
+        axisGroups.forEach(groupDefinition => {
+            if (groupDefinition.entries.length === 0) {
+                return;
+            }
+
+            const group = document.createElement("optgroup");
+            group.label = groupDefinition.label;
+
+            groupDefinition.entries.forEach(entry => {
+                const option = document.createElement("option");
+                option.value = entry.index;
+                option.textContent = entry.label;
+                group.appendChild(option);
+            });
+
+            axisSelect.appendChild(group);
+        });
+
+        addControl("Axis", axisSelect);
+
+        const minInput = document.createElement("input");
+        minInput.type = "number";
+        minInput.step = "any";
+        minInput.style.width = "clamp(88px, 12vw, 110px)";
+        addControl("Minimum", minInput);
+
+        const maxInput = document.createElement("input");
+        maxInput.type = "number";
+        maxInput.step = "any";
+        maxInput.style.width = "clamp(88px, 12vw, 110px)";
+        addControl("Maximum", maxInput);
+
+        const buttonRow = document.createElement("div");
+        buttonRow.style.display = "inline-flex";
+        buttonRow.style.flexWrap = "wrap";
+        buttonRow.style.gap = "6px";
+        content.appendChild(buttonRow);
+
+        const applyButton = document.createElement("button");
+        applyButton.textContent = "Apply axis";
+        buttonRow.appendChild(applyButton);
+
+        const zoomSelectionButton = document.createElement("button");
+        zoomSelectionButton.textContent = "Zoom to selection";
+        buttonRow.appendChild(zoomSelectionButton);
+
+        const resetButton = document.createElement("button");
+        resetButton.textContent = "Reset axis";
+        buttonRow.appendChild(resetButton);
+
+        const resetAllButton = document.createElement("button");
+        resetAllButton.textContent = "Reset all";
+        buttonRow.appendChild(resetAllButton);
+
+        const colorSelect = document.createElement("select");
+        colorSelect.style.width = "clamp(150px, 22vw, 230px)";
+        colorSelect.style.maxWidth = "100%";
+        colorSelect.style.minWidth = "130px";
+
+        const colorGroups = [
+            {
+                label: "Variable parameters",
+                entries: []
+            },
+            {
+                label: "Objectives",
+                entries: []
+            }
+        ];
+
+        dims.forEach((dimension, index) => {
+            const label =
+                dimension.label || ("Axis " + (index + 1));
+            const groupIndex = parameterKeySet.has(label) ? 0 : 1;
+
+            colorGroups[groupIndex].entries.push({
+                index: index,
+                label: label
+            });
+        });
+
+        colorGroups.forEach(groupDefinition => {
+            if (groupDefinition.entries.length === 0) {
+                return;
+            }
+
+            const group = document.createElement("optgroup");
+            group.label = groupDefinition.label;
+
+            groupDefinition.entries.forEach(entry => {
+                const option = document.createElement("option");
+                option.value = entry.index;
+                option.textContent = entry.label;
+                group.appendChild(option);
+            });
+
+            colorSelect.appendChild(group);
+        });
+
+        const initialColorDimensionIndex =
+            dims.findIndex(
+                dimension =>
+                    (dimension.label || "") === initialColorKey
+            );
+
+        if (initialColorDimensionIndex >= 0) {
+            colorSelect.value =
+                String(initialColorDimensionIndex);
+        }
+
+        addControl("Colour source", colorSelect);
+
+        const opacityInput = document.createElement("input");
+        opacityInput.type = "number";
+        opacityInput.min = "0";
+        opacityInput.max = "100";
+        opacityInput.step = "1";
+        opacityInput.style.width = "65px";
+        opacityInput.value =
+            String(Math.round(originalUnselectedOpacity * 100));
+
+        const opacityGroup = document.createElement("label");
+        opacityGroup.style.display = "inline-flex";
+        opacityGroup.style.alignItems = "center";
+        opacityGroup.style.gap = "5px";
+        opacityGroup.style.whiteSpace = "nowrap";
+
+        const opacityLabel = document.createElement("span");
+        opacityLabel.textContent = "Unselected opacity (%)";
+
+        opacityGroup.appendChild(opacityLabel);
+        opacityGroup.appendChild(opacityInput);
+        content.appendChild(opacityGroup);
+
+        const hint = document.createElement("span");
+        hint.textContent =
+            "Press Enter to apply values. Drag on an axis to filter.";
+        hint.style.color = "#666";
+        hint.style.fontSize = "11px";
+        hint.style.whiteSpace = "normal";
+        content.appendChild(hint);
+
+        document.body.insertBefore(panel, document.body.firstChild);
+
+        gd.style.flex = "0 0 auto";
+        gd.style.width = "100vw";
+        gd.style.minHeight = "0";
+
+        function updateResponsiveParallelLayout() {
+            if (
+                !gd._fullLayout ||
+                !gd._fullLayout._size ||
+                !Array.isArray(gd.layout.annotations) ||
+                !Array.isArray(gd.layout.shapes)
+            ) {
+                return;
+            }
+
+            const annotations = gd.layout.annotations;
+            const plotWidth = Math.max(
+                gd._fullLayout._size.w,
+                1
+            );
+            const plotHeight = Math.max(
+                gd._fullLayout._size.h,
+                1
+            );
+
+            /*
+             * The plot title sits in Plotly's top margin. Place the category
+             * headings directly at the top of the paper area, then derive the
+             * parallel-coordinate domain from the actual heading height. This
+             * keeps the layout compact on large windows while preserving a
+             * fixed readable gap above the axis labels on narrow windows.
+             */
+            const groupHeadingTopOffsetPx = 2;
+            const groupY =
+                1 - groupHeadingTopOffsetPx / plotHeight;
+            let maximumHeadingLines = 1;
+
+            const usedAnnotationIndices = new Set();
+            const updates = {};
+
+            const groups = [
+                {
+                    fillToken: "70,130,180",
+                    labelForWidth: function (width) {
+                        if (width >= 150) {
+                            return "Variable parameters";
+                        }
+
+                        if (width >= 85) {
+                            return "Variable<br>parameters";
+                        }
+
+                        if (width >= 55) {
+                            return "Parameters";
+                        }
+
+                        return "Vars";
+                    }
+                },
+                {
+                    fillToken: "220,140,50",
+                    labelForWidth: function (width) {
+                        return width >= 55 ? "Results" : "Result";
+                    }
+                }
+            ];
+
+            groups.forEach(group => {
+                const shape = gd.layout.shapes.find(
+                    candidate =>
+                        candidate.type === "rect" &&
+                        typeof candidate.fillcolor === "string" &&
+                        candidate.fillcolor.includes(group.fillToken)
+                );
+
+                if (shape === undefined) {
+                    return;
+                }
+
+                const center = (shape.x0 + shape.x1) / 2;
+                const width =
+                    Math.abs(shape.x1 - shape.x0) * plotWidth;
+
+                let annotationIndex = -1;
+                let smallestDistance = Infinity;
+
+                annotations.forEach((annotation, index) => {
+                    if (usedAnnotationIndices.has(index)) {
+                        return;
+                    }
+
+                    const distance = Math.abs(annotation.x - center);
+
+                    if (distance < smallestDistance) {
+                        smallestDistance = distance;
+                        annotationIndex = index;
+                    }
+                });
+
+                if (annotationIndex < 0) {
+                    return;
+                }
+
+                usedAnnotationIndices.add(annotationIndex);
+
+                const fontSize =
+                    width < 55 ? 9 : width < 100 ? 10 : 11;
+                const labelText = group.labelForWidth(width);
+                const headingLines =
+                    (labelText.match(/<br>/g) || []).length + 1;
+
+                maximumHeadingLines = Math.max(
+                    maximumHeadingLines,
+                    headingLines
+                );
+
+                updates[
+                    "annotations[" + annotationIndex + "].text"
+                ] = "<b>" + labelText + "</b>";
+
+                updates[
+                    "annotations[" + annotationIndex + "].font.size"
+                ] = fontSize;
+
+                updates[
+                    "annotations[" + annotationIndex + "].x"
+                ] = center;
+
+                updates[
+                    "annotations[" + annotationIndex + "].y"
+                ] = groupY;
+
+                updates[
+                    "annotations[" + annotationIndex + "].yanchor"
+                ] = "top";
+            });
+
+            const headingHeightPx =
+                maximumHeadingLines > 1 ? 25 : 14;
+            /*
+             * Plotly draws the parcoords dimension names above the visible
+             * axis line. Reserve that overhang explicitly; otherwise the
+             * category headings and dimension names occupy the same row.
+             */
+            const axisLabelGapPx = 16;
+            const dimensionLabelOverhangPx = 28;
+            const axisRegionOffsetPx =
+                groupHeadingTopOffsetPx +
+                headingHeightPx +
+                axisLabelGapPx +
+                dimensionLabelOverhangPx;
+            const domainTop = Math.max(
+                0.62,
+                1 - axisRegionOffsetPx / plotHeight
+            );
+
+            const layoutUpdate =
+                Object.keys(updates).length > 0
+                    ? Plotly.relayout(gd, updates)
+                    : Promise.resolve();
+
+            const currentDomain =
+                gd.data[traceIndex].domain &&
+                gd.data[traceIndex].domain.y;
+
+            const currentDomainTop =
+                Array.isArray(currentDomain) &&
+                currentDomain.length === 2
+                    ? currentDomain[1]
+                    : null;
+
+            const domainNeedsUpdate =
+                currentDomainTop === null ||
+                Math.abs(currentDomainTop - domainTop) > 1.0e-4;
+
+            const domainUpdate =
+                domainNeedsUpdate
+                    ? Plotly.restyle(
+                          gd,
+                          {
+                              "domain.y": [[0.0, domainTop]],
+                              "line.colorbar.len": domainTop,
+                              "line.colorbar.y": domainTop / 2
+                          },
+                          [traceIndex]
+                      )
+                    : Promise.resolve();
+
+            return Promise.all([
+                layoutUpdate,
+                domainUpdate
+            ]);
+        }
+
+        function resizePlotToViewport() {
+            const panelHeight =
+                panel.getBoundingClientRect().height;
+
+            gd.style.height =
+                Math.max(1, window.innerHeight - panelHeight) +
+                "px";
+
+            Plotly.Plots.resize(gd);
+            window.requestAnimationFrame(
+                updateResponsiveParallelLayout
+            );
+        }
+
+        const panelResizeObserver =
+            typeof ResizeObserver === "function"
+                ? new ResizeObserver(resizePlotToViewport)
+                : null;
+
+        if (panelResizeObserver !== null) {
+            panelResizeObserver.observe(panel);
+        }
+
+        window.setTimeout(resizePlotToViewport, 0);
+
+        function currentDimensionIndex() {
+            return Number(axisSelect.value);
+        }
+
+        function finiteValues(index) {
+            return gd.data[traceIndex]
+                .dimensions[index]
+                .values
+                .filter(
+                    value =>
+                        typeof value === "number" &&
+                        Number.isFinite(value)
+                );
+        }
+
+        function constraintRanges(constraint) {
+            if (!Array.isArray(constraint)) {
+                return [];
+            }
+
+            if (
+                constraint.length === 2 &&
+                constraint.every(isFiniteNumber)
+            ) {
+                return [constraint];
+            }
+
+            return constraint.filter(
+                range =>
+                    Array.isArray(range) &&
+                    range.length === 2 &&
+                    range.every(isFiniteNumber)
+            );
+        }
+
+        function selectedRowIndices() {
+            const currentDimensions =
+                gd.data[traceIndex].dimensions;
+
+            const hasActiveSelection =
+                currentDimensions.some(
+                    dimension =>
+                        constraintRanges(
+                            dimension.constraintrange
+                        ).length > 0
+                );
+
+            if (!hasActiveSelection) {
+                return null;
+            }
+
+            const pointCount =
+                currentDimensions[0].values.length;
+
+            const selectedIndices = [];
+
+            for (
+                let pointIndex = 0;
+                pointIndex < pointCount;
+                pointIndex += 1
+            ) {
+                const isSelected =
+                    currentDimensions.every(dimension => {
+                        const ranges =
+                            constraintRanges(
+                                dimension.constraintrange
+                            );
+
+                        if (ranges.length === 0) {
+                            return true;
+                        }
+
+                        const value =
+                            dimension.values[pointIndex];
+
+                        return (
+                            isFiniteNumber(value) &&
+                            ranges.some(
+                                range =>
+                                    valueInsideRange(
+                                        value,
+                                        range
+                                    )
+                            )
+                        );
+                    });
+
+                if (isSelected) {
+                    selectedIndices.push(pointIndex);
+                }
+            }
+
+            return selectedIndices;
+        }
+
+        function selectedAxisRanges(
+            dimensionIndex,
+            selectedIndices
+        ) {
+            const dimension =
+                gd.data[traceIndex]
+                    .dimensions[dimensionIndex];
+
+            const selectedValues =
+                selectedIndices
+                    .map(
+                        pointIndex =>
+                            dimension.values[pointIndex]
+                    )
+                    .filter(isFiniteNumber);
+
+            if (selectedValues.length === 0) {
+                return null;
+            }
+
+            const selectedMinimum =
+                Math.min(...selectedValues);
+
+            const selectedMaximum =
+                Math.max(...selectedValues);
+
+            const allValues =
+                finiteValues(dimensionIndex);
+
+            const fullMinimum =
+                allValues.length > 0
+                    ? Math.min(...allValues)
+                    : selectedMinimum;
+
+            const fullMaximum =
+                allValues.length > 0
+                    ? Math.max(...allValues)
+                    : selectedMaximum;
+
+            const selectedSpan =
+                selectedMaximum - selectedMinimum;
+
+            const fullSpan =
+                fullMaximum - fullMinimum;
+
+            const scale =
+                Math.max(
+                    Math.abs(selectedMinimum),
+                    Math.abs(selectedMaximum),
+                    Math.abs(fullMinimum),
+                    Math.abs(fullMaximum),
+                    1.0
+                );
+
+            const effectivelyConstant =
+                selectedSpan <= scale * 1.0e-12;
+
+            const zoomPadding =
+                effectivelyConstant
+                    ? (
+                        fullSpan > scale * 1.0e-12
+                            ? fullSpan * 0.03
+                            : scale * 0.03
+                    )
+                    : selectedSpan * 0.05;
+
+            // The visible selection should be exactly as wide as the
+            // selected data. A tiny interval is required when all selected
+            // values on this axis are identical, because Plotly cannot show
+            // a zero-width constraint range reliably.
+            const selectionPadding =
+                effectivelyConstant
+                    ? Math.max(scale * 1.0e-9, zoomPadding * 1.0e-6)
+                    : 0.0;
+
+            return {
+                zoomRange: [
+                    selectedMinimum - zoomPadding,
+                    selectedMaximum + zoomPadding
+                ],
+                selectionRange: [
+                    selectedMinimum - selectionPadding,
+                    selectedMaximum + selectionPadding
+                ]
+            };
+        }
+
+        function formatInputValue(value) {
+            return Number(value.toPrecision(8)).toString();
+        }
+
+        function updateInputValues() {
+            const index = currentDimensionIndex();
+            const dimension =
+                gd.data[traceIndex].dimensions[index];
+
+            const values = finiteValues(index);
+
+            if (values.length === 0) {
+                minInput.value = "";
+                maxInput.value = "";
+                return;
+            }
+
+            if (
+                Array.isArray(dimension.range) &&
+                dimension.range.length === 2 &&
+                Number.isFinite(dimension.range[0]) &&
+                Number.isFinite(dimension.range[1])
+            ) {
+                minInput.value =
+                    formatInputValue(dimension.range[0]);
+
+                maxInput.value =
+                    formatInputValue(dimension.range[1]);
+            } else {
+                minInput.value =
+                    formatInputValue(Math.min(...values));
+
+                maxInput.value =
+                    formatInputValue(Math.max(...values));
+            }
+        }
+
+        axisSelect.addEventListener(
+            "change",
+            updateInputValues
+        );
+
+        function colorSenseForKey(key) {
+            if (
+                objectiveKeySet.has(key) &&
+                Object.prototype.hasOwnProperty.call(
+                    objectiveSenses,
+                    key
+                )
+            ) {
+                return objectiveSenses[key];
+            }
+
+            // Parameters and other result quantities have no objective
+            // direction. Keep low values yellow and high values purple.
+            return "min";
+        }
+
+        function enforceCurrentColorDirection() {
+            const sense = colorSenseForKey(currentColorKey);
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.colorscale": colorscaleRestyleValue(sense),
+                    "line.reversescale": false
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            });
+        }
+
+        function applyColorSource() {
+            const dimensionIndex = Number(colorSelect.value);
+            const dimension =
+                gd.data[traceIndex].dimensions[dimensionIndex];
+
+            if (!dimension) {
+                return Promise.resolve();
+            }
+
+            const key =
+                dimension.label || ("Axis " + (dimensionIndex + 1));
+
+            const values =
+                Array.from(dimension.values || []);
+
+            const bounds =
+                adaptiveColorBounds(values);
+
+            if (bounds === null) {
+                alert(
+                    "The selected colour source has no finite values."
+                );
+                return Promise.resolve();
+            }
+
+            currentColorKey = key;
+            currentColorValues = values;
+            currentBaseCmin = bounds[0];
+            currentBaseCmax = bounds[1];
+
+            const sense =
+                colorSenseForKey(key);
+
+            updatingColorBounds = true;
+
+            return Plotly.restyle(
+                gd,
+                {
+                    "line.color": [values],
+                    "line.colorscale": colorscaleRestyleValue(sense),
+                    "line.reversescale": false,
+                    "line.cmin": bounds[0],
+                    "line.cmax": bounds[1],
+                    "line.colorbar.title.text": key
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            }).then(updateVisibleColorBounds);
+        }
+
+        colorSelect.addEventListener(
+            "change",
+            applyColorSource
+        );
+
+        function applyOpacity() {
+            const opacityPercent = Number(opacityInput.value);
+
+            if (
+                !Number.isFinite(opacityPercent) ||
+                opacityPercent < 0 ||
+                opacityPercent > 100
+            ) {
+                alert(
+                    "Unselected opacity must be between 0 and 100 percent."
+                );
+
+                opacityInput.value =
+                    String(
+                        Math.round(
+                            gd.data[traceIndex]
+                                .unselected.line.opacity * 100
+                        )
+                    );
+
+                return;
+            }
+
+            Plotly.restyle(
+                gd,
+                {
+                    "unselected.line.opacity":
+                        opacityPercent / 100
+                },
+                [traceIndex]
+            );
+        }
+
+        function applyAxisRange() {
+            const index = currentDimensionIndex();
+            const minimum = Number(minInput.value);
+            const maximum = Number(maxInput.value);
+
+            if (
+                !Number.isFinite(minimum) ||
+                !Number.isFinite(maximum) ||
+                minimum >= maximum
+            ) {
+                alert("Please enter a valid minimum and maximum.");
+                return;
+            }
+
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, dimensionIndex) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (dimensionIndex === index) {
+                            copied.range = [
+                                minimum,
+                                maximum
+                            ];
+
+                            delete copied.constraintrange;
+                        }
+
+                        return copied;
+                    }
+                );
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions]
+                },
+                [traceIndex]
+            ).then(function () {
+                updateInputValues();
+                return updateVisibleColorBounds();
+            });
+        }
+
+        function applyOnEnter(input, callback) {
+            input.addEventListener("keydown", function (event) {
+                if (event.key !== "Enter") {
+                    return;
+                }
+
+                event.preventDefault();
+                callback();
+            });
+        }
+
+        applyOnEnter(minInput, applyAxisRange);
+        applyOnEnter(maxInput, applyAxisRange);
+        applyOnEnter(opacityInput, applyOpacity);
+
+        applyButton.addEventListener(
+            "click",
+            applyAxisRange
+        );
+
+        zoomSelectionButton.addEventListener(
+            "click",
+            function () {
+                const selectedIndices =
+                    selectedRowIndices();
+
+                if (selectedIndices === null) {
+                    alert(
+                        "No active selection. Drag on one or more axes first."
+                    );
+                    return;
+                }
+
+                if (selectedIndices.length === 0) {
+                    alert(
+                        "The current filters do not select any lines."
+                    );
+                    return;
+                }
+
+                const newDimensions =
+                    gd.data[traceIndex].dimensions.map(
+                        (dimension, dimensionIndex) => {
+                            const copied =
+                                Object.assign({}, dimension);
+
+                            const selectedRanges =
+                                selectedAxisRanges(
+                                    dimensionIndex,
+                                    selectedIndices
+                                );
+
+                            if (selectedRanges !== null) {
+                                copied.range =
+                                    selectedRanges.zoomRange;
+
+                                // Tighten only axes that already carried an
+                                // active selection. Unfiltered axes remain
+                                // unfiltered after zooming.
+                                if (
+                                    constraintRanges(
+                                        dimension.constraintrange
+                                    ).length > 0
+                                ) {
+                                    copied.constraintrange =
+                                        selectedRanges.selectionRange;
+                                }
+                            }
+
+                            return copied;
+                        }
+                    );
+
+                Plotly.restyle(
+                    gd,
+                    {
+                        dimensions: [newDimensions]
+                    },
+                    [traceIndex]
+                ).then(function () {
+                    updateInputValues();
+                    return updateVisibleColorBounds();
+                });
+            }
+        );
+
+        resetButton.addEventListener("click", function () {
+            const index = currentDimensionIndex();
+
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, dimensionIndex) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (dimensionIndex === index) {
+                            if (originalRanges[index] === null) {
+                                delete copied.range;
+                            } else {
+                                copied.range =
+                                    originalRanges[index].slice();
+                            }
+
+                            delete copied.constraintrange;
+                        }
+
+                        return copied;
+                    }
+                );
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions]
+                },
+                [traceIndex]
+            ).then(function () {
+                updateInputValues();
+                return enforceCurrentColorDirection();
+            }).then(updateVisibleColorBounds);
+        });
+
+        resetAllButton.addEventListener("click", function () {
+            const newDimensions =
+                gd.data[traceIndex].dimensions.map(
+                    (dimension, index) => {
+                        const copied =
+                            Object.assign({}, dimension);
+
+                        if (originalRanges[index] === null) {
+                            delete copied.range;
+                        } else {
+                            copied.range =
+                                originalRanges[index].slice();
+                        }
+
+                        delete copied.constraintrange;
+
+                        return copied;
+                    }
+                );
+
+            opacityInput.value =
+                String(Math.round(originalUnselectedOpacity * 100));
+
+            currentColorKey = initialColorKey;
+            currentColorValues = originalColorValues.slice();
+            currentBaseCmin = originalCmin;
+            currentBaseCmax = originalCmax;
+
+            if (initialColorDimensionIndex >= 0) {
+                colorSelect.value =
+                    String(initialColorDimensionIndex);
+            }
+
+            updatingColorBounds = true;
+
+            Plotly.restyle(
+                gd,
+                {
+                    dimensions: [newDimensions],
+                    "unselected.line.opacity":
+                        originalUnselectedOpacity,
+                    "line.color": [originalColorValues],
+                    "line.colorscale": colorscaleRestyleValue(
+                        colorSenseForKey(initialColorKey)
+                    ),
+                    "line.reversescale": false,
+                    "line.cmin": originalCmin,
+                    "line.cmax": originalCmax,
+                    "line.colorbar.title.text":
+                        initialColorKey
+                },
+                [traceIndex]
+            ).finally(function () {
+                updatingColorBounds = false;
+            }).then(function () {
+                updateInputValues();
+                return updateVisibleColorBounds();
+            });
+        });
+
+        gd.on("plotly_restyle", function (eventData) {
+            if (updatingColorBounds) {
+                return;
+            }
+
+            const update =
+                Array.isArray(eventData) && eventData.length > 0
+                    ? eventData[0]
+                    : {};
+
+            const keys = Object.keys(update || {});
+
+            const dimensionsChanged = keys.some(
+                key =>
+                    key === "dimensions" ||
+                    key.startsWith("dimensions[")
+            );
+
+            const colorDirectionChanged = keys.some(
+                key =>
+                    key === "line.colorscale" ||
+                    key === "line.reversescale"
+            );
+
+            if (dimensionsChanged || colorDirectionChanged) {
+                window.setTimeout(function () {
+                    enforceCurrentColorDirection()
+                        .then(updateVisibleColorBounds);
+                }, 0);
+            }
+        });
+
+        window.addEventListener(
+            "resize",
+            resizePlotToViewport
+        );
+
+        updateInputValues();
+        resizePlotToViewport();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupControls
+        );
+    } else {
+        setupControls();
+    }
+})();
+</script>

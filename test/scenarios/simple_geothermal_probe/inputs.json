@@ -1,10 +1,10 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/simple_geothermal_probe/out.csv",
+        "csv_output_file_path": "./test/scenarios/simple_geothermal_probe/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/simple_geothermal_probe/auxiliary_info.md",
         "fixed_output_precision": 10,
-        "sankey_plot_file": "./test/scenarios/simple_geothermal_probe/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/simple_geothermal_probe/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "custom",
         "csv_output_keys": {
@@ -12,7 +12,7 @@
             "TST_DEM_01": ["m_h_w_ht1:IN"],
             "TST_GTP_01": ["new_fluid_temperature","fluid_reynolds_number"]
         },
-        "output_plot_file": "./test/scenarios/simple_geothermal_probe/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/simple_geothermal_probe/output_plot.html",
         "output_plot": "custom",
         "output_plot_spec": {
             "1": {
@@ -126,7 +126,7 @@
             "heat_losses_factor": 1.0
         },
         "TST_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_HP_01"

@@ -1,14 +1,14 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+import ResieQuasi as Resie
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
         ),

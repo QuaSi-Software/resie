@@ -2036,16 +2036,24 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         # check if it is required but has a value of nothing (meaning both the default is
         # nothing and no value was given). but also check if conditionals would "turn off"
         # the parameter in any case, in which case the value does not matter
-        if type_def[name].required && value === nothing && conditionals_apply(name, extracted, type_def)
-            throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
+        if type_def[name].required && value === nothing 
+            if conditionals_apply(name, extracted, type_def)
+                throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
+            else
+                continue
+            end
         end
 
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
-            if !(value in type_def[name].options)
-                throw(InputError("Given value `$value` is not in the allowed options for " *
-                                 "parameter `$name` of component `$uac`. " *
-                                 "Allowed options are: $(join(("`$option`" for option in type_def[name].options), ", "))"))
+            items = isa(value, Vector) ? value : [value]
+            for item in items
+                if !any(occursin.(type_def[name].options, item))
+                    options_str = join(("`$option`" for option in type_def[name].options), ", ")
+                    throw(InputError("Given value `$item` is not in the allowed options " *
+                                     "for parameter `$name` of component `$uac`. " *
+                                     "Allowed options are: $(options_str)"))
+                end
             end
         end
 
@@ -2670,8 +2678,8 @@ include("general/fixed_supply.jl")
 include("general/flexible_supply.jl")
 include("general/flexible_sink.jl")
 include("general/storage.jl")
-include("connections/grid_input.jl")
-include("connections/grid_output.jl")
+include("connections/grid_supply.jl")
+include("connections/grid_sink.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
 include("storage/buffer_tank.jl")
@@ -3315,7 +3323,7 @@ dictionaries. An example in JSON notation might look like this:
 function all_component_parameters()::Dict{String,Any}
     types = [Battery, BufferTank, Bus, CHPP, Electrolyser, FixedSink, FixedSupply, FlexibleSink,
              FlexibleSupply, FuelBoiler, GenericHeatSource, GeothermalHeatCollector,
-             GeothermalProbes, GridInput, GridOutput, HeatPump, PVPlant, SeasonalThermalStorage,
+             GeothermalProbes, GridSupply, GridSink, HeatPump, PVPlant, SeasonalThermalStorage,
              SolarthermalCollector, Storage, ThermalBooster, UTIR]
 
     all_parameters = Dict{String,Any}(
@@ -3336,7 +3344,7 @@ function all_component_parameters()::Dict{String,Any}
         )
     end
 
-    for (name, cm_type) in pairs(Resie.load_control_module_class_mapping())
+    for (name, cm_type) in pairs(ResieQuasi.load_control_module_class_mapping())
         all_parameters["control_modules"][name] = control_module_parameters(cm_type)
     end
 

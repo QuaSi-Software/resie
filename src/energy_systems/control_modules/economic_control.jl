@@ -1,5 +1,5 @@
 using Dates
-using ..Resie
+import ResieQuasi as Resie
 
 #! format: off
 CONMOD_ECONOMIC_CONTROL_PARAMS = Dict(

@@ -2,6 +2,7 @@ ReSiE general log file of simulation started at: 2000-01-01 00:00:00
 This log file contains general warnings, errors and information written by ReSiE
 ---------------------------------
 [Info] Logging set up
+[GlobalInfo] Loading weather data... (.\src\resie_logger.jl:82)
 [Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
 [Info] The timestamp of the profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
 [Info] The profile at .\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
@@ -26,26 +27,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\multi_family_house_economy_emissions\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 438/8760 in 2.777 s. ETA: 52.7630 s
-[Info] Progress: 876/8760 in 2.321 s. ETA: 41.7420 s
-[Info] Progress: 1314/8760 in 2.852 s. ETA: 48.4840 s
-[Info] Progress: 1752/8760 in 1.868 s. ETA: 29.8880 s
-[Info] Progress: 2190/8760 in 1.409 s. ETA: 21.1350 s
-[Info] Progress: 2628/8760 in 1.114 s. ETA: 15.5960 s
-[Info] Progress: 3066/8760 in 1.868 s. ETA: 24.2840 s
-[Info] Progress: 3504/8760 in 1.219 s. ETA: 14.6280 s
-[Info] Progress: 3942/8760 in 1.236 s. ETA: 13.5960 s
-[Info] Progress: 4380/8760 in 1.132 s. ETA: 11.3200 s
-[Info] Progress: 4818/8760 in 1.275 s. ETA: 11.4750 s
-[Info] Progress: 5256/8760 in 1.218 s. ETA: 9.7440 s
-[Info] Progress: 5694/8760 in 1.086 s. ETA: 7.6020 s
-[Info] Progress: 6132/8760 in 1.215 s. ETA: 7.2900 s
-[Info] Progress: 6570/8760 in 1.074 s. ETA: 5.3700 s
-[Info] Progress: 7008/8760 in 3.253 s. ETA: 13.0120 s
-[Info] Progress: 7446/8760 in 2.038 s. ETA: 6.1140 s
-[Info] Progress: 7884/8760 in 2.289 s. ETA: 4.5780 s
-[Info] Progress: 8322/8760 in 1.883 s. ETA: 1.8830 s
-[Info] Progress: 8760/8760 in 1.269 s. ETA: 0.0000 s
+[Info] Progress: 438/8760 in 0.707 s. ETA: 13.4330 s
+[Info] Progress: 876/8760 in 0.7 s. ETA: 12.6000 s
+[Info] Progress: 1314/8760 in 0.645 s. ETA: 10.9650 s
+[Info] Progress: 1752/8760 in 0.684 s. ETA: 10.9440 s
+[Info] Progress: 2190/8760 in 0.557 s. ETA: 8.3550 s
+[Info] Progress: 2628/8760 in 0.709 s. ETA: 9.9260 s
+[Info] Progress: 3066/8760 in 0.509 s. ETA: 6.6170 s
+[Info] Progress: 3504/8760 in 0.441 s. ETA: 5.2920 s
+[Info] Progress: 3942/8760 in 0.448 s. ETA: 4.9280 s
+[Info] Progress: 4380/8760 in 0.489 s. ETA: 4.8900 s
+[Info] Progress: 4818/8760 in 0.4 s. ETA: 3.6000 s
+[Info] Progress: 5256/8760 in 0.4 s. ETA: 3.1680 s
+[Info] Progress: 5694/8760 in 0.379 s. ETA: 2.6530 s
+[Info] Progress: 6132/8760 in 0.405 s. ETA: 2.4300 s
+[Info] Progress: 6570/8760 in 0.434 s. ETA: 2.1700 s
+[Info] Progress: 7008/8760 in 0.445 s. ETA: 1.7800 s
+[Info] Progress: 7446/8760 in 0.45 s. ETA: 1.3500 s
+[Info] Progress: 7884/8760 in 0.491 s. ETA: 0.9820 s
+[Info] Progress: 8322/8760 in 0.532 s. ETA: 0.5320 s
+[Info] Progress: 8760/8760 in 0.469 s. ETA: 0.0000 s
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\test\scenarios\multi_family_house_economy_emissions\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\multi_family_house_economy_emissions\sankey_plot.html
@@ -55,3 +56,4 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Emissions plot created and saved to .\test\scenarios\multi_family_house_economy_emissions\emissions_plot.html
 [Info] Emissions results exported to .\test\scenarios\multi_family_house_economy_emissions\emissions_results.csv
 [Info] general log saved to .\test\scenarios\multi_family_house_economy_emissions\general.log
+[Info] balanceWarn log saved to .\test\scenarios\multi_family_house_economy_emissions\balanceWarn.log

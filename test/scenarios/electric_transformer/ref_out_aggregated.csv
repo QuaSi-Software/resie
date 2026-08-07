@@ -2,9 +2,10 @@ Parameter;Type;Aggregation;Values used;Value;Min;Max;Value kWh;Value MWh
 TST_BAT_01 Capacity;intensive;mean;669;50000,0;50000,0;50000,0;;
 TST_BAT_01 CellVoltage;intensive;mean;669;1,0;1,0;1,0;;
 TST_BAT_01 charge_efficiency;intensive;mean;669;1,0;1,0;1,0;;
+TST_BAT_01 Current;intensive;mean;669;0,0;0,0;0,0;;
 TST_BAT_01 Cycles;intensive;mean;669;1,0;1,0;1,0;;
 TST_BAT_01 discharge_efficiency;intensive;mean;669;1,0;1,0;1,0;;
-TST_BAT_01 ExtractedCharge;energy;sum;669;831587,5038;0,0;2756,700323;831,5875038;0,8315875038
+TST_BAT_01 ExtractedCharge;energy;sum;669;0,0;0,0;0,0;0,0;0,0
 TST_BAT_01 Load;intensive;mean;669;7902,068224;0,0;28003,49093;;
 TST_BAT_01 Load%;intensive;mean;669;15,80413645;0,0;56,00698185;;
 TST_BAT_01 LossesGains;energy;sum;669;0,0;0,0;0,0;0,0;0,0

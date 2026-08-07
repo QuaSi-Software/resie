@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../test_util.jl")
 
@@ -24,17 +24,17 @@ function get_energy_system_ely_and_hp()
             "scale" => 3000,
         ),
         "TST_GRI_O2_01" => Dict{String,Any}(
-            "type" => "GridOutput",
+            "type" => "GridSink",
             "medium" => "m_c_g_o2",
             "output_refs" => [],
         ),
         "TST_GRI_el_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_ELY_01"],
         ),
         "TST_GRI_el_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -77,7 +77,7 @@ end
 function test_multiple_transformer_with_limitations()
     components_config = get_energy_system_ely_and_hp()
     simulation_parameters = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -248,7 +248,7 @@ end
 function test_heat_pump_min_use_fraction_limited_by_ely()
     components_config = get_energy_system_ely_and_hp()
     simulation_parameters = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]

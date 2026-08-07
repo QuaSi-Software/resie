@@ -1,7 +1,7 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+using ResieQuasi
+using ResieQuasi.EnergySystems
 
 @testset "project_loading_tests" begin
     include("initialization/loading.jl")

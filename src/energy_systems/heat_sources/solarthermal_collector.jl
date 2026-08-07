@@ -1,6 +1,6 @@
 import Interpolations as ip
 using Roots
-using Resie.SolarIrradiance
+using ResieQuasi.SolarIrradiance
 
 """
 Implementation of a solarthermal collector.

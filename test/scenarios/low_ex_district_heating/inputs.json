@@ -2,9 +2,9 @@
     "io_settings": {
         "fixed_output_precision": 10,
         "sankey_plot": "default",
-        "sankey_plot_file": "./test/scenarios/low_ex_district_heating/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/low_ex_district_heating/sankey_plot.html",
         "output_plot": "all_incl_flows",
-        "output_plot_file": "./test/scenarios/low_ex_district_heating/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/low_ex_district_heating/output_plot.html",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/low_ex_district_heating/auxiliary_info.md",
         "csv_output": "nothing"
@@ -140,7 +140,7 @@
             }
         },
         "GRI_Power_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "BUS_Power_Houses"
             ],
@@ -235,14 +235,14 @@
             "nr_optimisation_passes": 10
         },
         "GRI_Power_02": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
             "medium": "electricity"
         },
         "GRI_Air": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": [
                 "HP_DistrictHeating_LowEx"
             ],
@@ -321,7 +321,7 @@
             "scale": 350
         },
         "GRO_Power": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": [],
             "medium": "electricity"
         }

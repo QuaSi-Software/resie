@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../../test_util.jl")
 
@@ -47,7 +47,7 @@ function test_short_chain_distribution()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     proxy = components["Proxy-TST_BUS_01|TST_BUS_02"]
 
     @test length(proxy.input_interfaces) == 1
@@ -147,7 +147,7 @@ function test_long_chain_distribution()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     proxy = components["Proxy-TST_BUS_01|TST_BUS_02|TST_BUS_04|TST_BUS_03"]
 
     @test length(proxy.input_interfaces) == 1

@@ -1,9 +1,96 @@
 # Changes made, features added and bugs fixed
 In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatibility then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independent of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
 
+## Versions
+Starting with v1.0.0 breaking changes in the project file concerning component models or individual simulation parameters and settings constitute a cause to bump the minor number of the version. The major number is reserved for breaking changes in the overall structure of the project file. New features may increase the minor number if they constitute sufficient new work. It should be considered that users wish to stick to a specific minor number until they find the time to update their inputs. A migration feature might be considered in the feature, but is not implemented as of v1.0.0. Thus fixes should preferably bump the patch number only and care should be taken when updating the minor number.
+
+### Version 1.0.0
+Listed in the following are changes since the last beta-release v0.15.1. A full list of all features of ReSiE as of v1.0.0 can be found in the documentation.
+
+#### Package renaming
+* The julia package has been renamed to ResieQuasi. This name was chosen to avoid naming conflicts with existing packages in the General registry. The preferred name and spelling is ReSiE, as part of the QuaSi project. You can find an explanation of these two names in the online documentation.
+  * If the package name is used extensively in code, a handy trick is to use `import ResieQuasi as Resie`
+
+#### Grid connections
+* The two component models `GridInput` and `GridOutput` have been renamed to `GridSupply` and `GridSink`. These names were chosen to be in line with the names of other supply/sink components and because "input" and "output" where deemed confusing as they relate to the whole energy system, not the invidiual component. The models work exactly the same as before, only the name has changed.
+
+#### Minor changes
+* Updates to the scenario reference files
+* Set compat entries in file `Project.toml`. This is mostly a requirement for the General registry, but also helps to specificy a known working set of dependencies, which should reduce a source of errors caused by new versions of dependencies.
+
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.15.1
+* Update detailed battery model with various fixes and improvements identified during validation studies
+  * This includes a new output for the current of the battery
+  * Scenarios have been updated to reflect these changes
+* Fix an issue with parameter validation for required parameters that have been "toggled off" due to conditionals on other parameters
+
+### Version 0.15.0
+
+#### Major feature: Parameter studies, optimisation and sensitivity analysis
+
+* Add a `parameter_study` section for repeatedly simulating an energy system with different input parameters
+  * Define variable parameters using optimisation bounds, starting values, explicit variation values or generated ranges
+  * Use sums or means of simulation outputs as objectives, as well as results from the economic and emissions calculations
+  * Combine objectives using `sum` or a weighted `linear` function, or retain them as separate objectives for multi-objective optimisation
+* Add systematic parameter variation
+  * Evaluate the Cartesian product of parameter values, zip corresponding values or generate a configured number of random samples
+* Add single- and multi-objective optimisation
+  * Add support for algorithms from `Optim`, `BlackBoxOptim`, `Metaheuristics`, `NLopt` and `NOMAD`
+  * Add `max_runs` and `max_time` limits as well as the common tolerances `x_tol_abs` and `f_tol_abs` where supported by the selected backend
+  * Normalise variable parameters internally while retaining physical values in the project file and results
+  * Add `objective_senses` for minimising or maximising individual objectives in multi-objective optimisation
+  * Add an optional refinement stage for continuing a single-objective optimisation from its best result
+* Add global and local sensitivity analyses
+  * Global sensitivity fits a polynomial chaos expansion surrogate and calculates first- and total-order Sobol indices over the configured parameter bounds
+  * Local sensitivity changes one parameter at a time around configured starting values or the best available result, using either explicit evaluation values or a relative variation
+  * Reuse matching results from parameter variation, optimisation and preceding sensitivity calculations before performing additional simulations
+  * Sensitivity analysis currently supports single-objective studies only
+* Use Julia threads for parameter variation, sensitivity calculations and optimisation algorithms that support parallel evaluation
+* Add CSV and interactive HTML outputs for parameter-study results
+  * Add an all-results CSV and separate global- and local-sensitivity CSV outputs
+  * Add optional continuous CSV writing so partial results remain available during long or interrupted studies
+  * Add convergence, matrix, objective-parameter, parallel-coordinate and interactive 3D plots
+  * Add global- and local-sensitivity plots
+  * Add an option to include or exclude local-sensitivity simulations from the general parameter-study plots
+* Add `disable_all_simulation_outputs`, enabled by default, to suppress the regular output files of individual simulations during a parameter study
+  * If individual simulation outputs are enabled, their file names include the varied parameter values to avoid overwriting results from other runs
+* Add parameter-study status messages, result summaries and output paths to the new general log
+* Improve interruption handling so that `Ctrl+C` stops running and pending simulations and preserves the available parameter-study results for configured outputs
+* Add the example `multi_family_house_optim.json` demonstrating component-size optimisation and global and local sensitivity analyses
+* Add two scenarios `multi_family_house_optim` and `multi_family_house_param_variation` including adaption of the scenario CLI to support parameter study runs
+
+#### Breaking changes
+
+* Rename general output-path parameters for consistency:
+  * `csv_output_file` → `csv_output_file_path`
+  * `output_plot_file` → `output_plot_file_path`
+  * `sankey_plot_file` → `sankey_plot_file_path`
+* Rename CSV-related parameters to use lowercase `csv` consistently:
+  * `write_summary_CSV` → `write_summary_csv`
+  * `output_economic_CSV` → `output_economic_csv`
+  * `economic_CSV_file_path` → `economic_csv_file_path`
+  * `output_emissions_CSV` → `output_emissions_csv`
+  * `emissions_CSV_file_path` → `emissions_csv_file_path`
+
+#### Minor changes / fixes
+
+* Add `annuity_opex_including_energies` to the available economic results
+* Prevent file-only plots from opening graphical windows randomly during CLI execution
+* Fix optional geothermal collector and probe figures so the intended plot object is not disturbing other plots
+* Fix logger shutdown so final log messages are written before the log files are closed
+
+#### Internal changes
+
+* Add the new optimisation and sensitivity package dependencies `BlackBoxOptim`, `Metaheuristics`, `NLopt`, `NOMAD` and `PolyChaos`
+* Separate parameter-study execution and output generation into `parameter_study.jl` and `parameter_study_output.jl`
+* Rename `file_output.jl` to `simulation_output.jl` and generalise simulation-result extraction for parameter-study objectives
+* Add a `GlobalInfo` log level for messages that apply to an entire parameter study rather than an individual simulation. For parameter studies, the min_log_level is set to GlobalInfo
+* Cache reusable profiles and the order of operations for repeated simulation runs
+* Update examples and scenario inputs to use the renamed IO settings
+  
 ### Version 0.14.5
 * add check&error for profiles values being Inf or NaN
 * add possibility to apply storage_driven control module to storages used as source by adding the parameter "control_mode"

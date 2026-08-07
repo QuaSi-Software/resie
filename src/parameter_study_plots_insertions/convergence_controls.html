@@ -1,0 +1,360 @@
+<script>
+(function () {
+    const objectiveData = {{OBJECTIVE_DATA_JSON}};
+    const bestData = {{BEST_DATA_JSON}};
+    const objectiveKeys = {{OBJECTIVE_KEYS_JSON}};
+    const useLogAxis = {{USE_LOG_AXIS_JSON}};
+    const runIds = {{RUN_IDS_JSON}};
+    const initialObjective = {{INITIAL_OBJECTIVE_JSON}};
+
+    function findPlotlyDiv() {
+        const divs =
+            document.querySelectorAll(".js-plotly-plot");
+
+        return divs.length > 0 ?
+            divs[0] :
+            null;
+    }
+
+    function formatValue(value) {
+        if (
+            typeof value !== "number" ||
+            !Number.isFinite(value)
+        ) {
+            return "missing";
+        }
+
+        const absolute = Math.abs(value);
+
+        if (
+            absolute !== 0 &&
+            (absolute >= 100000 || absolute < 0.001)
+        ) {
+            return value.toExponential(4);
+        }
+
+        return Number(
+            value.toPrecision(6)
+        ).toString();
+    }
+
+    function objectiveHoverText(objectiveKey) {
+        return objectiveData[objectiveKey].map(
+            (value, index) =>
+                "run " + runIds[index] +
+                "<br>" + objectiveKey + " = " +
+                formatValue(value)
+        );
+    }
+
+    function bestHoverText(objectiveKey) {
+        return bestData[objectiveKey].map(
+            (value, index) =>
+                "run " + runIds[index] +
+                "<br>best " + objectiveKey + " = " +
+                formatValue(value)
+        );
+    }
+
+    function setupControls() {
+        const gd = findPlotlyDiv();
+
+        if (
+            gd === null ||
+            !gd.data ||
+            gd.data.length < 2
+        ) {
+            window.setTimeout(
+                setupControls,
+                200
+            );
+            return;
+        }
+
+        if (
+            document.getElementById(
+                "convergence-objective-controls"
+            )
+        ) {
+            return;
+        }
+
+        const objectiveTraceIndex = 0;
+        const bestTraceIndex = 1;
+
+        const controls =
+            document.createElement("div");
+
+        controls.id =
+            "convergence-objective-controls";
+        controls.style.fontFamily =
+            "Arial, sans-serif";
+        controls.style.fontSize =
+            "13px";
+        controls.style.margin =
+            "8px 0 4px 0";
+        controls.style.padding =
+            "10px";
+        controls.style.border =
+            "1px solid #ccc";
+        controls.style.borderRadius =
+            "5px";
+        controls.style.display =
+            "flex";
+        controls.style.alignItems =
+            "center";
+        controls.style.gap =
+            "8px";
+        controls.style.width =
+            "fit-content";
+        controls.style.maxWidth =
+            "calc(100% - 24px)";
+
+        const label =
+            document.createElement("label");
+
+        label.style.display =
+            "flex";
+        label.style.alignItems =
+            "center";
+        label.style.gap =
+            "6px";
+
+        const labelText =
+            document.createElement("span");
+
+        labelText.textContent =
+            "Objective:";
+
+        const select =
+            document.createElement("select");
+
+        select.style.maxWidth =
+            "420px";
+
+        const objectiveGroup =
+            document.createElement(
+                "optgroup"
+            );
+
+        objectiveGroup.label =
+            "Objectives";
+
+        objectiveKeys.forEach(
+            objectiveKey => {
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    objectiveKey;
+                option.textContent =
+                    objectiveKey;
+
+                objectiveGroup.appendChild(
+                    option
+                );
+            }
+        );
+
+        select.appendChild(
+            objectiveGroup
+        );
+
+        select.value =
+            initialObjective;
+
+        label.appendChild(
+            labelText
+        );
+        label.appendChild(
+            select
+        );
+        controls.appendChild(
+            label
+        );
+
+        gd.parentNode.insertBefore(
+            controls,
+            gd
+        );
+
+        // Fit the controls and convergence graph into the browser viewport.
+        const plotParent = gd.parentNode;
+
+        document.documentElement.style.height =
+            "100%";
+        document.documentElement.style.overflow =
+            "hidden";
+        document.body.style.height =
+            "100%";
+        document.body.style.margin =
+            "0";
+        document.body.style.overflow =
+            "hidden";
+
+        plotParent.style.height =
+            "100vh";
+        plotParent.style.width =
+            "100%";
+        plotParent.style.display =
+            "flex";
+        plotParent.style.flexDirection =
+            "column";
+        plotParent.style.overflow =
+            "hidden";
+        plotParent.style.minHeight =
+            "0";
+
+        controls.style.flex =
+            "0 0 auto";
+        controls.style.boxSizing =
+            "border-box";
+        controls.style.margin =
+            "8px 12px 4px 12px";
+
+        gd.style.flex =
+            "1 1 auto";
+        gd.style.minHeight =
+            "0";
+        gd.style.width =
+            "100%";
+
+        function resizeConvergencePlot() {
+            const parentTop =
+                plotParent
+                    .getBoundingClientRect()
+                    .top;
+
+            const controlsHeight =
+                controls
+                    .getBoundingClientRect()
+                    .height;
+
+            const availableHeight =
+                Math.max(
+                    320,
+                    window.innerHeight -
+                        parentTop -
+                        controlsHeight -
+                        16
+                );
+
+            gd.style.height =
+                availableHeight + "px";
+            gd.style.width =
+                "100%";
+
+            return Plotly.relayout(
+                gd,
+                {
+                    autosize: true,
+                    height: availableHeight
+                }
+            ).then(function () {
+                Plotly.Plots.resize(gd);
+            });
+        }
+
+        function applyObjective(
+            resetYAxis
+        ) {
+            const objectiveKey =
+                select.value;
+
+            const objectiveUpdate = {
+                y: [
+                    objectiveData[
+                        objectiveKey
+                    ]
+                ],
+                name: objectiveKey,
+                text: [
+                    objectiveHoverText(
+                        objectiveKey
+                    )
+                ]
+            };
+
+            const bestUpdate = {
+                y: [
+                    bestData[
+                        objectiveKey
+                    ]
+                ],
+                text: [
+                    bestHoverText(
+                        objectiveKey
+                    )
+                ]
+            };
+
+            return Promise.all([
+                Plotly.restyle(
+                    gd,
+                    objectiveUpdate,
+                    [objectiveTraceIndex]
+                ),
+                Plotly.restyle(
+                    gd,
+                    bestUpdate,
+                    [bestTraceIndex]
+                )
+            ]).then(function () {
+                const layoutUpdate = {
+                    "title.text":
+                        "Objective convergence: " +
+                        objectiveKey,
+                    "yaxis.title.text":
+                        objectiveKey,
+                    "yaxis.type":
+                        useLogAxis[objectiveKey] ?
+                            "log" :
+                            "linear"
+                };
+
+                if (resetYAxis) {
+                    layoutUpdate[
+                        "yaxis.range"
+                    ] = null;
+                    layoutUpdate[
+                        "yaxis.autorange"
+                    ] = true;
+                }
+
+                return Plotly.relayout(
+                    gd,
+                    layoutUpdate
+                );
+            });
+        }
+
+        select.addEventListener(
+            "change",
+            function () {
+                applyObjective(true);
+            }
+        );
+
+        resizeConvergencePlot();
+
+        window.addEventListener(
+            "resize",
+            resizeConvergencePlot
+        );
+    }
+
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            setupControls
+        );
+    } else {
+        setupControls();
+    }
+})();
+</script>

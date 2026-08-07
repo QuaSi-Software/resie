@@ -1,9 +1,9 @@
 module Weatherdata
 
-using Resie.Profiles
+using ResieQuasi.Profiles
 using Dates
 using Proj
-using Resie.SolarIrradiance
+using ResieQuasi.SolarIrradiance
 
 export WeatherData, gather_weather_data, get_weather_data_keys, WeatherFileType, guess_file_format
 
@@ -116,7 +116,8 @@ mutable struct WeatherData
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
             outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
-            transform = Proj.Transformation(inProj, outProj)
+            ctx = Proj.proj_context_clone()
+            transform = Proj.Transformation(inProj, outProj; ctx=ctx)
             latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
 
             if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
@@ -561,8 +562,10 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     return weatherdata_dict, headerdata
 end
 
-function get_weather_data_keys(sim_params::Dict{String,Any})
-    if haskey(sim_params, "weather_data")
+function get_weather_data_keys(sim_params::Dict{String,Any}, suppress_all_output::Bool)
+    if suppress_all_output
+        return nothing
+    elseif haskey(sim_params, "weather_data")
         return collect(String.(fieldnames(typeof(sim_params["weather_data"]))))
     else
         return nothing

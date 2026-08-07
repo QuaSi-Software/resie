@@ -1,7 +1,7 @@
 #! format: off
-const GRID_INPUT_PARAMETERS = Dict(
+const GRID_SINK_PARAMETERS = Dict(
     "medium" => (
-        description="Medium of the grid input (e.g. electrical or thermal medium)",
+        description="Medium of the grid sink (e.g. electrical or thermal medium)",
         display_name="Medium",
         required=true,
         type=String,
@@ -37,7 +37,7 @@ const GRID_INPUT_PARAMETERS = Dict(
     ),
     "constant_temperature" => (
         default=nothing,
-        description="Constant temperature value for the grid input",
+        description="Constant temperature value for the grid sink",
         display_name="Constant temperature",
         required=false,
         conditionals=[
@@ -50,7 +50,7 @@ const GRID_INPUT_PARAMETERS = Dict(
     ),
 )
 
-const GRID_INPUT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection",
+const GRID_SINK_ECONOMIC_PARAMETERS = get_economic_standard_params("connection",
     Dict{String,Any}(
         "energy_price_profile_file_path" => nothing,
         "energy_price_profile_scale" => 1.0,
@@ -76,12 +76,12 @@ const GRID_INPUT_ECONOMIC_PARAMETERS = get_economic_standard_params("connection"
     ),
 )
 
-const GRID_INPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_source",
+const GRID_SINK_EMISSIONS_PARAMETERS = get_emissions_standard_params("connection_sink",
     Dict{String,Any}(
-        "energy_emissions_profile_file_path" => nothing,
-        "energy_emissions_profile_scale" => 1.0,
-        "constant_energy_emissions" => nothing,
-        "energy_emissions_change_rate_per_year" =>  0.0,
+        "energy_emissions_credits_profile_file_path" => nothing,
+        "energy_emissions_credits_profile_scale" => 1.0,
+        "constant_energy_emissions_credits" => nothing,
+        "energy_emissions_credits_change_rate_per_year" =>  0.0,
 
         "lifetime_years" => 20,
         "embodied_emissions_specific" => "const:0.0",
@@ -95,14 +95,14 @@ const GRID_INPUT_EMISSIONS_PARAMETERS = get_emissions_standard_params("connectio
 #! format: on
 
 """
-Implementation of a component modelling the input connection to a public grid of a certain medium.
+Implementation of a component modelling the output connection to a public grid of a certain medium.
 
-Public grids are considered to have an unlimited amount of energy they can provide. They
-exist to model real connections to a public grid that can provide any remaining demand of
-energy. A grid input can also be configured to provide energy (if a thermal medium is
+Public grids are considered to have an unlimited amount of energy they can take in. They
+exist to model real connections to a public grid that can take in any remaining surplus of
+energy. A grid sink can also be configured to take in energy (if a thermal medium is
 modelled) at a given temperature.
 """
-mutable struct GridInput <: Component
+mutable struct GridSink <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -118,26 +118,26 @@ mutable struct GridInput <: Component
     constant_temperature::Temperature
     temperature::Temperature
 
-    output_sum::Float64
+    input_sum::Float64
 
-    function GridInput(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        return new(SSOT_parameter_constructor(GridInput, uac, config, sim_params)...)
+    function GridSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+        return new(SSOT_parameter_constructor(GridSink, uac, config, sim_params)...)
     end
 end
 
-function component_parameters(x::Type{GridInput})::Dict{String,Any}
-    return deepcopy(GRID_INPUT_PARAMETERS)
+function component_parameters(x::Type{GridSink})::Dict{String,Any}
+    return deepcopy(GRID_SINK_PARAMETERS)
 end
 
-function economic_parameters(x::Type{GridInput})::Dict{String,Any}
-    return deepcopy(GRID_INPUT_ECONOMIC_PARAMETERS)
+function economic_parameters(x::Type{GridSink})::Dict{String,Any}
+    return deepcopy(GRID_SINK_ECONOMIC_PARAMETERS)
 end
 
-function emissions_parameters(x::Type{GridInput})::Dict{String,Any}
-    return deepcopy(GRID_INPUT_EMISSIONS_PARAMETERS)
+function emissions_parameters(x::Type{GridSink})::Dict{String,Any}
+    return deepcopy(GRID_SINK_EMISSIONS_PARAMETERS)
 end
 
-function extract_parameter(x::Type{GridInput}, config::Dict{String,Any}, param_name::String,
+function extract_parameter(x::Type{GridSink}, config::Dict{String,Any}, param_name::String,
                            param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name == "temperature_from_global_file"
         return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
@@ -150,28 +150,28 @@ function extract_parameter(x::Type{GridInput}, config::Dict{String,Any}, param_n
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
-function validate_config(x::Type{GridInput}, config::Dict{String,Any}, extracted::Dict{String,Any},
+function validate_config(x::Type{GridSink}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any}, param_type::String)
     if param_type == "economy"
-        parameter = economic_parameters(GridInput)
+        parameter = economic_parameters(GridSink)
         uac = uac * " - economic_parameters"
     elseif param_type == "emissions"
-        parameter = emissions_parameters(GridInput)
+        parameter = emissions_parameters(GridSink)
         uac = uac * " - emissions_parameters"
     elseif param_type == "component"
-        parameter = component_parameters(GridInput)
+        parameter = component_parameters(GridSink)
     end
     validate_config(Component, extracted, uac, sim_params, parameter)
 end
 
-function init_from_params(x::Type{GridInput}, uac::String, params::Dict{String,Any},
+function init_from_params(x::Type{GridSink}, uac::String, params::Dict{String,Any},
                           raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     medium = Symbol(params["medium"])
 
     # return tuple in the order expected by new()
     return (uac,                                     # uac
             Controller(params["control_parameters"]),#
-            sf_flexible_source,                      # sys_function
+            sf_flexible_sink,                        # sys_function
             medium,                                  # medium
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
@@ -180,15 +180,15 @@ function init_from_params(x::Type{GridInput}, uac::String, params::Dict{String,A
             some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["constant_temperature"],          # constant_temperature
             nothing,                                 # temperature
-            0.0)                                     # output_sum
+            0.0)                                     # input_sum
 end
 
-function initialise!(unit::GridInput, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.output_interfaces[unit.medium],
-                          load_storages(unit.controller, unit.medium), unit.uac, unit.medium)
+function initialise!(unit::GridSink, sim_params::Dict{String,Any})
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium), unit.uac, unit.medium)
 end
 
-function control(unit::GridInput, components::Grouping, sim_params::Dict{String,Any})
+function control(unit::GridSink, components::Grouping, sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_temperature !== nothing
@@ -197,59 +197,58 @@ function control(unit::GridInput, components::Grouping, sim_params::Dict{String,
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
-    set_max_energy!(unit.output_interfaces[unit.medium], Inf, nothing, unit.temperature)
+    set_max_energy!(unit.input_interfaces[unit.medium], Inf, unit.temperature, nothing)
 end
 
-function process(unit::GridInput, sim_params::Dict{String,Any})
-    outface = unit.output_interfaces[unit.medium]
-    exchanges = balance_on(outface, outface.target)
+function process(unit::GridSink, sim_params::Dict{String,Any})
+    inface = unit.input_interfaces[unit.medium]
+    exchanges = balance_on(inface, inface.source)
 
     # if we get multiple exchanges from balance_on, a bus is involved, which means the
     # temperature check has already been performed. we only need to check the case for
-    # a single output which can happen for direct 1-to-1 connections or if the bus has
-    # filtered outputs down to a single entry, which works the same as the 1-to-1 case
+    # a single input which can happen for direct 1-to-1 connections or if the bus has
+    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
     if length(exchanges) > 1
-        energy_demand = balance(exchanges) + energy_potential(exchanges)
-        temp_out = temp_min_highest(exchanges)
+        energy_supply = balance(exchanges) + energy_potential(exchanges)
     else
         e = first(exchanges)
         if (unit.temperature === nothing ||
             (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
             (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
             # end of condition
-            energy_demand = e.balance + e.energy_potential
-            temp_out = lowest(e.temperature_min, unit.temperature)
+            energy_supply = e.balance + e.energy_potential
         else
-            energy_demand = 0.0
+            energy_supply = 0.0
         end
     end
-    if energy_demand < 0.0
-        unit.output_sum += energy_demand
-        add!(outface, abs(energy_demand), nothing, temp_out)
+
+    if energy_supply > 0.0
+        unit.input_sum += energy_supply
+        sub!(inface, abs(energy_supply), unit.temperature, nothing)
     end
 end
 
-function get_reference_for_capex_and_embodied_emissions(unit::GridInput)
+function get_reference_for_capex_and_embodied_emissions(unit::GridSink)
     return 1.0 # absolute costs here
 end
 
-function output_values(unit::GridInput)::Vector{String}
-    output_vals = [string(unit.medium) * ":OUT", "Output_sum"]
+function output_values(unit::GridSink)::Vector{String}
+    output_vals = [string(unit.medium) * ":IN", "Input_sum"]
     if unit.temperature !== nothing
         push!(output_vals, "Temperature")
     end
     return output_vals
 end
 
-function output_value(unit::GridInput, key::OutputKey)::Float64
-    if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Output_sum"
-        return unit.output_sum
+function output_value(unit::GridSink, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "Input_sum"
+        return unit.input_sum
     elseif key.value_key == "Temperature"
         return unit.temperature
     end
     throw(KeyError(key.value_key))
 end
 
-export GridInput
+export GridSink

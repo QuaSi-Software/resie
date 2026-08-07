@@ -1,10 +1,10 @@
 {
     "io_settings": {
-        "csv_output_file": "./test/scenarios/3_busses_GB_3_storages/out.csv",
+        "csv_output_file_path": "./test/scenarios/3_busses_GB_3_storages/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./test/scenarios/3_busses_GB_3_storages/auxiliary_info.md",
         "fixed_output_precision": 10,
-        "sankey_plot_file": "./test/scenarios/3_busses_GB_3_storages/sankey_plot.html",
+        "sankey_plot_file_path": "./test/scenarios/3_busses_GB_3_storages/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output": "custom",
         "csv_output_keys": {
@@ -13,7 +13,7 @@
             "ESS_BUS_TH_02": ["Balance"],
             "ESS_GRI_EG_01": ["m_c_g_natgas:OUT"]
         },
-        "output_plot_file": "./test/scenarios/3_busses_GB_3_storages/output_plot.html",
+        "output_plot_file_path": "./test/scenarios/3_busses_GB_3_storages/output_plot.html",
         "output_plot": "custom",
         "output_plot_spec": {
             "1": {
@@ -121,7 +121,7 @@
             "scale": 1500
         },
         "ESS_GRI_EG_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_c_g_natgas",
             "output_refs": ["ESS_GBO_01"]
         },

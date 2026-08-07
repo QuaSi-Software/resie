@@ -3,7 +3,7 @@ module Resie_Logger
 using Dates
 using Logging
 
-export @balanceWarn
+export @balanceWarn, @globalInfo, set_min_log_level!
 
 """
 CustomLogger
@@ -23,15 +23,22 @@ Avaiblable logging level:
  Debug          | @debug        | Logging.LogLevel(-1000) 
  Info           | @info         | Logging.LogLevel(    0)
  BalanceWarning | @balanceWarn  | Logging.LogLevel(  500)  <-- this is a custom log level!
+ GlobalInfo     | @globalInfo   | Logging.LogLevel(  700)  <-- this is a custom log level!
  Warn           | @warn         | Logging.LogLevel( 1000)
  Error          | @error        | Logging.LogLevel( 2000)
 """
-struct CustomLogger <: Logging.AbstractLogger
+mutable struct CustomLogger <: Logging.AbstractLogger
     io_general::Union{IO,Nothing}
     io_balanceWarnings::Union{IO,Nothing}
     log_to_console::Bool
     log_to_file::Bool
     min_level::Logging.LogLevel
+end
+
+function set_min_log_level!(logger::CustomLogger,
+                            level::Logging.LogLevel)::CustomLogger
+    logger.min_level = level
+    return logger
 end
 
 """
@@ -61,6 +68,21 @@ macro balanceWarn(exprs...)
     end
 end
 
+"""
+Adding custom level "GlobalInfo" of level 700.
+This can be used with the @globalInfo macro.
+
+To add further custom levels, you need to define a new constant using the 
+CustomLevel struct, the corresponding macro and export the macro. 
+Also define the behaviour in Base.show() and Logging.handle_message() below.
+"""
+const GlobalInfo = CustomLevel(700, "GlobalInfo")
+macro globalInfo(exprs...)
+    quote
+        @logmsg GlobalInfo $(map(x -> esc(x), exprs)...)
+    end
+end
+
 # define basic functions to handle the CustomLevels
 Base.isless(a::CustomLevel, b::LogLevel) = isless(a.level, b.level)
 Base.isless(a::LogLevel, b::CustomLevel) = isless(a.level, b.level)
@@ -68,6 +90,8 @@ Base.convert(::Type{LogLevel}, level::CustomLevel) = LogLevel(level.level)
 Base.show(io::IO, level::CustomLevel) =
     if level == BalanceWarning
         print(io, "BalanceWarning")
+    elseif level == GlobalInfo
+        print(io, "GlobalInfo")
     else
         show(io, LogLevel(level))
     end
@@ -88,6 +112,8 @@ function Logging.handle_message(logger::CustomLogger, level, message, _module, g
     if logger.log_to_console
         if level.level == BalanceWarning.level  # directly comparing the levels here as this is easier to implement
             handle_BalanceWarning_message(level, message)
+        elseif level.level == GlobalInfo.level
+            handle_GlobalInfo_message(level, message)
         else
             default_logger = ConsoleLogger(stderr, logger.min_level)
             Logging.handle_message(default_logger, level, message, _module, group, id, file, line; kwargs...)
@@ -133,6 +159,31 @@ Note that not all terminals support 256 colors..
 """
 function handle_BalanceWarning_message(level, message)
     color = :light_magenta
+    prefix = "[ " * string(level.name, ':')
+
+    stream = stderr
+    buf = IOBuffer()
+    iob = IOContext(buf, stream)
+    printstyled(iob, prefix; bold=true, color=color)
+    print(iob, " ", message, "\n")
+    write(stream, take!(buf))
+end
+
+"""
+    handle_GlobalInfo_message()
+
+defines the console-output of the GlobalInfo messages.
+This is a very simple implementation of the general handle_message()
+of the Logging module of Julia with only the basic functionalities.
+
+Color can be one of  :normal, :default, :bold, :black, :blink, :blue, :cyan, 
+:green, :hidden, :light_black, :light_blue, :light_cyan, :light_green, 
+:light_magenta, :light_red, :light_white, :light_yellow, :magenta, :nothing, 
+:red, :reverse, :underline, :white, or :yellow or an integer between 0 and 255 inclusive. 
+Note that not all terminals support 256 colors..
+"""
+function handle_GlobalInfo_message(level, message)
+    color = :blue
     prefix = "[ " * string(level.name, ':')
 
     stream = stderr
@@ -210,10 +261,14 @@ Closes the given logger and prints final statements if file logging is activated
 function close_logger(logger)
     if logger.io_general !== nothing
         @info "general log saved to $(match(r"<file (.*?)>", logger.io_general.name).captures[1])"
-        close(logger.io_general)
     end
     if logger.io_balanceWarnings !== nothing
         @info "balanceWarn log saved to $(match(r"<file (.*?)>", logger.io_balanceWarnings.name).captures[1])"
+    end
+    if logger.io_general !== nothing
+        close(logger.io_general)
+    end
+    if logger.io_balanceWarnings !== nothing
         close(logger.io_balanceWarnings)
     end
 end
