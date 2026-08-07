@@ -9,23 +9,23 @@ This log file contains general warnings, errors and information written by ReSiE
 [GlobalInfo] Loading weather data... (.\src\resie_logger.jl:82)
 [GlobalInfo] Preparing reusable data for repeated simulation runs... (.\src\resie_logger.jl:82)
 [GlobalInfo] ---- Simulation setup completed. ---- (.\src\resie_logger.jl:82)
-[GlobalInfo] ---- Starting simulations on 1 Threads. ---- (.\src\resie_logger.jl:82)
+[GlobalInfo] ---- Starting simulations on 16 Threads. ---- (.\src\resie_logger.jl:82)
 [GlobalInfo] Starting simulations for parameter variation study... (.\src\resie_logger.jl:82)
-[GlobalInfo] [1/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [2/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [3/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [4/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [5/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [6/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [7/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [8/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [9/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [10/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [11/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [12/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [13/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [14/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
-[GlobalInfo] [15/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
+[GlobalInfo] [1/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [2/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [3/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [4/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [5/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [6/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [7/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [8/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [9/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [10/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [11/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [12/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [13/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [14/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
+[GlobalInfo] [15/27] → completed in XX s. ETA: calculating... (.\src\resie_logger.jl:82)
 [GlobalInfo] [16/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
 [GlobalInfo] [17/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
 [GlobalInfo] [18/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
@@ -44,7 +44,7 @@ Objective: 4.0909164e8
 
 Parameter                                                           Value
 -------------------------------------------------------------------------
-Building_heating_BFT economic_parameters.lifetime_years                10
+Building_heating_BFT economic_parameters.lifetime_years                20
 Building_heating_BFT volume                                             0
 emissions_parameters observation_period_in_years                       10
  (.\src\resie_logger.jl:82)
