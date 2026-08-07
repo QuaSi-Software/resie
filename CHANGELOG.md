@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.15.1
+* Update detailed battery model with various fixes and improvements identified during validation studies
+  * This includes a new output for the current of the battery
+  * Scenarios have been updated to reflect these changes
+* Fix an issue with parameter validation for required parameters that have been "toggled off" due to conditionals on other parameters
+
 ### Version 0.15.0
 
 #### Major feature: Parameter studies, optimisation and sensitivity analysis
