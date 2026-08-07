@@ -32,26 +32,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\low_ex_district_heating\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 37/744 in 0.057 s. ETA: 1.0892 s
-[Info] Progress: 74/744 in 0.043 s. ETA: 0.7786 s
-[Info] Progress: 111/744 in 0.036 s. ETA: 0.6159 s
-[Info] Progress: 148/744 in 0.047 s. ETA: 0.7571 s
-[Info] Progress: 185/744 in 0.053 s. ETA: 0.8007 s
-[Info] Progress: 222/744 in 0.849 s. ETA: 11.9778 s
-[Info] Progress: 259/744 in 0.032 s. ETA: 0.4195 s
-[Info] Progress: 296/744 in 0.033 s. ETA: 0.3996 s
-[Info] Progress: 333/744 in 0.049 s. ETA: 0.5443 s
-[Info] Progress: 370/744 in 0.037 s. ETA: 0.3740 s
-[Info] Progress: 407/744 in 0.031 s. ETA: 0.2824 s
-[Info] Progress: 444/744 in 0.051 s. ETA: 0.4135 s
-[Info] Progress: 481/744 in 0.032 s. ETA: 0.2275 s
-[Info] Progress: 518/744 in 0.049 s. ETA: 0.2993 s
-[Info] Progress: 555/744 in 0.038 s. ETA: 0.1941 s
-[Info] Progress: 592/744 in 0.047 s. ETA: 0.1931 s
-[Info] Progress: 629/744 in 0.051 s. ETA: 0.1585 s
-[Info] Progress: 666/744 in 0.045 s. ETA: 0.0949 s
-[Info] Progress: 703/744 in 0.037 s. ETA: 0.0410 s
-[Info] Progress: 740/744 in 0.05 s. ETA: 0.0054 s
+[Info] Progress: 37/744 in 0.086 s. ETA: 1.6433 s
+[Info] Progress: 74/744 in 0.071 s. ETA: 1.2857 s
+[Info] Progress: 111/744 in 0.072 s. ETA: 1.2318 s
+[Info] Progress: 148/744 in 0.079 s. ETA: 1.2725 s
+[Info] Progress: 185/744 in 0.081 s. ETA: 1.2238 s
+[Info] Progress: 222/744 in 0.085 s. ETA: 1.1992 s
+[Info] Progress: 259/744 in 0.287 s. ETA: 3.7620 s
+[Info] Progress: 296/744 in 0.07 s. ETA: 0.8476 s
+[Info] Progress: 333/744 in 0.063 s. ETA: 0.6998 s
+[Info] Progress: 370/744 in 0.066 s. ETA: 0.6671 s
+[Info] Progress: 407/744 in 0.071 s. ETA: 0.6467 s
+[Info] Progress: 444/744 in 0.063 s. ETA: 0.5108 s
+[Info] Progress: 481/744 in 0.066 s. ETA: 0.4691 s
+[Info] Progress: 518/744 in 0.076 s. ETA: 0.4642 s
+[Info] Progress: 555/744 in 0.114 s. ETA: 0.5823 s
+[Info] Progress: 592/744 in 0.094 s. ETA: 0.3862 s
+[Info] Progress: 629/744 in 0.105 s. ETA: 0.3264 s
+[Info] Progress: 666/744 in 0.097 s. ETA: 0.2045 s
+[Info] Progress: 703/744 in 0.107 s. ETA: 0.1186 s
+[Info] Progress: 740/744 in 0.118 s. ETA: 0.0128 s
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\test\scenarios\low_ex_district_heating\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\low_ex_district_heating\sankey_plot.html

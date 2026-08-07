@@ -27,26 +27,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\multi_family_house_economy_emissions\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 438/8760 in 0.35 s. ETA: 6.6500 s
-[Info] Progress: 876/8760 in 0.35 s. ETA: 6.3000 s
-[Info] Progress: 1314/8760 in 0.394 s. ETA: 6.6980 s
-[Info] Progress: 1752/8760 in 0.32 s. ETA: 5.1200 s
-[Info] Progress: 2190/8760 in 0.408 s. ETA: 6.1200 s
-[Info] Progress: 2628/8760 in 0.363 s. ETA: 5.0820 s
-[Info] Progress: 3066/8760 in 0.292 s. ETA: 3.7960 s
-[Info] Progress: 3504/8760 in 0.304 s. ETA: 3.6480 s
-[Info] Progress: 3942/8760 in 0.238 s. ETA: 2.6180 s
-[Info] Progress: 4380/8760 in 0.297 s. ETA: 2.9700 s
-[Info] Progress: 4818/8760 in 0.29 s. ETA: 2.6100 s
-[Info] Progress: 5256/8760 in 0.264 s. ETA: 2.1120 s
-[Info] Progress: 5694/8760 in 0.263 s. ETA: 1.8410 s
-[Info] Progress: 6132/8760 in 0.286 s. ETA: 1.7160 s
-[Info] Progress: 6570/8760 in 0.271 s. ETA: 1.3550 s
-[Info] Progress: 7008/8760 in 0.318 s. ETA: 1.2720 s
-[Info] Progress: 7446/8760 in 0.318 s. ETA: 0.9540 s
-[Info] Progress: 7884/8760 in 0.33 s. ETA: 0.6600 s
-[Info] Progress: 8322/8760 in 0.333 s. ETA: 0.3330 s
-[Info] Progress: 8760/8760 in 0.331 s. ETA: 0.0000 s
+[Info] Progress: 438/8760 in 0.707 s. ETA: 13.4330 s
+[Info] Progress: 876/8760 in 0.7 s. ETA: 12.6000 s
+[Info] Progress: 1314/8760 in 0.645 s. ETA: 10.9650 s
+[Info] Progress: 1752/8760 in 0.684 s. ETA: 10.9440 s
+[Info] Progress: 2190/8760 in 0.557 s. ETA: 8.3550 s
+[Info] Progress: 2628/8760 in 0.709 s. ETA: 9.9260 s
+[Info] Progress: 3066/8760 in 0.509 s. ETA: 6.6170 s
+[Info] Progress: 3504/8760 in 0.441 s. ETA: 5.2920 s
+[Info] Progress: 3942/8760 in 0.448 s. ETA: 4.9280 s
+[Info] Progress: 4380/8760 in 0.489 s. ETA: 4.8900 s
+[Info] Progress: 4818/8760 in 0.4 s. ETA: 3.6000 s
+[Info] Progress: 5256/8760 in 0.4 s. ETA: 3.1680 s
+[Info] Progress: 5694/8760 in 0.379 s. ETA: 2.6530 s
+[Info] Progress: 6132/8760 in 0.405 s. ETA: 2.4300 s
+[Info] Progress: 6570/8760 in 0.434 s. ETA: 2.1700 s
+[Info] Progress: 7008/8760 in 0.445 s. ETA: 1.7800 s
+[Info] Progress: 7446/8760 in 0.45 s. ETA: 1.3500 s
+[Info] Progress: 7884/8760 in 0.491 s. ETA: 0.9820 s
+[Info] Progress: 8322/8760 in 0.532 s. ETA: 0.5320 s
+[Info] Progress: 8760/8760 in 0.469 s. ETA: 0.0000 s
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\test\scenarios\multi_family_house_economy_emissions\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\multi_family_house_economy_emissions\sankey_plot.html
