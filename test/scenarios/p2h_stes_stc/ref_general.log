@@ -18,26 +18,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\p2h_stes_stc\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 36/720 in 0.4 s. ETA: 7.6000 s
-[Info] Progress: 72/720 in 0.033 s. ETA: 0.5940 s
-[Info] Progress: 108/720 in 0.037 s. ETA: 0.6290 s
-[Info] Progress: 144/720 in 0.04 s. ETA: 0.6400 s
-[Info] Progress: 180/720 in 0.024 s. ETA: 0.3600 s
-[Info] Progress: 216/720 in 0.05 s. ETA: 0.7000 s
-[Info] Progress: 252/720 in 0.044 s. ETA: 0.5720 s
-[Info] Progress: 288/720 in 0.039 s. ETA: 0.4560 s
-[Info] Progress: 324/720 in 0.035 s. ETA: 0.3850 s
-[Info] Progress: 360/720 in 0.032 s. ETA: 0.3200 s
-[Info] Progress: 396/720 in 0.05 s. ETA: 0.4500 s
-[Info] Progress: 432/720 in 0.044 s. ETA: 0.3520 s
-[Info] Progress: 468/720 in 0.029 s. ETA: 0.2030 s
-[Info] Progress: 504/720 in 0.048 s. ETA: 0.2880 s
-[Info] Progress: 540/720 in 0.047 s. ETA: 0.2300 s
-[Info] Progress: 576/720 in 0.152 s. ETA: 0.6080 s
-[Info] Progress: 612/720 in 0.036 s. ETA: 0.1080 s
-[Info] Progress: 648/720 in 0.04 s. ETA: 0.0760 s
-[Info] Progress: 684/720 in 0.035 s. ETA: 0.0350 s
-[Info] Progress: 720/720 in 0.039 s. ETA: 0.0000 s
+[Info] Progress: 36/720 in 0.6 s. ETA: 11.4000 s
+[Info] Progress: 72/720 in 0.05 s. ETA: 0.9000 s
+[Info] Progress: 108/720 in 0.067 s. ETA: 1.1390 s
+[Info] Progress: 144/720 in 0.056 s. ETA: 0.8960 s
+[Info] Progress: 180/720 in 0.063 s. ETA: 0.9450 s
+[Info] Progress: 216/720 in 0.058 s. ETA: 0.8120 s
+[Info] Progress: 252/720 in 0.06 s. ETA: 0.7800 s
+[Info] Progress: 288/720 in 0.073 s. ETA: 0.8760 s
+[Info] Progress: 324/720 in 0.063 s. ETA: 0.6930 s
+[Info] Progress: 360/720 in 0.061 s. ETA: 0.6100 s
+[Info] Progress: 396/720 in 0.16 s. ETA: 1.4400 s
+[Info] Progress: 432/720 in 0.06 s. ETA: 0.4640 s
+[Info] Progress: 468/720 in 0.051 s. ETA: 0.3570 s
+[Info] Progress: 504/720 in 0.058 s. ETA: 0.3480 s
+[Info] Progress: 540/720 in 0.053 s. ETA: 0.2650 s
+[Info] Progress: 576/720 in 0.051 s. ETA: 0.2040 s
+[Info] Progress: 612/720 in 0.049 s. ETA: 0.1470 s
+[Info] Progress: 648/720 in 0.061 s. ETA: 0.1220 s
+[Info] Progress: 684/720 in 0.073 s. ETA: 0.0730 s
+[Info] Progress: 720/720 in 0.066 s. ETA: 0.0000 s
 [Info] -- Finished time step loop
 [Info] CSV-file with outputs written to .\test\scenarios\p2h_stes_stc\out.csv
 [Info] Summary CSV-file with outputs created and written to .\test\scenarios\p2h_stes_stc\out_aggregated.csv

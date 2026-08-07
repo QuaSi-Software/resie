@@ -1,21 +1,21 @@
 ﻿Emissions results
 Note: Positive values are emissions, negative values are credits / avoided emissions.
-Total emissions:;1393954,44;kg CO₂e
-Energy emissions:;1393954,44;kg CO₂e
+Total emissions:;1395089,41;kg CO₂e
+Energy emissions:;1395089,41;kg CO₂e
 Embodied emissions:;0,00;kg CO₂e
 
 Yearly emissions in [kg CO₂e/year]:
 ;2024;2025;2026;2027;2028;2029;2030;2031;2032;2033;2034;2035;2036;2037;2038;2039;2040;2041;2042;2043
 Building_A_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_A_PV - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
-Building_A_el_GRI - energy_emissions_per_year:;20205,01;19598,86;19010,89;18440,57;17887,35;17350,73;16830,21;16325,30;15835,54;15360,48;14899,66;14452,67;14019,09;13598,52;13190,56;12794,85;12411,00;12038,67;11677,51;11327,19
+Building_A_el_GRI - energy_emissions_per_year:;20257,40;19649,68;19060,19;18488,38;17933,73;17395,72;16873,85;16367,63;15876,60;15400,30;14938,29;14490,14;14055,44;13633,78;13224,76;12828,02;12443,18;12069,89;11707,79;11356,55
 Building_A_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_A_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_A_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_B_DHW_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_B_PV_east - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
 Building_B_PV_west - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00;0,00
-Building_B_el_GRI - energy_emissions_per_year:;46177,91;44792,57;43448,80;42145,33;40880,97;39654,54;38464,91;37310,96;36191,63;35105,88;34052,71;33031,13;32040,19;31078,99;30146,62;29242,22;28364,95;27514,00;26688,58;25887,93
+Building_B_el_GRI - energy_emissions_per_year:;46200,16;44814,16;43469,73;42165,64;40900,67;39673,65;38483,44;37328,94;36209,07;35122,80;34069,11;33047,04;32055,63;31093,96;30161,14;29256,31;28378,62;27527,26;26701,44;25900,40
 Building_B_el_GRO - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_B_el_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
 Building_B_heating_demand - energy_emissions_credits_per_year:;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00;-0,00
@@ -26,14 +26,14 @@ River_water_thermal_source - energy_emissions_per_year:;0,00;0,00;0,00;0,00;0,00
 Emissions breakdown per component:
 Building_A_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_A_PV - emissions_energy:;0,00;kg CO₂e
-Building_A_el_GRI - emissions_energy:;307254,67;kg CO₂e
+Building_A_el_GRI - emissions_energy:;308051,31;kg CO₂e
 Building_A_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
 Building_A_el_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_A_heating_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_B_DHW_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_B_PV_east - emissions_energy:;0,00;kg CO₂e
 Building_B_PV_west - emissions_energy:;0,00;kg CO₂e
-Building_B_el_GRI - emissions_energy:;702220,83;kg CO₂e
+Building_B_el_GRI - emissions_energy:;702559,15;kg CO₂e
 Building_B_el_GRO - emissions_credits_energy:;0,00;kg CO₂e
 Building_B_el_demand - emissions_credits_energy:;0,00;kg CO₂e
 Building_B_heating_demand - emissions_credits_energy:;0,00;kg CO₂e

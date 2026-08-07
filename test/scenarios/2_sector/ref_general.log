@@ -5,26 +5,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\2_sector\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/672 in 9.122 s. ETA: 176.6351 s
-[Info] Progress: 66/672 in 0.049 s. ETA: 0.8998 s
-[Info] Progress: 99/672 in 0.0 s. ETA: 0.0000 s
-[Info] Progress: 132/672 in 0.02 s. ETA: 0.3273 s
-[Info] Progress: 165/672 in 0.042 s. ETA: 0.6453 s
+[Info] Progress: 33/672 in 12.342 s. ETA: 238.8698 s
+[Info] Progress: 66/672 in 0.052 s. ETA: 0.9549 s
+[Info] Progress: 99/672 in 0.015 s. ETA: 0.2605 s
+[Info] Progress: 132/672 in 0.012 s. ETA: 0.1964 s
+[Info] Progress: 165/672 in 0.05 s. ETA: 0.7682 s
 [Info] Progress: 198/672 in 0.014 s. ETA: 0.2011 s
-[Info] Progress: 231/672 in 0.011 s. ETA: 0.1470 s
-[Info] Progress: 264/672 in 0.009 s. ETA: 0.1113 s
-[Info] Progress: 297/672 in 0.013 s. ETA: 0.1477 s
-[Info] Progress: 330/672 in 0.012 s. ETA: 0.1244 s
-[Info] Progress: 363/672 in 0.013 s. ETA: 0.1217 s
-[Info] Progress: 396/672 in 0.006 s. ETA: 0.0502 s
-[Info] Progress: 429/672 in 0.012 s. ETA: 0.0884 s
-[Info] Progress: 462/672 in 0.012 s. ETA: 0.0764 s
-[Info] Progress: 495/672 in 0.008 s. ETA: 0.0429 s
-[Info] Progress: 528/672 in 0.009 s. ETA: 0.0393 s
-[Info] Progress: 561/672 in 0.008 s. ETA: 0.0269 s
-[Info] Progress: 594/672 in 0.013 s. ETA: 0.0307 s
-[Info] Progress: 627/672 in 0.004 s. ETA: 0.0055 s
-[Info] Progress: 660/672 in 0.016 s. ETA: 0.0058 s
+[Info] Progress: 231/672 in 0.012 s. ETA: 0.1604 s
+[Info] Progress: 264/672 in 0.015 s. ETA: 0.1855 s
+[Info] Progress: 297/672 in 0.017 s. ETA: 0.1932 s
+[Info] Progress: 330/672 in 0.014 s. ETA: 0.1451 s
+[Info] Progress: 363/672 in 0.014 s. ETA: 0.1311 s
+[Info] Progress: 396/672 in 0.007 s. ETA: 0.0585 s
+[Info] Progress: 429/672 in 0.021 s. ETA: 0.1399 s
+[Info] Progress: 462/672 in 0.015 s. ETA: 0.0955 s
+[Info] Progress: 495/672 in 0.014 s. ETA: 0.0644 s
+[Info] Progress: 528/672 in 0.013 s. ETA: 0.0567 s
+[Info] Progress: 561/672 in 0.015 s. ETA: 0.0505 s
+[Info] Progress: 594/672 in 0.016 s. ETA: 0.0378 s
+[Info] Progress: 627/672 in 0.014 s. ETA: 0.0191 s
+[Info] Progress: 660/672 in 0.014 s. ETA: 0.0051 s
 [Info] -- Finished time step loop
 [Info] CSV-file with outputs written to .\test\scenarios\2_sector\out.csv
 [Info] Summary CSV-file with outputs created and written to .\test\scenarios\2_sector\out_aggregated.csv

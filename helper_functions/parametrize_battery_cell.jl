@@ -19,7 +19,7 @@ V_nom_T_2, Q_nom_T_2 in nominal zone of curve for T_2 (P11)
 r_i, 
 V_6, Q_6 in nominal zone of curve I_2 only necessary if r_i not given
 
-example Paper SP-LFP1000AHA:
+Example from Paper SP-LFP1000AHA:
 calc_cell_values(100, 3.4, 3.346, 10, 3.332, 20, 3.216, 820, 2.0, 1087.5,
                  1000, 1061.5,
                  nothing, 3.141, 550,
@@ -28,7 +28,6 @@ calc_cell_values(100, 3.4, 3.346, 10, 3.332, 20, 3.216, 820, 2.0, 1087.5,
                  500, -20, 987,         
                  55, 3.31, 3.277, 696, 1035,
                  25)
-
 """
 function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_full_1,
                           I_2, Q_full_2,
@@ -110,9 +109,9 @@ function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_fu
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2 - T_ref) A*(T_2 - T_ref)
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_nom_T_2)) A*(T_2-T_ref)*exp(-B * Q_nom_T_2)
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_full_T_2)) A*(T_2-T_ref)*exp(-B * Q_full_T_2)]
-        try k_T = G_T \ b_T
+        try k_T = svd(G_T) \ b_T
         catch
-            try k_T = svd(G_T) \ b_T
+            try k_T = G_T \ b_T
             catch 
                 k_T = pinv(G_T) * b_T
             end

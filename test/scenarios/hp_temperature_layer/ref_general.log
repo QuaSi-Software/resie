@@ -5,26 +5,26 @@ This log file contains general warnings, errors and information written by ReSiE
 [Info] Auxiliary info dumped to file .\test\scenarios\hp_temperature_layer\auxiliary_info.md
 [Info] -- Start time step loop
 [Info] -- No preheating activated. Starting output from beginning.
-[Info] Progress: 33/671 in 0.043 s. ETA: 0.8313 s
-[Info] Progress: 66/671 in 0.014 s. ETA: 0.2567 s
-[Info] Progress: 99/671 in 0.013 s. ETA: 0.2253 s
-[Info] Progress: 132/671 in 0.014 s. ETA: 0.2287 s
-[Info] Progress: 165/671 in 0.015 s. ETA: 0.2300 s
+[Info] Progress: 33/671 in 0.066 s. ETA: 1.2760 s
+[Info] Progress: 66/671 in 0.02 s. ETA: 0.3667 s
+[Info] Progress: 99/671 in 0.025 s. ETA: 0.4333 s
+[Info] Progress: 132/671 in 0.008 s. ETA: 0.1307 s
+[Info] Progress: 165/671 in 0.033 s. ETA: 0.5060 s
 [Info] Progress: 198/671 in 0.017 s. ETA: 0.2437 s
-[Info] Progress: 231/671 in 0.015 s. ETA: 0.2000 s
-[Info] Progress: 264/671 in 0.015 s. ETA: 0.1850 s
-[Info] Progress: 297/671 in 0.014 s. ETA: 0.1587 s
-[Info] Progress: 330/671 in 0.016 s. ETA: 0.1653 s
-[Info] Progress: 363/671 in 0.003 s. ETA: 0.0280 s
-[Info] Progress: 396/671 in 0.03 s. ETA: 0.2500 s
-[Info] Progress: 429/671 in 0.016 s. ETA: 0.1173 s
-[Info] Progress: 462/671 in 0.014 s. ETA: 0.0887 s
-[Info] Progress: 495/671 in 0.089 s. ETA: 0.4747 s
-[Info] Progress: 528/671 in 0.018 s. ETA: 0.0780 s
-[Info] Progress: 561/671 in 0.015 s. ETA: 0.0500 s
+[Info] Progress: 231/671 in 0.034 s. ETA: 0.4533 s
+[Info] Progress: 264/671 in 0.016 s. ETA: 0.1973 s
+[Info] Progress: 297/671 in 0.036 s. ETA: 0.4080 s
+[Info] Progress: 330/671 in 0.023 s. ETA: 0.2377 s
+[Info] Progress: 363/671 in 0.027 s. ETA: 0.2520 s
+[Info] Progress: 396/671 in 0.021 s. ETA: 0.1750 s
+[Info] Progress: 429/671 in 0.026 s. ETA: 0.1907 s
+[Info] Progress: 462/671 in 0.025 s. ETA: 0.1583 s
+[Info] Progress: 495/671 in 0.025 s. ETA: 0.1333 s
+[Info] Progress: 528/671 in 0.025 s. ETA: 0.1083 s
+[Info] Progress: 561/671 in 0.025 s. ETA: 0.0833 s
 [Info] Progress: 594/671 in 0.017 s. ETA: 0.0397 s
-[Info] Progress: 627/671 in 0.013 s. ETA: 0.0173 s
-[Info] Progress: 660/671 in 0.016 s. ETA: 0.0053 s
+[Info] Progress: 627/671 in 0.019 s. ETA: 0.0253 s
+[Info] Progress: 660/671 in 0.035 s. ETA: 0.0117 s
 [Info] -- Finished time step loop
 [Info] Line plot created and saved to .\test\scenarios\hp_temperature_layer\output_plot.html
 [Info] Sankey created and saved to .\test\scenarios\hp_temperature_layer\sankey_plot.html

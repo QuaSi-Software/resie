@@ -40,7 +40,7 @@ This log file contains general warnings, errors and information written by ReSiE
 [GlobalInfo] [27/27] → completed in XX s. ETA: XX (.\src\resie_logger.jl:82)
 [GlobalInfo] Parameter variation completed in XX s. 27 runs completed. (.\src\resie_logger.jl:82)
 [GlobalInfo] Best Parameter variation result:
-Objective: 4.0874336e8
+Objective: 4.0909164e8
 
 Parameter                                                           Value
 -------------------------------------------------------------------------
@@ -57,13 +57,13 @@ emissions_parameters observation_period_in_years                       10
 [GlobalInfo] Local sensitivity status: 6 of 7 runs completed. (.\src\resie_logger.jl:82)
 [GlobalInfo] Local sensitivity status: 7 of 7 runs completed. (.\src\resie_logger.jl:82)
 [GlobalInfo] Local sensitivity results:
-Reference objective: 6.8184715e8
+Reference objective: 6.8235547e8
 
 Parameter                                                       Lower         Δ objective (Δ %)         Upper         Δ objective (Δ %)  Elasticity
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 Building_heating_BFT economic_parameters.lifetime_years          13.5              0 (+0.000 %)          16.5              0 (+0.000 %)           0
-Building_heating_BFT volume                                       1.8      -108778.4 (-0.016 %)           2.2       101427.5 (+0.015 %)    0.001541
-emissions_parameters observation_period_in_years                   16  -5.919178e+07 (-8.681 %)            20   5.400423e+07 (+7.920 %)      0.7471
+Building_heating_BFT volume                                       1.8      -108838.8 (-0.016 %)           2.2       100277.1 (+0.015 %)    0.001532
+emissions_parameters observation_period_in_years                   16  -5.923733e+07 (-8.681 %)            20   5.404047e+07 (+7.920 %)       0.747
  (.\src\resie_logger.jl:82)
 [GlobalInfo] Local sensitivity outputs:
   CSV: .\test\scenarios\multi_family_house_param_variation\parameter_study_local_sensitivity.csv
