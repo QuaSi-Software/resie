@@ -1,4 +1,4 @@
-using ..Resie: get_run
+using ..ResieQuasi: get_run
 
 #! format: off
 const THERMAL_BOOSTER_COMPONENT_PARAMETERS = Dict(

@@ -326,7 +326,7 @@ function base_order(components_by_function)
     # process flexible sources/sinks
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
-            if isa(unit, EnergySystems.GridInput) || isa(unit, EnergySystems.GridOutput)
+            if isa(unit, EnergySystems.GridSupply) || isa(unit, EnergySystems.GridSink)
                 # skip grid connections here to place them after general flexible sources/sinks
                 continue
             end
@@ -337,7 +337,7 @@ function base_order(components_by_function)
     # process grids
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
-            if !(isa(unit, EnergySystems.GridInput) || isa(unit, EnergySystems.GridOutput))
+            if !(isa(unit, EnergySystems.GridSupply) || isa(unit, EnergySystems.GridSink))
                 # ignore general flexible sources/sinks here as they are already added
                 continue
             end
@@ -1775,7 +1775,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
             end
             for inface in values(component.input_interfaces)
                 inface.is_secondary_interface && continue
-                if has_grid_output(component, inface.source.uac)
+                if has_grid_sink(component, inface.source.uac)
                     continue # skip all interfaces with connection to a grid
                 end
                 if check_interface_for_transformer(inface, "input")
@@ -1799,7 +1799,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
             end
             for outface in values(component.output_interfaces)
                 outface.is_secondary_interface && continue
-                if has_grid_input(component, outface.target.uac)
+                if has_grid_supply(component, outface.target.uac)
                     continue # skip all interfaces with connection to a grid
                 end
                 if check_interface_for_transformer(outface, "output")
@@ -2103,8 +2103,8 @@ function find_parallels(components)
                 || outface.is_secondary_interface
                 ||
                 (unit.sys_function === EnergySystems.sf_bus
-                 && has_grid_input(unit, outface.target.uac)
-                 && !(old_uac !== "" && !has_grid_output(unit, old_uac)))
+                 && has_grid_supply(unit, outface.target.uac)
+                 && !(old_uac !== "" && !has_grid_sink(unit, old_uac)))
                 || (old_uac !== "" && !connection_allowed(unit, old_uac, outface.target.uac))
                 || (outface.target.sys_function === EnergySystems.sf_transformer && !(outface.target in components)))
                 continue
@@ -2380,12 +2380,12 @@ function add_non_recursive_indirect_outputs!(node_set,
                 continue
             elseif (interrupt_at_grids
                     && unit.sys_function === EnergySystems.sf_bus
-                    && has_grid_input(unit, outface.target.uac))
+                    && has_grid_supply(unit, outface.target.uac))
                 continue
             elseif (interrupt_at_grids_both_ways
                     && unit.sys_function === EnergySystems.sf_bus
-                    && has_grid_input(unit, outface.target.uac)
-                    && (last_unit_uac == "" ? false : has_grid_output(unit, last_unit_uac)))
+                    && has_grid_supply(unit, outface.target.uac)
+                    && (last_unit_uac == "" ? false : has_grid_sink(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
                 if outface.target.sys_function === EnergySystems.sf_bus && outface.target.proxy !== nothing
@@ -2465,12 +2465,12 @@ function add_non_recursive_indirect_inputs!(node_set,
                 continue
             elseif (interrupt_at_grids
                     && unit.sys_function === EnergySystems.sf_bus
-                    && has_grid_output(unit, inface.source.uac))
+                    && has_grid_sink(unit, inface.source.uac))
                 continue
             elseif (interrupt_at_grids_both_ways
                     && unit.sys_function === EnergySystems.sf_bus
-                    && has_grid_output(unit, inface.source.uac)
-                    && (last_unit_uac == "" ? false : has_grid_input(unit, last_unit_uac)))
+                    && has_grid_sink(unit, inface.source.uac)
+                    && (last_unit_uac == "" ? false : has_grid_supply(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
                 if inface.source.sys_function === EnergySystems.sf_bus && inface.source.proxy !== nothing
@@ -2712,8 +2712,8 @@ function reorder_for_input_priorities(simulation_order, components, components_b
             for other_idx in (own_idx + 1):length(bus.connectivity.input_order)
                 #(...if there is a connected grid with an allowed connection to both components...)
                 #(...then the order doesn't matter as the components can deliver their energy anyway)
-                if has_grid_output(bus, bus.connectivity.input_order[own_idx]) &&
-                   has_grid_output(bus, bus.connectivity.input_order[other_idx])
+                if has_grid_sink(bus, bus.connectivity.input_order[own_idx]) &&
+                   has_grid_sink(bus, bus.connectivity.input_order[other_idx])
                     continue
                 end
                 # ...is of a lower priority in process
@@ -2725,10 +2725,10 @@ function reorder_for_input_priorities(simulation_order, components, components_b
     end
 end
 
-function has_grid_input(bus, output_interface_uac)
+function has_grid_supply(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
         inface !== nothing && inface.is_secondary_interface && continue
-        if inface !== nothing && isa(inface.source, EnergySystems.GridInput)
+        if inface !== nothing && isa(inface.source, EnergySystems.GridSupply)
             input_idx = bus.balance_table_inputs[inface.source.uac].priority
             output_idx = bus.balance_table_outputs[output_interface_uac].priority
             if (bus.connectivity.energy_flow === nothing ||
@@ -2740,10 +2740,10 @@ function has_grid_input(bus, output_interface_uac)
     return false
 end
 
-function has_grid_output(bus, input_interface_uac)
+function has_grid_sink(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
         outface !== nothing && outface.is_secondary_interface && continue
-        if outface !== nothing && isa(outface.target, EnergySystems.GridOutput)
+        if outface !== nothing && isa(outface.target, EnergySystems.GridSink)
             input_idx = bus.balance_table_inputs[input_interface_uac].priority
             output_idx = bus.balance_table_outputs[outface.target.uac].priority
             if (bus.connectivity.energy_flow === nothing ||
@@ -2834,8 +2834,8 @@ function reorder_transformer_for_output_priorities(simulation_order, components,
                 end
                 #(...if there is a connected grid with an allowed connection to both transformers...)
                 #(...then the order doesn't matter as the transformers can get their required energy anyway)
-                if has_grid_input(bus, own_uac) &&
-                   has_grid_input(bus, other_uac)
+                if has_grid_supply(bus, own_uac) &&
+                   has_grid_supply(bus, other_uac)
                     continue
                 end
                 # ...is of a lower priority in process

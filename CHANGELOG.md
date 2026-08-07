@@ -1,6 +1,23 @@
 # Changes made, features added and bugs fixed
 In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatibility then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independent of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
 
+## Versions
+Starting with v1.0.0 breaking changes in the project file concerning component models or individual simulation parameters and settings constitute a cause to bump the minor number of the version. The major number is reserved for breaking changes in the overall structure of the project file. New features may increase the minor number if they constitute sufficient new work. It should be considered that users wish to stick to a specific minor number until they find the time to update their inputs. A migration feature might be considered in the feature, but is not implemented as of v1.0.0. Thus fixes should preferably bump the patch number only and care should be taken when updating the minor number.
+
+### Version 1.0.0
+Listed in the following are changes since the last beta-release v0.15.1. A full list of all features of ReSiE as of v1.0.0 can be found in the documentation.
+
+#### Package renaming
+* The julia package has been renamed to ResieQuasi. This name was chosen to avoid naming conflicts with existing packages in the General registry. The preferred name and spelling is ReSiE, as part of the QuaSi project. You can find an explanation of these two names in the online documentation.
+  * If the package name is used extensively in code, a handy trick is to use `import ResieQuasi as Resie`
+
+#### Grid connections
+* The two component models `GridInput` and `GridOutput` have been renamed to `GridSupply` and `GridSink`. These names were chosen to be in line with the names of other supply/sink components and because "input" and "output" where deemed confusing as they relate to the whole energy system, not the invidiual component. The models work exactly the same as before, only the name has changed.
+
+#### Minor changes
+* Updates to the scenario reference files
+* Set compat entries in file `Project.toml`. This is mostly a requirement for the General registry, but also helps to specificy a known working set of dependencies, which should reduce a source of errors caused by new versions of dependencies.
+
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 

@@ -1,7 +1,7 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+import ResieQuasi as Resie
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
@@ -353,7 +353,7 @@ end
 function test_data_storage_loading_with_matrix()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
         ),

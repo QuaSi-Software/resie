@@ -21,7 +21,7 @@ If no scenario name is given, performs the command for all scenarios. Be aware t
 might take a while.
 """
 
-using Resie
+import ResieQuasi as Resie
 using UUIDs
 using Logging
 

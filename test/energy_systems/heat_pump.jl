@@ -1,8 +1,8 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
-using Resie.Profiles
+using ResieQuasi
+using ResieQuasi.EnergySystems
+using ResieQuasi.Profiles
 
 include("../test_util.jl")
 
@@ -25,7 +25,7 @@ function get_config_heat_pump_1S1D()
             "scale" => 6000,
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -44,7 +44,7 @@ function test_heat_pump_one_source_dynamic_cop()
     components_config = get_config_heat_pump_1S1D()
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -156,7 +156,7 @@ function test_heat_pump_1S1D_icing_losses()
     components_config = get_config_heat_pump_1S1D()
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -234,7 +234,7 @@ end
 function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
     base_dict = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -259,7 +259,7 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
                 "constant_temperature" => 60,
             ),
             "TST_SRC_01" => Dict{String,Any}(
-                "type" => "GridInput",
+                "type" => "GridSupply",
                 "medium" => "m_h_w_lt1",
                 "output_refs" => ["TST_HP_01"],
             ),
@@ -269,7 +269,7 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
 
         extended = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
-                "type" => "GridOutput",
+                "type" => "GridSink",
                 "medium" => "m_h_w_ht1",
                 "output_refs" => [],
             ),
@@ -290,7 +290,7 @@ function test_heat_pump_1S1D_infinite_input()
     components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=true)
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -330,7 +330,7 @@ function test_heat_pump_1S1D_infinite_output()
     components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -378,7 +378,7 @@ function test_heat_pump_1S1D_losses()
     delete!(components_config["TST_SRC_01"], "max_power_profile_file_path")
     components_config["TST_SRC_01"]["constant_power"] = 400
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -467,7 +467,7 @@ function test_heat_pump_1S1D_constant_losses()
     delete!(components_config["TST_SRC_01"], "max_power_profile_file_path")
     components_config["TST_SRC_01"]["constant_power"] = 400
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -560,7 +560,7 @@ function get_config_heat_pump_2S2D()
             ),
         ),
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01"],
         ),
@@ -578,7 +578,7 @@ function test_heat_pump_2S2D_constant_cop()
     components_config = get_config_heat_pump_2S2D()
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -653,7 +653,7 @@ function test_heat_pump_2S2D_losses()
     components_config["TST_HP_01"]["heat_losses_factor"] = 0.95
     components_config["TST_HP_01"]["power_th"] = 16000
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -728,7 +728,7 @@ function test_heat_pump_2S2D_dynamic_cop()
     components_config = get_config_heat_pump_2S2D()
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -813,7 +813,7 @@ function test_heat_pump_2S2D_reorder_inputs()
                                                          )]
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -895,7 +895,7 @@ function test_heat_pump_2S2D_min_power()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -977,7 +977,7 @@ function test_heat_pump_2S2D_optimising_slices()
     simulation_parameters = get_default_sim_params()
     eps = simulation_parameters["epsilon"]
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]
@@ -1038,7 +1038,7 @@ function test_heat_pump_2S2D_on_off_optimisation_is_constant()
 
     simulation_parameters = get_default_sim_params()
 
-    components = Resie.load_components(components_config, simulation_parameters)
+    components = ResieQuasi.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
 
     heat_pump = components["TST_HP_01"]

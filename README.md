@@ -1,22 +1,24 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10492373.svg)](https://zenodo.org/doi/10.5281/zenodo.10492373)
 
-# ReSiE - simulation engine for district-scale networks of energy systems
+# ReSiE - simulation engine for district-scale sector-coupled energy systems
 
-Use of ReSiE is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
+Use of ReSiE is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io/en/latest/resie_overview/). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
 
 ReSiE is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. External files with different license have their own license file in their respective folders.
-For information on how you can contribute please check the documentation.
+For information on how you can contribute please [check the documentation](https://quasi-software.readthedocs.io/en/latest/contributions/).
+
+**Note: The Julia package is called ResieQuasi due to naming conflicts with similar packages in the General registry. The preferred name and spelling is ReSiE, as part of the QuaSi project. You can find an explanation of these two names in the online documentation.**
 
 ## Installation
 
 ### **Requirements**
 
-* Julia, minimum v1.8.5 and tested up to v1.11.3. You can find installation instructions [here](https://julialang.org/install/). Works best using Juliaup instead of precompiled binary files.
+* Julia, minimum v1.10.0 and tested up to v1.12.2. You can find installation instructions [here](https://julialang.org/install/). Works best using Juliaup instead of precompiled binary files.
 * (Optional) Python3, tested with v3.9.13. Only required for developing ReSiE.
 
 ### Instructions
 
-1. Get a copy: `git clone https://github.com/QuaSi-Software/resie.git`
+1. Get a copy: `git clone https://github.com/QuaSi-Software/ResieQuasi.jl.git`
 2. Switch into the ReSiE root directory: `cd /path/to/resie`
 3. Start the julia REPL with `julia`
 4. Switch to the package REPL with `]` (no enter necessary)

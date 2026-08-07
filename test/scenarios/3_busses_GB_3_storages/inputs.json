@@ -121,7 +121,7 @@
             "scale": 1500
         },
         "ESS_GRI_EG_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_c_g_natgas",
             "output_refs": ["ESS_GBO_01"]
         },

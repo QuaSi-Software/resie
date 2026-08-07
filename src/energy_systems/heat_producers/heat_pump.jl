@@ -1,5 +1,5 @@
 using Optim: optimize, minimizer, Options, NelderMead
-using ..Resie: get_run
+using ..ResieQuasi: get_run
 
 #! format: off
 const HEAT_PUMP_COMPONENT_PARAMETERS = Dict(

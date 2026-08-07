@@ -1,6 +1,6 @@
 using Dates
 using UUIDs
-using Resie
+import ResieQuasi as Resie
 
 """
     pwc_units_astr(expected, actual)

@@ -251,7 +251,7 @@
             }
         },
         "Building_A_el_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Building_A_BUS_electricity"
             },
@@ -269,7 +269,7 @@
             }
         },
         "Building_A_el_GRO": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": {},
             "medium": "m_e_ac_230v",
             "is_source": false,
@@ -514,7 +514,7 @@
             }
         },
         "Building_B_el_GRI": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Building_B_BUS_electricity"
             },
@@ -532,7 +532,7 @@
             }
         },
         "Building_B_el_GRO": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "output_refs": {},
             "medium": "m_e_ac_230v",
             "is_source": false,
@@ -591,7 +591,7 @@
            }
         },
         "River_water_HP_Grid_el": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "River_water_HP"
             },
@@ -725,7 +725,7 @@
             }
         },
         "Grid_NaturalGas": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "output_refs": {
                 "medium": "Gasboiler"
             },

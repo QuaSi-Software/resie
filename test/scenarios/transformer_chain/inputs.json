@@ -46,21 +46,21 @@
             "constant_temperature": 20
         },
         "TST_GRI_natgas": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_c_natgas",
             "output_refs": [
                 "TST_CHP_01"
             ]
         },
         "TST_GRI_01": {
-            "type": "GridInput",
+            "type": "GridSupply",
             "medium": "m_e_ac_230v",
             "output_refs": [
                 "TST_BUS_EL"
             ]
         },
         "TST_GRI_02": {
-            "type": "GridOutput",
+            "type": "GridSink",
             "medium": "m_e_ac_230v",
             "input_refs": [
                 "TST_BUS_EL"

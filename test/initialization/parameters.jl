@@ -1,14 +1,14 @@
 using Debugger
 using Test
-using Resie
-using Resie.EnergySystems
+import ResieQuasi as Resie
+using ResieQuasi.EnergySystems
 
 include("../test_util.jl")
 
 function test_mutex_parameters()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_DEM_01"],
             "medium" => "m_h_w_lt1",
             "temperature_from_global_file" => "temp key",
@@ -154,13 +154,13 @@ end
 function test_parameter_with_options()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_HP_01"],
             "medium" => "m_h_w_lt1",
             "constant_temperature" => 20.0,
         ),
         "TST_GRI_02" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_HP_01"],
             "medium" => "m_e_ac_230v",
         ),
@@ -252,7 +252,7 @@ end
 function test_required_with_conditional()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridInput",
+            "type" => "GridSupply",
             "output_refs" => ["TST_BUS_01"],
             "medium" => "m_e_ac_230v",
         ),
