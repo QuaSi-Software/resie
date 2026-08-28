@@ -1227,7 +1227,7 @@ function distribute!(unit::Bus)
 end
 
 function output_values(unit::Bus)::Vector{String}
-    # dynamic output channels
+    # dynamic output channels for energy transfer between busses
     outputs_proxies = ["Transfer->" * outface.target.uac
                        for outface in unit.output_interfaces
                        if outface.target.sys_function == sf_bus]
@@ -1238,45 +1238,36 @@ function output_values(unit::Bus)::Vector{String}
     else
         balance = ["Balance"]
     end
-    # energyFlow between inputs and outputs, only for proxy busses or busses without a proxy and for
-    # allowed connections
-    if unit.proxy === nothing
-        outputs_energy_flow = ["EnergyFlow $i->$o"
-                               for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
-                                         for inface in unit.input_interfaces]
-                               for o in [outface.target.uac for outface in unit.output_interfaces]
-                               if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                          unit.balance_table_outputs[o]) &&
-                                   !unit.balance_table_inputs[i].is_secondary_interface)]
-        append!(outputs_energy_flow,
-                [create_secondary_name("EnergyFlow") * " $i->$o"
-                 for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
-                           for inface in unit.input_interfaces]
-                 for o in [outface.target.uac for outface in unit.output_interfaces]
-                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                            unit.balance_table_outputs[o]) &&
-                     unit.balance_table_inputs[i].is_secondary_interface)])
-        outputs_temperature_flow = ["TemperatureFlow $i->$o"
-                                    for i in
-                                        [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
-                                         for inface in unit.input_interfaces]
-                                    for o in [outface.target.uac for outface in unit.output_interfaces]
-                                    if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                               unit.balance_table_outputs[o]) &&
-                                        !unit.balance_table_inputs[i].is_secondary_interface)]
-        append!(outputs_temperature_flow,
-                [create_secondary_name("TemperatureFlow") * " $i->$o"
-                 for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
-                           for inface in unit.input_interfaces]
-                 for o in [outface.target.uac for outface in unit.output_interfaces]
-                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                            unit.balance_table_outputs[o]) &&
-                     unit.balance_table_inputs[i].is_secondary_interface)])
 
-        return [balance; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
-    else
+    # for principals of proxy busses we're done and can return early
+    if unit.proxy !== nothing
         return [balance; outputs_proxies]
     end
+
+    # add energy and temperature flow output channels for all allowed combinations between
+    # inputs and outputs
+    outputs_energy_flow = []
+    outputs_temperature_flow = []
+    inputs = [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+              for inface in unit.input_interfaces]
+    outputs = [outface.target.uac for outface in unit.output_interfaces]
+
+    for i in inputs
+        for o in outputs
+            if !energy_flow_is_denied(unit, unit.balance_table_inputs[i], unit.balance_table_outputs[o])
+                for base_name in ("Energy", "Temperature")
+                    name = if unit.balance_table_inputs[i].is_secondary_interface
+                        create_secondary_name(base_name * "Flow")
+                    else
+                        base_name * "Flow"
+                    end
+                    push!(base_name == "Energy" ? outputs_energy_flow : outputs_temperature_flow, name * " $i->$o")
+                end
+            end
+        end
+    end
+
+    return [balance; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
 end
 
 function output_value(unit::Bus, key::OutputKey)::Float64
