@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Versions
 Starting with v1.0.0 breaking changes in the project file concerning component models or individual simulation parameters and settings constitute a cause to bump the minor number of the version. The major number is reserved for breaking changes in the overall structure of the project file. New features may increase the minor number if they constitute sufficient new work. It should be considered that users wish to stick to a specific minor number until they find the time to update their inputs. A migration feature might be considered in the feature, but is not implemented as of v1.0.0. Thus fixes should preferably bump the patch number only and care should be taken when updating the minor number.
 
+### Version 1.0.2
+* Fix a bug in the battery that caused it to charge more than the set SOC_max at higher time steps
+
 ### Version 1.0.1
 * Update README with instructions making note of the --threads=auto argument of Julia
 * Fix a bug where the energy and temperature flow dynamic output channels of Bus would not show up in certain cases
